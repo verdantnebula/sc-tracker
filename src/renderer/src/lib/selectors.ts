@@ -227,6 +227,238 @@ export function dropoffGroups(
   return filtered;
 }
 
+// ---------------------------------------------------------------------------
+// Route view selectors (cargo only). The ROUTE tab presents the SAME active-
+// mission data two ways: a pickup/dropoff LIST and a node+arrow MAP. Both are
+// pure derivations over the active set — no new persisted state.
+// ---------------------------------------------------------------------------
+
+/**
+ * Placeholder location for legs the game log never gave a source/destination
+ * (leg.location == null) — the pickup mirror of UNKNOWN_DESTINATION. Used as the
+ * group key + visible fallback for pickup legs in pickupGroups.
+ */
+export const UNKNOWN_PICKUP = "Unknown pickup";
+
+/**
+ * By-Pickup aggregation across ACTIVE missions only — the exact mirror of
+ * dropoffGroups but for `kind === 'pickup'` legs. Groups pickup legs by source
+ * location, sums each distinct commodity (todo + collected), computes remaining/
+ * % collected, flags all-done + current location. Returns the same DropoffGroup
+ * shape so the route LIST column can reuse the dropoff card rendering verbatim.
+ *
+ * The "completed" notion for a pickup is "collected" (cargo loaded). Same as
+ * dropoffGroups, the synthetic needs-location bucket is dropped when its todo is
+ * empty (a collected null-location pickup must not render an empty action card).
+ */
+export function pickupGroups(
+  missions: Mission[],
+  currentLocation: string | null,
+): DropoffGroup[] {
+  type Acc = {
+    location: string;
+    todo: Map<
+      string,
+      { scu: number; refs: { missionId: string; legId: string }[] }
+    >;
+    delivered: Map<string, number>;
+    scuRemaining: number;
+    scuDelivered: number;
+  };
+  const groups = new Map<string, Acc>();
+
+  for (const m of missions) {
+    if (!isActive(m)) continue;
+    for (const l of m.legs) {
+      if (l.kind !== "pickup") continue;
+      const loc = l.location ?? UNKNOWN_PICKUP;
+      let g = groups.get(loc);
+      if (!g) {
+        g = {
+          location: loc,
+          todo: new Map(),
+          delivered: new Map(),
+          scuRemaining: 0,
+          scuDelivered: 0,
+        };
+        groups.set(loc, g);
+      }
+      if (l.completed) {
+        g.delivered.set(
+          l.commodity,
+          (g.delivered.get(l.commodity) ?? 0) + l.scuTotal,
+        );
+        g.scuDelivered += l.scuTotal;
+      } else {
+        const rem = legRemaining(l.scuTotal, l.scuDelivered, l.completed);
+        const cur = g.todo.get(l.commodity) ?? { scu: 0, refs: [] };
+        cur.scu += rem;
+        cur.refs.push({ missionId: m.id, legId: l.id });
+        g.todo.set(l.commodity, cur);
+        g.scuRemaining += rem;
+        g.scuDelivered += l.scuDelivered;
+      }
+    }
+  }
+
+  const out: DropoffGroup[] = Array.from(groups.values()).map((g) => {
+    const todo: DropoffCommodity[] = Array.from(g.todo.entries()).map(
+      ([commodity, v]) => ({
+        commodity,
+        scuRemaining: v.scu,
+        scuDelivered: 0,
+        legRefs: v.refs,
+      }),
+    );
+    const delivered: DropoffCommodity[] = Array.from(g.delivered.entries()).map(
+      ([commodity, scu]) => ({
+        commodity,
+        scuRemaining: 0,
+        scuDelivered: scu,
+        legRefs: [],
+      }),
+    );
+    const scuTotal = g.scuRemaining + g.scuDelivered;
+    const pctDelivered = scuTotal
+      ? Math.round((g.scuDelivered / scuTotal) * 100)
+      : 0;
+    const needsLocation = g.location === UNKNOWN_PICKUP;
+    const allDone = todo.length === 0;
+    return {
+      location: g.location,
+      todo,
+      delivered,
+      scuRemaining: g.scuRemaining,
+      scuTotal,
+      pctDelivered,
+      allDone,
+      isCurrentLocation: isConfidentLocationMatch(currentLocation, g.location),
+      needsLocation,
+    };
+  });
+
+  // Mirror dropoffGroups: drop the empty needs-location bucket (a collected
+  // null-location pickup would otherwise render as a nonsensical CLEARED card).
+  const filtered = out.filter((g) => !(g.needsLocation && g.todo.length === 0));
+
+  filtered.sort(
+    (a, b) =>
+      Number(a.allDone) - Number(b.allDone) ||
+      Number(b.needsLocation) - Number(a.needsLocation) ||
+      b.scuRemaining - a.scuRemaining,
+  );
+  return filtered;
+}
+
+/** A single haul movement (pickup location -> dropoff location) for the map. */
+export interface RouteEdge {
+  /** Stable id: `${missionId}:${pickupLegId}->${dropoffLegId}`. */
+  id: string;
+  /** Source (pickup) location label — sentinel "Unknown" when not known. */
+  fromLocation: string;
+  /** Destination (dropoff) location label — sentinel "Unknown" when not known. */
+  toLocation: string;
+  /** Commodity moving along this edge (best-effort match). */
+  commodity: string;
+  /** SCU on this edge (the dropoff leg's total). */
+  scu: number;
+  /** True when the pickup location is known (not null). */
+  fromKnown: boolean;
+  /** True when the dropoff location is known (not null). */
+  toKnown: boolean;
+  /** True when both legs are complete -> the map can de-emphasize the edge. */
+  done: boolean;
+}
+
+/** Sentinel label for a leg whose location the log never reported. */
+export const UNKNOWN_ROUTE_NODE = "Unknown";
+
+/**
+ * Build directed haul edges (pickup -> dropoff) for every ACTIVE mission.
+ *
+ * Pairing strategy per mission:
+ *  - A_TO_B (1 pickup + 1 dropoff): one edge.
+ *  - SINGLE_TO_MULTI (1 pickup + N dropoffs): N edges sharing the pickup, SCU
+ *    taken from each dropoff.
+ *  - MULTI_TO_SINGLE (N pickups + 1 dropoff): N edges sharing the dropoff.
+ *  - General N×M: match each dropoff to a pickup by commodity first (consuming
+ *    the matched pickup), else fall back to the next pickup in order, else reuse
+ *    the first pickup (so the dropoff still has a source node). The driving side
+ *    is the dropoff set (that's the SCU + destination that matters for hauling).
+ *
+ * Null locations become the UNKNOWN_ROUTE_NODE sentinel with fromKnown/toKnown
+ * = false (the node is still drawn, labeled "Unknown"). Fully-delivered edges
+ * are flagged `done` (included, not skipped — the map dims them).
+ */
+export function routeEdges(missions: Mission[]): RouteEdge[] {
+  const edges: RouteEdge[] = [];
+
+  for (const m of missions) {
+    if (!isActive(m)) continue;
+    const pickups = m.legs.filter((l) => l.kind === "pickup");
+    const dropoffs = m.legs.filter((l) => l.kind === "dropoff");
+    if (dropoffs.length === 0) continue;
+
+    // Track which pickups have been consumed by a commodity match so a multi-
+    // pickup mission distributes its sources rather than always reusing #0.
+    const used = new Set<string>();
+    let orderCursor = 0;
+
+    for (const d of dropoffs) {
+      let pk = null as (typeof pickups)[number] | null;
+
+      if (pickups.length > 0) {
+        // 1) commodity match (prefer an unused pickup of the same commodity).
+        pk =
+          pickups.find(
+            (p) =>
+              !used.has(p.id) && p.commodity && p.commodity === d.commodity,
+          ) ?? null;
+        // 2) next unused pickup in order.
+        if (!pk) {
+          while (
+            orderCursor < pickups.length &&
+            used.has(pickups[orderCursor].id)
+          )
+            orderCursor++;
+          pk = orderCursor < pickups.length ? pickups[orderCursor] : null;
+        }
+        // 3) fall back to the first pickup (shared source) if all consumed.
+        if (!pk) pk = pickups[0];
+        if (pk) {
+          used.add(pk.id);
+          if (pk.id === pickups[orderCursor]?.id) orderCursor++;
+        }
+      }
+
+      const fromKnown = pk?.location != null;
+      const toKnown = d.location != null;
+      edges.push({
+        id: `${m.id}:${pk?.id ?? "none"}->${d.id}`,
+        fromLocation: pk?.location ?? UNKNOWN_ROUTE_NODE,
+        toLocation: d.location ?? UNKNOWN_ROUTE_NODE,
+        commodity: d.commodity || pk?.commodity || "",
+        scu: d.scuTotal,
+        fromKnown,
+        toKnown,
+        done: (pk ? pk.completed : true) && d.completed,
+      });
+    }
+  }
+
+  return edges;
+}
+
+/** Distinct stop count across edges (union of from + to locations). */
+export const routeStopCount = (edges: RouteEdge[]): number => {
+  const stops = new Set<string>();
+  for (const e of edges) {
+    stops.add(e.fromLocation);
+    stops.add(e.toLocation);
+  }
+  return stops.size;
+};
+
 export const grandTotalRemaining = (groups: DropoffGroup[]): number =>
   groups.reduce((a, g) => a + (g.allDone ? 0 : g.scuRemaining), 0);
 

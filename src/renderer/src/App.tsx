@@ -23,6 +23,7 @@ import { applyTheme } from "./lib/theme";
 import { LogMissingBanner } from "./components/LogMissingBanner";
 import { TabBar, type TabKey } from "./components/TabBar";
 import { DropoffView } from "./components/DropoffView";
+import { RouteView } from "./components/RouteView";
 import { MissionListView } from "./components/MissionListView";
 import { HistoryView } from "./components/HistoryView";
 import { MissionDetailPanel } from "./components/MissionDetailPanel";
@@ -35,6 +36,8 @@ import {
   dropoffGroups,
   grandTotalRemaining,
   activeStopCount,
+  routeEdges,
+  routeStopCount,
   isTerminal,
   shouldShowLogBanner,
 } from "./lib/selectors";
@@ -161,6 +164,12 @@ function CargoApp({
   );
   const grandTotal = useMemo(() => grandTotalRemaining(groups), [groups]);
   const activeStops = useMemo(() => activeStopCount(groups), [groups]);
+  // ROUTE tab badge = number of distinct stops (union of pickup + dropoff
+  // locations) across active hauls. Same active set as the By-Dropoff view.
+  const routeStops = useMemo(
+    () => routeStopCount(routeEdges(activeMissions)),
+    [activeMissions],
+  );
   // Live active missions keyed by id, so By-Dropoff can resolve a LegRef back to
   // its {mission, leg} for inline editing (single source of truth — no leg data
   // is duplicated into the selector).
@@ -230,22 +239,27 @@ function CargoApp({
     void window.api.updateMission(missionId, { removeLegIds: [legId] });
   };
 
-  const checkOffLine = (location: string, commodity: string): void => {
-    // TOGGLE every matching dropoff leg at this location + commodity. If all of
-    // them are already delivered, clicking UN-delivers them; otherwise it marks
-    // the remaining ones delivered. Lets the user undo a mistaken/auto check.
-    // Only active missions feed the by-dropoff view, so iterate that set.
+  // TOGGLE every matching leg of `kind` at this location + commodity. If all of
+  // them are already done -> un-do them; otherwise mark the remaining ones done.
+  // Shared by By-Dropoff (kind 'dropoff' = delivered) and the ROUTE tab's pickup
+  // column (kind 'pickup' = collected). Pickup completion IS tracked: the store's
+  // objectiveCompleted sets a leg's `completed` regardless of kind, and the leg
+  // patch in updateMission is kind-agnostic — so the same toggle works for both.
+  // Only active missions feed these views, so iterate that set.
+  const checkOffLineOf = (
+    kind: LegKind,
+    location: string,
+    commodity: string,
+  ): void => {
     const matching = (l: Mission["legs"][number]): boolean =>
-      l.kind === "dropoff" &&
-      l.location === location &&
-      l.commodity === commodity;
+      l.kind === kind && l.location === location && l.commodity === commodity;
 
     const all = activeMissions.flatMap((m) =>
       m.legs.filter(matching).map((l) => ({ mission: m, leg: l })),
     );
     if (all.length === 0) return;
 
-    // If every matching leg is already done -> un-deliver all; else deliver the
+    // If every matching leg is already done -> un-do all; else complete the
     // not-yet-done ones. (Toggle semantics, matching the CommodityLine intent.)
     const allDone = all.every(({ leg }) => leg.completed);
     const target = allDone ? false : true;
@@ -258,6 +272,14 @@ function CargoApp({
       });
     }
   };
+
+  // Existing By-Dropoff check-off (dropoff legs) — unchanged behavior.
+  const checkOffLine = (location: string, commodity: string): void =>
+    checkOffLineOf("dropoff", location, commodity);
+
+  // ROUTE tab pickup-column check-off (pickup legs = "collected").
+  const checkOffPickup = (location: string, commodity: string): void =>
+    checkOffLineOf("pickup", location, commodity);
 
   const setPayout = (missionId: string, payout: number): void => {
     // Manual edit -> treat as confirmed (SPEC §10 delta 3).
@@ -355,6 +377,7 @@ function CargoApp({
         active={tab}
         counts={{
           dropoff: activeStops,
+          route: routeStops,
           missions: activeMissions.length,
           history: terminalCount,
         }}
@@ -441,6 +464,15 @@ function CargoApp({
               onCheckOff={checkOffLine}
               onEditLeg={editLeg}
               onOpenMission={setSelectedId}
+            />
+          ) : tab === "route" ? (
+            <RouteView
+              activeMissions={activeMissions}
+              currentLocation={currentLocation}
+              gap={gap}
+              dropoffs={groups}
+              onCheckOffPickup={checkOffPickup}
+              onCheckOffDropoff={checkOffLine}
             />
           ) : tab === "missions" ? (
             <MissionListView

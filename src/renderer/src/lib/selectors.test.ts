@@ -7,8 +7,13 @@ import {
   isLegIncomplete,
   isMissionIncomplete,
   dropoffGroups,
+  pickupGroups,
+  routeEdges,
+  routeStopCount,
   shouldShowLogBanner,
   UNKNOWN_DESTINATION,
+  UNKNOWN_PICKUP,
+  UNKNOWN_ROUTE_NODE,
 } from "./selectors";
 
 function leg(partial: Partial<Leg>): Leg {
@@ -268,6 +273,307 @@ describe("needs-location group (UNKNOWN_DESTINATION / needsLocation)", () => {
       { missionId: "mA", legId: "x" },
       { missionId: "mB", legId: "y" },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pickupGroups — the pickup mirror of dropoffGroups (ROUTE tab LIST left column).
+// Same grouping/sorting/needs-location-drop behavior, but over pickup legs and
+// the UNKNOWN_PICKUP sentinel.
+// ---------------------------------------------------------------------------
+describe("pickupGroups", () => {
+  it("groups pickup legs by source location with remaining SCU", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Ice",
+        scuTotal: 30,
+        location: "Origin",
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 30,
+        location: "Dest",
+      }),
+    ]);
+    const groups = pickupGroups([m], null);
+    // Only the pickup leg feeds this view — the dropoff is ignored.
+    expect(groups.map((g) => g.location)).toEqual(["Origin"]);
+    const g = groups[0];
+    const ice = g.todo.find((c) => c.commodity === "Ice")!;
+    expect(ice.scuRemaining).toBe(30);
+    expect(ice.legRefs).toEqual([{ missionId: "m1", legId: "p0" }]);
+    expect(g.needsLocation).toBe(false);
+  });
+
+  it("a null-location pickup lands in the UNKNOWN_PICKUP needsLocation bucket", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Gold",
+        scuTotal: 12,
+        location: null,
+      }),
+    ]);
+    const groups = pickupGroups([m], null);
+    const g = groups.find((x) => x.location === UNKNOWN_PICKUP)!;
+    expect(g).toBeDefined();
+    expect(g.needsLocation).toBe(true);
+    expect(g.todo.find((c) => c.commodity === "Gold")!.legRefs).toEqual([
+      { missionId: "m1", legId: "p0" },
+    ]);
+  });
+
+  it("drops the empty needs-location bucket (collected null-location pickup)", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Gold",
+        scuTotal: 0,
+        location: null,
+        completed: true,
+      }),
+    ]);
+    const groups = pickupGroups([m], null);
+    expect(groups.find((g) => g.needsLocation)).toBeUndefined();
+    expect(groups.find((g) => g.location === UNKNOWN_PICKUP)).toBeUndefined();
+  });
+
+  it("ignores dropoff legs entirely", () => {
+    const m = mission([
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 10,
+        location: "A",
+      }),
+    ]);
+    expect(pickupGroups([m], null)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// routeEdges — directed haul edges (pickup -> dropoff) for the ROUTE map.
+// ---------------------------------------------------------------------------
+describe("routeEdges", () => {
+  it("A->B: one pickup + one dropoff yields a single edge", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Ice",
+        scuTotal: 50,
+        location: "Origin",
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 50,
+        location: "Dest",
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(1);
+    const e = edges[0];
+    expect(e.fromLocation).toBe("Origin");
+    expect(e.toLocation).toBe("Dest");
+    expect(e.commodity).toBe("Ice");
+    expect(e.scu).toBe(50);
+    expect(e.fromKnown).toBe(true);
+    expect(e.toKnown).toBe(true);
+    expect(e.done).toBe(false);
+  });
+
+  it("single-to-multi: one pickup + N dropoffs yields N edges sharing the pickup", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Ore",
+        scuTotal: 100,
+        location: "Origin",
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ore",
+        scuTotal: 40,
+        location: "A",
+      }),
+      leg({
+        id: "d1",
+        kind: "dropoff",
+        commodity: "Ore",
+        scuTotal: 60,
+        location: "B",
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(2);
+    expect(edges.every((e) => e.fromLocation === "Origin")).toBe(true);
+    expect(edges.map((e) => e.toLocation).sort()).toEqual(["A", "B"]);
+    expect(edges.map((e) => e.scu).sort((a, b) => a - b)).toEqual([40, 60]);
+  });
+
+  it("multi-to-single: N pickups + one dropoff yields N edges sharing the dropoff", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Ice",
+        scuTotal: 20,
+        location: "PA",
+      }),
+      leg({
+        id: "p1",
+        kind: "pickup",
+        commodity: "Ore",
+        scuTotal: 20,
+        location: "PB",
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 20,
+        location: "Hub",
+      }),
+      leg({
+        id: "d1",
+        kind: "dropoff",
+        commodity: "Ore",
+        scuTotal: 20,
+        location: "Hub",
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(2);
+    expect(edges.every((e) => e.toLocation === "Hub")).toBe(true);
+    // Commodity match distributes the two distinct sources, not reuse of #0.
+    expect(edges.map((e) => e.fromLocation).sort()).toEqual(["PA", "PB"]);
+  });
+
+  it("null locations become the Unknown sentinel with from/toKnown false", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Gold",
+        scuTotal: 10,
+        location: null,
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Gold",
+        scuTotal: 10,
+        location: null,
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].fromLocation).toBe(UNKNOWN_ROUTE_NODE);
+    expect(edges[0].toLocation).toBe(UNKNOWN_ROUTE_NODE);
+    expect(edges[0].fromKnown).toBe(false);
+    expect(edges[0].toKnown).toBe(false);
+  });
+
+  it("a fully-delivered haul is flagged done (not skipped)", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Ice",
+        scuTotal: 10,
+        location: "O",
+        completed: true,
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 10,
+        location: "D",
+        completed: true,
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].done).toBe(true);
+  });
+
+  it("a dropoff-only mission (no pickup) still emits an edge from Unknown", () => {
+    const m = mission([
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 10,
+        location: "D",
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].fromLocation).toBe(UNKNOWN_ROUTE_NODE);
+    expect(edges[0].fromKnown).toBe(false);
+    expect(edges[0].toLocation).toBe("D");
+  });
+
+  it("excludes terminal (non-active) missions", () => {
+    const m = {
+      ...mission([
+        leg({
+          id: "p0",
+          kind: "pickup",
+          commodity: "Ice",
+          scuTotal: 10,
+          location: "O",
+        }),
+        leg({
+          id: "d0",
+          kind: "dropoff",
+          commodity: "Ice",
+          scuTotal: 10,
+          location: "D",
+        }),
+      ]),
+      status: "complete" as const,
+    };
+    expect(routeEdges([m])).toEqual([]);
+  });
+
+  it("routeStopCount counts the union of from + to locations", () => {
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Ore",
+        scuTotal: 100,
+        location: "Origin",
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ore",
+        scuTotal: 40,
+        location: "A",
+      }),
+      leg({
+        id: "d1",
+        kind: "dropoff",
+        commodity: "Ore",
+        scuTotal: 60,
+        location: "B",
+      }),
+    ]);
+    expect(routeStopCount(routeEdges([m]))).toBe(3); // Origin, A, B
   });
 });
 

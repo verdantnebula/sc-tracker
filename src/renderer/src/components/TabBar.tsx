@@ -2,10 +2,11 @@
 // with count badges + the TOTAL REMAINING readout.
 import { fmt } from "../lib/selectors";
 
-export type TabKey = "dropoff" | "missions" | "history";
+export type TabKey = "dropoff" | "route" | "missions" | "history";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "dropoff", label: "BY-DROPOFF" },
+  { key: "route", label: "ROUTE" },
   { key: "missions", label: "MISSION LIST" },
   { key: "history", label: "HISTORY" },
 ];
