@@ -171,6 +171,71 @@ describe("needs-location group (UNKNOWN_DESTINATION / needsLocation)", () => {
     expect(groups[0].needsLocation).toBe(true);
   });
 
+  it("a COMPLETED null-location dropoff (suppressed delivery) emits NO needsLocation group", () => {
+    // A dropoff leg with no destination that the user checked off without ever
+    // assigning a location would land in the needs-location bucket's `delivered`
+    // tray, leaving `todo` empty -> allDone && needsLocation -> a nonsensical
+    // already-CLEARED "Set destination" card. The action prompt must not exist
+    // when there's nothing left needing a destination.
+    const m = mission([
+      leg({
+        id: "d0",
+        commodity: "Gold",
+        scuTotal: 0,
+        location: null,
+        completed: true,
+      }),
+    ]);
+    const groups = dropoffGroups([m], null);
+    expect(groups.find((g) => g.needsLocation)).toBeUndefined();
+    expect(
+      groups.find((g) => g.location === UNKNOWN_DESTINATION),
+    ).toBeUndefined();
+  });
+
+  it("an UNDELIVERED null-location dropoff STILL emits a needsLocation group (regression guard)", () => {
+    const m = mission([
+      leg({
+        id: "d0",
+        commodity: "Titanium",
+        scuTotal: 0,
+        location: null,
+        completed: false,
+      }),
+    ]);
+    const groups = dropoffGroups([m], null);
+    const g = groups.find((x) => x.needsLocation);
+    expect(g).toBeDefined();
+    expect(g!.location).toBe(UNKNOWN_DESTINATION);
+    expect(g!.todo.length).toBeGreaterThan(0);
+  });
+
+  it("a MIX of undelivered + completed null-location legs keeps the needsLocation group with only the undelivered todo", () => {
+    const m = mission([
+      // suppressed delivery already checked off (no destination) -> delivered tray
+      leg({
+        id: "d0",
+        commodity: "Gold",
+        scuTotal: 0,
+        location: null,
+        completed: true,
+      }),
+      // still needs a destination -> keeps the action prompt alive
+      leg({
+        id: "d1",
+        commodity: "Titanium",
+        scuTotal: 12,
+        location: null,
+        completed: false,
+      }),
+    ]);
+    const groups = dropoffGroups([m], null);
+    const g = groups.find((x) => x.needsLocation);
+    expect(g).toBeDefined();
+    expect(g!.allDone).toBe(false);
+    expect(g!.todo.map((c) => c.commodity)).toEqual(["Titanium"]);
+  });
+
   it("aggregates null-location legs across missions into one bucket with all refs", () => {
     const a = {
       ...mission([

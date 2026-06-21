@@ -27,9 +27,15 @@ export function DropoffGroupCard({
     patch: { commodity?: string; scuTotal?: number; location?: string | null },
   ) => void;
   onOpenMission: (missionId: string) => void;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const needsLocation = group.needsLocation;
   const hasDelivered = group.delivered.length > 0;
+  // Defensive guard: the needs-location ("Set destination") card is an action
+  // prompt and is meaningless once its todo is empty (it would render as an
+  // already-CLEARED "Set destination" card). The selector already drops such a
+  // group, but never render it here even if the data slips through. Normal groups
+  // and needs-location groups WITH todo entries are unaffected.
+  if (needsLocation && group.todo.length === 0) return null;
   return (
     <div
       style={{

@@ -203,7 +203,18 @@ export function dropoffGroups(
     };
   });
 
-  out.sort(
+  // The needs-location ("Set destination") bucket is an ACTION prompt — it must
+  // only exist when there is at least one UNDELIVERED dropoff leg that actually
+  // needs a destination. A completed null-location leg (a suppressed delivery the
+  // user checked off without ever assigning a destination) leaves its bucket with
+  // an empty `todo` while `allDone`+`needsLocation` are both true, which would
+  // render as a nonsensical already-CLEARED "Set destination" card. Drop that
+  // bucket here. Real, named stops that are fully delivered are unaffected (only
+  // the needs-location group with empty todo is dropped) and still show as
+  // "CLEARED" when delivered-shown is on.
+  const filtered = out.filter((g) => !(g.needsLocation && g.todo.length === 0));
+
+  filtered.sort(
     (a, b) =>
       // Cleared stops sink to the bottom; otherwise the "needs a destination"
       // action bucket floats to the very top (its SCU is usually suppressed to
@@ -213,7 +224,7 @@ export function dropoffGroups(
       Number(b.needsLocation) - Number(a.needsLocation) ||
       b.scuRemaining - a.scuRemaining,
   );
-  return out;
+  return filtered;
 }
 
 export const grandTotalRemaining = (groups: DropoffGroup[]): number =>
