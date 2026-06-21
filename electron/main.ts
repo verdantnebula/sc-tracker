@@ -26,6 +26,13 @@ import type {
   MissionPatch,
   LogPathInfo,
   PickLogFolderResult,
+  AppMode,
+  SalvageRun,
+  SalvageRunInput,
+  SalvageRunPatch,
+  StrippedComponentInput,
+  StrippedComponentPatch,
+  SalvageReferenceData,
 } from "@shared/types";
 import type { DomainEvent } from "@shared/events";
 import {
@@ -33,6 +40,11 @@ import {
   DatabaseRecoveredError,
   type MissionStore,
 } from "./missionStore";
+import { openSalvageStore, type SalvageStore } from "./salvageStore";
+import {
+  createSalvageReference,
+  type SalvageReferenceLoader,
+} from "./salvageReference";
 import { isCorruptionError } from "./db/recovery";
 import { CurrentLocationTracker } from "./currentLocation";
 import { createUexClient, type UexClient } from "./uexClient";
@@ -62,10 +74,14 @@ let uex: UexClient | null = null;
 let watcher: LogWatcher | null = null;
 let mainWindow: BrowserWindow | null = null;
 
+// Salvage tracker singletons (separate domain; own store + bundled reference).
+let salvage: SalvageStore | null = null;
+let salvageRef: SalvageReferenceLoader | null = null;
+
 // Per-user settings (custom LIVE folder, etc.), loaded on boot. Held in memory
 // so the IPC handlers can report/resolve the current Game.log path without a disk
 // read each call; saveSettings() still merges onto disk as the source of truth.
-let settings: AppSettings = { liveFolder: null };
+let settings: AppSettings = { liveFolder: null, mode: "cargo" };
 
 // Latest UEX cache state, threaded into LogStatus.uexActive.
 let uexActive = false;
@@ -497,6 +513,117 @@ function registerIpc(): void {
       return applyLiveFolder(liveFolder);
     },
   );
+
+  // --- App mode (cargo / salvage) -----------------------------------------
+  // Read/persist which tracker the app shows. Mode is a pure renderer concern
+  // (it swaps the UI + theme); the watcher/store/DB are mode-agnostic, so there
+  // is nothing to restart here — just persist so the choice survives a restart.
+
+  ipcMain.handle(IPC.SETTINGS_GET_MODE, (): AppMode => settings.mode);
+
+  ipcMain.handle(IPC.SETTINGS_SET_MODE, (_e, mode: AppMode): AppMode => {
+    // saveSettings normalizes an unknown/forged value back to 'cargo' and
+    // merges onto disk so the liveFolder key is never dropped.
+    settings = saveSettings({ mode });
+    return settings.mode;
+  });
+
+  // --- Salvage tracker -----------------------------------------------------
+  // Separate domain backed by the salvage store + bundled reference. Every
+  // mutation re-broadcasts the full run list (salvage:runs:changed) so any open
+  // salvage view stays in sync, mirroring the cargo missions:changed pattern.
+
+  const broadcastSalvageRuns = (): void => {
+    if (!salvage) return;
+    broadcast(IPC.SALVAGE_RUNS_CHANGED, salvage.listRuns());
+  };
+
+  ipcMain.handle(IPC.SALVAGE_LIST_RUNS, (): SalvageRun[] =>
+    salvage ? salvage.listRuns() : [],
+  );
+
+  ipcMain.handle(IPC.SALVAGE_GET_ACTIVE_RUN, (): SalvageRun | null =>
+    salvage ? salvage.getActiveRun() : null,
+  );
+
+  ipcMain.handle(
+    IPC.SALVAGE_CREATE_RUN,
+    (_e, input: SalvageRunInput): SalvageRun => {
+      if (!salvage) throw new Error("salvage store not ready");
+      const run = salvage.createRun(input);
+      broadcastSalvageRuns();
+      return run;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SALVAGE_UPDATE_RUN,
+    (_e, runId: string, patch: SalvageRunPatch): SalvageRun => {
+      if (!salvage) throw new Error("salvage store not ready");
+      const run = salvage.updateRun(runId, patch);
+      broadcastSalvageRuns();
+      return run;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SALVAGE_ADD_STRIPPED,
+    (_e, runId: string, input: StrippedComponentInput): SalvageRun => {
+      if (!salvage) throw new Error("salvage store not ready");
+      const run = salvage.addStripped(runId, input);
+      broadcastSalvageRuns();
+      return run;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SALVAGE_UPDATE_STRIPPED,
+    (
+      _e,
+      runId: string,
+      componentId: string,
+      patch: StrippedComponentPatch,
+    ): SalvageRun => {
+      if (!salvage) throw new Error("salvage store not ready");
+      const run = salvage.updateStripped(runId, componentId, patch);
+      broadcastSalvageRuns();
+      return run;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.SALVAGE_REMOVE_STRIPPED,
+    (_e, runId: string, componentId: string): SalvageRun => {
+      if (!salvage) throw new Error("salvage store not ready");
+      const run = salvage.removeStripped(runId, componentId);
+      broadcastSalvageRuns();
+      return run;
+    },
+  );
+
+  ipcMain.handle(IPC.SALVAGE_COMPLETE_RUN, (_e, runId: string): SalvageRun => {
+    if (!salvage) throw new Error("salvage store not ready");
+    const run = salvage.completeRun(runId);
+    broadcastSalvageRuns();
+    return run;
+  });
+
+  ipcMain.handle(IPC.SALVAGE_DELETE_RUN, (_e, runId: string): void => {
+    if (!salvage) return;
+    salvage.deleteRun(runId);
+    broadcastSalvageRuns();
+  });
+
+  ipcMain.handle(IPC.SALVAGE_REFERENCE, (): SalvageReferenceData => {
+    if (!salvageRef)
+      return {
+        ships: [],
+        components: [],
+        materialPrices: { rmcPerScu: 0, cmatPerScu: 0 },
+        haulers: [],
+      };
+    return salvageRef.getReferenceData();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -521,6 +648,12 @@ async function boot(): Promise<void> {
   });
   // Reference data is a bundled local snapshot — no token, no network, no TTL.
   uex = createUexClient();
+
+  // Salvage tracker: its own store over the SAME sqlite file (additive v4
+  // tables; WAL allows the shared handle pattern) plus the bundled salvage
+  // reference snapshot. Independent of the cargo store/watcher.
+  salvage = openSalvageStore({ dbPath });
+  salvageRef = createSalvageReference();
 
   // Load per-user settings (custom LIVE folder) BEFORE resolving the log path.
   // A missing/corrupt file returns safe defaults, so this never blocks boot.
@@ -587,6 +720,7 @@ if (!gotTheLock) {
     void watcher?.stop();
     uex?.close();
     store?.close();
+    salvage?.close();
   });
 }
 

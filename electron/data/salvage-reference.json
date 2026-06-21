@@ -1,0 +1,4261 @@
+{
+  "fetchedAt": 0,
+  "source": "Community SC 4.8 salvage worksheet (sanitized; game data only)",
+  "materialPrices": {
+    "rmcPerScu": 7200.0,
+    "cmatPerScu": 12000.0
+  },
+  "ships": [
+    {
+      "name": "325P",
+      "costTier": 300,
+      "claimCost": null,
+      "claimCostOrg": 150,
+      "cmat": 3.6,
+      "cargoScu": 4.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "2x SW16BR3",
+          "1x M6A"
+        ]
+      }
+    },
+    {
+      "name": "San'tok Yai",
+      "costTier": 300,
+      "claimCost": null,
+      "claimCostOrg": 150,
+      "cmat": 3.0,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "2x Dynaflux",
+        "shield": "1x Fullstop",
+        "quantumdrive": "1x Beacon",
+        "cooler": "2x Polar",
+        "radar": "1x CSR-RP",
+        "weapons": [
+          "4x Yeng'tu Repeater"
+        ]
+      }
+    },
+    {
+      "name": "Terrapin",
+      "costTier": 300,
+      "claimCost": null,
+      "claimCostOrg": 150,
+      "cmat": 5.2,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": null,
+        "shield": "2x 5MA Chimali",
+        "quantumdrive": "1x Daybreak",
+        "cooler": "2x Polar",
+        "radar": "1x Chernykh",
+        "weapons": []
+      }
+    },
+    {
+      "name": "Gladius",
+      "costTier": 500,
+      "claimCost": null,
+      "claimCostOrg": 250,
+      "cmat": null,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "1x Charger",
+        "shield": "2x Securehyde",
+        "quantumdrive": null,
+        "cooler": "2x Polar",
+        "radar": "1x Voir",
+        "weapons": [
+          "2x Panther 337",
+          "1x Mantis GT-220"
+        ]
+      }
+    },
+    {
+      "name": "315P",
+      "costTier": 500,
+      "claimCost": null,
+      "claimCostOrg": 250,
+      "cmat": null,
+      "cargoScu": 12.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "2x SW16BR3"
+        ]
+      }
+    },
+    {
+      "name": "Prowler",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 7.4,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "1x Eclipse",
+        "shield": "4x Obscura",
+        "quantumdrive": "1x Nova",
+        "cooler": "2x Heatsafe",
+        "radar": "1x Surveyor Lite",
+        "weapons": [
+          "2x Deadbolt V",
+          "2x Lightstrike III"
+        ]
+      }
+    },
+    {
+      "name": "Vanguard Hoplite",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 12.7,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "1x Maelstrom",
+        "shield": "2x Fullstop",
+        "quantumdrive": "1x Crossfield",
+        "cooler": "2x Arctic",
+        "radar": null,
+        "weapons": [
+          "1x Deadbolt V",
+          "2x SW16BR2"
+        ]
+      }
+    },
+    {
+      "name": "Vanguard Warden",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 12.7,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "1x Maelstrom",
+        "shield": "2x Fullstop",
+        "quantumdrive": "1x Crossfield",
+        "cooler": "2x Arctic",
+        "radar": null,
+        "weapons": [
+          "1x Deadbolt V",
+          "2x SW16BR2"
+        ]
+      }
+    },
+    {
+      "name": "Vanguard Sentinel",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 12.7,
+      "cargoScu": null,
+      "components": {
+        "powerplant": "1x Gammamax?",
+        "shield": "2x Sheut",
+        "quantumdrive": "1x Nova",
+        "cooler": "2x Arctic",
+        "radar": null,
+        "weapons": [
+          "1x Attrition V",
+          "1x Suckerpunch L"
+        ]
+      }
+    },
+    {
+      "name": "Scorpius",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 3.3,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "2x Regulus",
+        "shield": "1x Fullstop",
+        "quantumdrive": "1x Eos",
+        "cooler": "2x Polar",
+        "radar": "1x Observer Lite",
+        "weapons": [
+          "4x CF-337"
+        ]
+      }
+    },
+    {
+      "name": "Vulture",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 8.9,
+      "cargoScu": 12.0,
+      "components": {
+        "powerplant": "2x Fortitude",
+        "shield": "2x Bulwark",
+        "quantumdrive": "1x Goliath",
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "2x CF-117",
+          "2x Baler Head"
+        ]
+      }
+    },
+    {
+      "name": "Spirit",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 19.9,
+      "cargoScu": 39.0,
+      "components": {
+        "powerplant": "1x Yaeger",
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": []
+      }
+    },
+    {
+      "name": "Redeemer",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": 17.8,
+      "cargoScu": 2.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": "1x Crossfield",
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "4x AD4B",
+          "2x C-788",
+          "2x M5A"
+        ]
+      }
+    },
+    {
+      "name": "Ares Ion",
+      "costTier": 10000,
+      "claimCost": null,
+      "claimCostOrg": 5000,
+      "cmat": null,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": null,
+        "shield": "2x Fullstop",
+        "quantumdrive": null,
+        "cooler": "2x Arctic",
+        "radar": "1x Epier",
+        "weapons": []
+      }
+    },
+    {
+      "name": "Corsair",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 43.8,
+      "cargoScu": 22.0,
+      "components": {
+        "powerplant": "2x Daybreak",
+        "shield": "1x Torrent",
+        "quantumdrive": null,
+        "cooler": "2x Frost Star EX",
+        "radar": "1x Chernykh",
+        "weapons": [
+          "1x M7A",
+          "4x M6A",
+          "6x CF-227"
+        ]
+      }
+    },
+    {
+      "name": "MSR",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 70.6,
+      "cargoScu": 52.0,
+      "components": {
+        "powerplant": "2x Diligence",
+        "shield": null,
+        "quantumdrive": "1x Torrent",
+        "cooler": "2x Coolcore",
+        "radar": "1x Bolon",
+        "weapons": [
+          "6x CF-337"
+        ]
+      }
+    },
+    {
+      "name": "400i",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 26.5,
+      "cargoScu": 37.0,
+      "components": {
+        "powerplant": "2x Sedulity",
+        "shield": null,
+        "quantumdrive": "1x Torrent",
+        "cooler": "2x Snowfall",
+        "radar": null,
+        "weapons": [
+          "2x CF-447",
+          "4x CF-337"
+        ]
+      }
+    },
+    {
+      "name": "Retaliator",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 30.1,
+      "cargoScu": 0.0,
+      "components": {
+        "powerplant": "2x Maelstrom",
+        "shield": "6x Fullstop",
+        "quantumdrive": "1x Crossfield",
+        "cooler": "2x Arctic",
+        "radar": "1x Chernykh",
+        "weapons": [
+          "10x CF-337"
+        ]
+      }
+    },
+    {
+      "name": "Hammerhead",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 204.6,
+      "cargoScu": 30.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "28x CF-447"
+        ]
+      }
+    },
+    {
+      "name": "MOLE",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 32.8,
+      "cargoScu": 22.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": "1x Huracan",
+        "cooler": null,
+        "radar": "1x Surveyor",
+        "weapons": [
+          "2x CF-227",
+          "3x Mining Laser",
+          "8x Argo Ore Bag"
+        ]
+      }
+    },
+    {
+      "name": "Constellation Taurus",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 41.5,
+      "cargoScu": 78.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "4x CF-557"
+        ]
+      }
+    },
+    {
+      "name": "A2",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 227.8,
+      "cargoScu": 96.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "2x M7A",
+          "2x CF-557",
+          "4x M6A",
+          "2x Omnisky XV",
+          "4x Colossus Bombs",
+          "2x CF-447"
+        ]
+      }
+    },
+    {
+      "name": "C2",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 227.3,
+      "cargoScu": 272.0,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "2x M6A",
+          "2x CF-447"
+        ]
+      }
+    },
+    {
+      "name": "M2",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 217.0,
+      "cargoScu": null,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "4x M6A",
+          "2x CF-447"
+        ]
+      }
+    },
+    {
+      "name": "890 Jump",
+      "costTier": 20000,
+      "claimCost": null,
+      "claimCostOrg": 10000,
+      "cmat": 1300.0,
+      "cargoScu": null,
+      "components": {
+        "powerplant": null,
+        "shield": null,
+        "quantumdrive": null,
+        "cooler": null,
+        "radar": null,
+        "weapons": [
+          "7x M2C \"Swarm\""
+        ]
+      }
+    },
+    {
+      "name": "RAFT",
+      "costTier": 500,
+      "claimCost": null,
+      "claimCostOrg": 250,
+      "cmat": null,
+      "cargoScu": null,
+      "components": {
+        "powerplant": "Diligence",
+        "shield": "Aspis",
+        "quantumdrive": "Bolon",
+        "cooler": "2x Coolcore",
+        "radar": "Ecouter",
+        "weapons": [
+          "2x M5A"
+        ]
+      }
+    }
+  ],
+  "components": [
+    {
+      "type": "powerplant",
+      "model": "Main Powerplant",
+      "class": null,
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Celestial",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "DayBreak",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 2475.0
+    },
+    {
+      "type": "powerplant",
+      "model": "DuraJet",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "FullForce",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "FullForce Pro",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "IonBurst",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "IonSurge",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "IonSurge Pro",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "IonWave",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "LightBlossom",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Lotus",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "MagnaBloom",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "NewDawn",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "PowerBolt",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Radiance",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Radix",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SparkJet",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SparkJet Pro",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Stellate",
+      "class": "Civilian",
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "TigerLilly",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "WhiteRose",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "ZapJet",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "LumaCore",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "LuxCore",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SolarFlare",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "StarBurn",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "StarHeart",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SunFlare",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Breton",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Defiant",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Diligence",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 6682.0
+    },
+    {
+      "type": "powerplant",
+      "model": "Durango",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Endurance",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Fortitude",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": 3341.0
+    },
+    {
+      "type": "powerplant",
+      "model": "Genoa",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Ginzel",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Jennet",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Reliance",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Roughneck",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Sedulity",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Steadfast",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Trommel",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Bolide",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Centurion (power plant)",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Charger",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": 3403.0
+    },
+    {
+      "type": "powerplant",
+      "model": "Drassik",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "DynaFlux",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": 12375.0
+    },
+    {
+      "type": "powerplant",
+      "model": "ExoGen",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Fierell Cascade",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Fulgur",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "HyperGen",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "JS-300",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "JS-400",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "JS-500",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Maelstrom",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 13812.0
+    },
+    {
+      "type": "powerplant",
+      "model": "MegaFlux",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "OverDrive",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "QuadraCell",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "QuadraCell MT",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "QuadraCell MX",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Regulus",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SmartGen",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SuperDrive",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "TurboDrive",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "UltraFlux",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Vortex",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Cirrus",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "DeltaMax",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "Eclipse (power plant)",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": 36114.0
+    },
+    {
+      "type": "powerplant",
+      "model": "GammaMax",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": 19057.0
+    },
+    {
+      "type": "powerplant",
+      "model": "Slipstream",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "powerplant",
+      "model": "SonicLite",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "5CA 'Akura'",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "5MA 'Chimalli'",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 1687.0
+    },
+    {
+      "type": "shield",
+      "model": "5SA 'Rhada'",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "6CA 'Bila'",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "6MA 'Kozane'",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "6SA 'Arbiter'",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "7CA 'Nargun'",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "7MA 'Lorica'",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "7SA 'Concord'",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "AllStop",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Armada",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "ARMOR",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Aspis",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Bamoty",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Barbican",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "BLOC",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Bulwark",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": 2784.0
+    },
+    {
+      "type": "shield",
+      "model": "Castra (shield generator)",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Citadel (shield generator)",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Cloak",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "CoverAll",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Falco",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "ForceWall",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "FR-66",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "FR-76",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "FR-86",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "FullBlock",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "FullStop",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 9281.0
+    },
+    {
+      "type": "shield",
+      "model": "Glacis",
+      "class": "Industrial",
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "GUARD",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Guardian (shield generator)",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Haltur",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "HAVEN",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "HEX",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Holdstrong",
+      "class": null,
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "INK",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Jaghte",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Mirage",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Obscura",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Palisade",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Parapet",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "PIN",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Rampart",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "RPEL",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "RS-Barrier",
+      "class": "Industrial",
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "SecureHyde",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "SecureScreen",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "SecureShield",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Sheut",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Shimmer",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Shroud",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Steward",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "STOP",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Stronghold",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Sukoran",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Suldrath",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "SureStop",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Targa",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Trenta",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Umbra",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Veil",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "Ward",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "shield",
+      "model": "WEB",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Agni",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Aither",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Allegro",
+      "class": "Civilian",
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Atlas",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Balandin",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Beacon (quantum drive)",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": 5315.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Bolon",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Bolt",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Burst",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Cascade",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Colossus",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": 7464.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Crossfield",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 10631.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Drift",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Drifter",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Echo (quantum drive)",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Eos",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": 1885.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Erebos",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Expedition",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Fissure",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Flash",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Flood",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "FoxFire",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Frontline",
+      "class": null,
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Goliath",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Hemera",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Huracan",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": 20366.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Hyperion (quantum drive)",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Impulse",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Kama",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Khaos",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "LightFire",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Metis",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Nova (quantum drive)",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 9095.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Odyssey (quantum drive)",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Pontes",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Quest",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Ranger (quantum drive)",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Rush",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Siren",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Sojourn",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "SparkFire",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Spectre",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Spicule",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "SunFire",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Torrent (quantum drive)",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 2362.0
+    },
+    {
+      "type": "quantumdrive",
+      "model": "TS-2",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Tyche",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Vesta",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "VK-00",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Voyage",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Vulcan (quantum drive)",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Wanderer",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Wayfare",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "XL-1",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Yaluk",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Yeager",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "quantumdrive",
+      "model": "Zephyr",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Abetti",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Agrippa",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Agure",
+      "class": "Military",
+      "size": 0.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Anysta",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Backlund",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Battani",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "BroadSpec",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "BroadSpec-Go",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Broadspec-Lite",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "BroadSpec-Max",
+      "class": "Industrial",
+      "size": 4.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Capston",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Capsulo",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Cassandra",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Chernykh",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Denning",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Devoue",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Ecouter",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Epier",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Fabian",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Fawad",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Fidele",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Fleming",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "FullSpec",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "FullSpec-Go",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "FullSpec-Max",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Hunter (radar)",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Lephari",
+      "class": null,
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Observer",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Observer-Go",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Observer-Lite",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Observer-Max",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Pelerous",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Predator",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Prevenir",
+      "class": "Military",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Prophet",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Resolu",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Savoir",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Sens",
+      "class": "Military",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "SNS-R5x",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "SNS-R6",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "SNS-R6x",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "SNS-R7x",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "SNSR5",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "SNSR7",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Socoria",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Spyglass",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Surveyor",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Surveyor-Go",
+      "class": "Industrial",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Surveyor-Lite",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Surveyor-Max",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Tige",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "V60-26",
+      "class": "Military",
+      "size": 0.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "V801-11",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "V801-12",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "V880",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Vigilance",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Vogel",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "radar",
+      "model": "Voir",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "AbsoluteZero",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Algid",
+      "class": "Industrial",
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Arctic",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 4950.0
+    },
+    {
+      "type": "cooler",
+      "model": "ArcticStorm",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": 721.0
+    },
+    {
+      "type": "cooler",
+      "model": "Aufeis",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Avalanche",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Berian",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "BlastChill",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Blizzard",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Boreal",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Bracer",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Chill-Max",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "ColdSnap",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "ColdSurge",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "CoolCore",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Cryo-Star",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Cryo-Star EX",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Cryo-Star SL",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Cryo-Star XL",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Draug",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Eco-Flow",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Elsen",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Endo",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Exotherm",
+      "class": null,
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "FlashFreeze",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Fridan",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Frost-Star",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Frost-Star EX",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 900.0
+    },
+    {
+      "type": "cooler",
+      "model": "Frost-Star SL",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Frost-Star XL",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "FrostBite",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "FrostBurn",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "FullFrost",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Galinstan",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Gelid",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Glacier",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Graupel",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "HeatSafe",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "HeatSink",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": 11063.0
+    },
+    {
+      "type": "cooler",
+      "model": "Hydrocel",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "HydroJet",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Hydropulse",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Ice-Flush",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "IceBox",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "IceDive",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "IcePlunge",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Kelvid",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Kragen",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Mercury (cooler)",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "NightFall",
+      "class": "Stealth",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Permafrost",
+      "class": "Military",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Polar",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "QuikCool",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "RapidCool",
+      "class": "Competition",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Serac",
+      "class": "Civilian",
+      "size": 4.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "SnowBlind",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Snowfall",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Snowpack",
+      "class": "Industrial",
+      "size": 2.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Taiga",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Tempest",
+      "class": "Military",
+      "size": 3.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Tepilo",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "ThermalCore",
+      "class": "Industrial",
+      "size": 3.0,
+      "grade": "C",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Thermax",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "C",
+      "sellPrice": 1215.0
+    },
+    {
+      "type": "cooler",
+      "model": "Tundra",
+      "class": "Military",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Ultra-Flow",
+      "class": "Industrial",
+      "size": 1.0,
+      "grade": "A",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "VaporBlock",
+      "class": "Stealth",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "WhiteOut",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Winter-Star",
+      "class": "Civilian",
+      "size": 1.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Winter-Star EX",
+      "class": "Civilian",
+      "size": 2.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Winter-Star SL",
+      "class": "Civilian",
+      "size": 0.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "Winter-Star XL",
+      "class": "Civilian",
+      "size": 3.0,
+      "grade": "D",
+      "sellPrice": null
+    },
+    {
+      "type": "cooler",
+      "model": "ZeroRush",
+      "class": "Competition",
+      "size": 1.0,
+      "grade": "B",
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "WAR' Cannon",
+      "class": "Neutron Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "WARLORD' Cannon",
+      "class": null,
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "WASP' Repeater",
+      "class": "Laser Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "WEAK' Repeater",
+      "class": "Laser Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "WHIP' Cannon",
+      "class": null,
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "WRATH' Cannon",
+      "class": "Plasma Canon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "10-Series Greatsword Cannon",
+      "class": "Ballistic Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "11-Series Broadsword Cannon",
+      "class": "Ballistic Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "9-Series Longsword Cannon",
+      "class": "Ballistic Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Absolution Distortion Scattergun",
+      "class": "Distortion Scattergun",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "AD4B Ballistic Gatling",
+      "class": "Ballistic Gatling",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": 3043.0
+    },
+    {
+      "type": "weapon",
+      "model": "AD5B Ballistic Gatling",
+      "class": "Ballistic Gatling",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "AD6B Ballistic Gatling",
+      "class": "Ballistic Gatling",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Arame Laser Beam",
+      "class": "Laser Beam",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Ardor-1 Salvaged Repeater",
+      "class": "Laser Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Ardor-2 Salvaged Repeater",
+      "class": "Laser Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Ardor-3 Salvaged Repeater",
+      "class": "Laser Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Attrition-1 Repeater",
+      "class": "Laser Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Attrition-2 Repeater",
+      "class": "Laser Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Attrition-3 Repeater",
+      "class": "Laser Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Attrition-4 Repeater",
+      "class": "Laser Repeater",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Attrition-5 Repeater",
+      "class": "Laser Repeater",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": 15342.0
+    },
+    {
+      "type": "weapon",
+      "model": "Attrition-6 Repeater",
+      "class": "Laser Repeater",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "ATVS Repeater",
+      "class": "Distortion Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Axiom L-22 Repeater",
+      "class": "Laser Repeater",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Breakneck S4 Gatling",
+      "class": "Ballistic Gatling",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "BRVS Repeater",
+      "class": "Ballistic Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "C-07T Cannon",
+      "class": "Ballistic Cannon",
+      "size": 7.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "C-788 Cannon",
+      "class": "Ballistic Cannon",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": 7608.0
+    },
+    {
+      "type": "weapon",
+      "model": "C-810 Cannon",
+      "class": "Ballistic Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "C-912 Cannon",
+      "class": "Ballistic Cannon",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "CF-117 Bulldog Repeater",
+      "class": "Laser Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "CF-227 Badger Repeater",
+      "class": "Laser Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": 1704.0
+    },
+    {
+      "type": "weapon",
+      "model": "CF-337 Panther Repeater",
+      "class": "Laser Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": 3835.0
+    },
+    {
+      "type": "weapon",
+      "model": "CF-447 Rhino Repeater",
+      "class": "Laser Repeater",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": 5406.0
+    },
+    {
+      "type": "weapon",
+      "model": "CF-557 Galdereen Repeater",
+      "class": "Laser Repeater",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": 12163.0
+    },
+    {
+      "type": "weapon",
+      "model": "CF-667 Mammoth Repeater",
+      "class": "Laser Repeater",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Condemnation Distortion Scattergun",
+      "class": "Distortion Scattergun",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Conqueror-7",
+      "class": "Ballistic Cannon Turret",
+      "size": 7.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "CVSA Cannon",
+      "class": "Ballistic Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Deadbolt I Cannon",
+      "class": "Ballistic Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Deadbolt II Cannon",
+      "class": "Ballistic Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Deadbolt III Cannon",
+      "class": "Ballistic Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Deadbolt IV Cannon",
+      "class": "Ballistic Cannon",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Deadbolt V Cannon",
+      "class": "Ballistic Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": 16218.0
+    },
+    {
+      "type": "weapon",
+      "model": "Deadbolt VI Cannon",
+      "class": "Ballistic Cannon",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Destroyer Mass Driver Cannon",
+      "class": "Mass Driver Cannon",
+      "size": 10.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Dominance-1 Scattergun",
+      "class": "Laser Scattergun",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Dominance-2 Scattergun",
+      "class": "Laser Scattergun",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Dominance-3 Scattergun",
+      "class": "Laser Scattergun",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "DR Model-XJ1 Repeater",
+      "class": "Distortion Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "DR Model-XJ2 Repeater",
+      "class": "Distortion Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "DR Model-XJ3 Repeater",
+      "class": "Distortion Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Draugar Gatling",
+      "class": "Ballistic Gatling",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Echion Repeater",
+      "class": "Laser Repeater",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Eventide Repeater",
+      "class": "Ballistic Repeater",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "EVSD Cannon",
+      "class": "Distortion Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Exodus-10 Laser Beam",
+      "class": "Laser Beam",
+      "size": 10.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "FL-11 Cannon",
+      "class": "Laser Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "FL-22 Cannon",
+      "class": "Laser Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "FL-33 Cannon",
+      "class": "Laser Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "GVSR Repeater",
+      "class": "Laser Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Havoc Scattergun",
+      "class": "Ballistic Scattergun",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Havoc Scattergun Sharkmouth Edition",
+      "class": "Ballistic Scattergun",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Hellion Scattergun",
+      "class": "Ballistic Scattergun",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Kombu Laser Beam",
+      "class": "Laser Beam",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Leonids Cannon",
+      "class": "Ballistic Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Lightstrike I Cannon",
+      "class": "Laser Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Lightstrike II Cannon",
+      "class": "Laser Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Lightstrike III Cannon",
+      "class": "Laser Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": 4004.0
+    },
+    {
+      "type": "weapon",
+      "model": "Lightstrike IV Cannon",
+      "class": "Laser Cannon",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Lightstrike V Cannon",
+      "class": "Laser Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Lightstrike VI Cannon",
+      "class": "Laser Cannon",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M3A Cannon",
+      "class": "Laser Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M3A Cannon Defense Division",
+      "class": "Laser Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M4A Cannon",
+      "class": "Laser Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M4A Cannon Defense Division",
+      "class": "Laser Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M5A Cannon",
+      "class": "Laser Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": 4226.0
+    },
+    {
+      "type": "weapon",
+      "model": "M5A Cannon Defense Division",
+      "class": "Laser Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M6A Cannon",
+      "class": "Laser Cannon",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": 9510.0
+    },
+    {
+      "type": "weapon",
+      "model": "M7A Cannon",
+      "class": "Laser Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": 21399.0
+    },
+    {
+      "type": "weapon",
+      "model": "M8A Cannon",
+      "class": "Laser Cannon",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "M9A Cannon",
+      "class": "Laser Cannon",
+      "size": 7.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Mantis GT-220 Gatling",
+      "class": "Ballistic Gatling",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": 1352.0
+    },
+    {
+      "type": "weapon",
+      "model": "Maris Cannon",
+      "class": "Ballistic Cannon",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Medusa Cannon",
+      "class": "Ballistic Cannon",
+      "size": 8.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "MVSA Cannon",
+      "class": "Laser Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NDB-26 Repeater",
+      "class": "Neutron Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NDB-28 Repeater",
+      "class": "Neutron Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NDB-30 Repeater",
+      "class": "Neutron Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Nightfall Repeater",
+      "class": "Ballistic Repeater",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NN-13 Cannon",
+      "class": "Neutron Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NN-14 Cannon",
+      "class": "Neutron Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NN-15 Cannon",
+      "class": "Neutron Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "NV57 Ballistic Gatling",
+      "class": "Ballistic Gatling Gun",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Omnisky III Cannon",
+      "class": "Laser Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Omnisky IX Cannon",
+      "class": "Laser Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Omnisky VI Cannon",
+      "class": "Laser Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Omnisky XII Cannon",
+      "class": "Laser Cannon",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Omnisky XV Cannon",
+      "class": "Laser Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": 21399.0
+    },
+    {
+      "type": "weapon",
+      "model": "Omnisky XVIII Cannon",
+      "class": "Laser Cannon",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Predator Scattergun",
+      "class": "Ballistic Scattergun",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "PyroBurst Scattergun",
+      "class": "Plasma Scattergun",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Quarreler Cannon",
+      "class": "Laser Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Reign-3 Repeater",
+      "class": "Laser Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Relentless L-21 Gatling",
+      "class": "Ballistic Gatling",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Revenant Gatling",
+      "class": "Ballistic Gatling",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Salvation Distortion Scattergun",
+      "class": "Distortion Scattergun",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Scorpion GT-215 Gatling",
+      "class": "Ballistic Gatling",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "SF7B Gatling",
+      "class": "Ballistic Gatling",
+      "size": 7.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "SF7E Cannon",
+      "class": "Laser Cannon",
+      "size": 7.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Shade Repeater",
+      "class": "Ballistic Repeater",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Singe Cannon (S1)",
+      "class": "Tachyon Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Singe Cannon (S2)",
+      "class": "Tachyon Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Singe Cannon (S3)",
+      "class": "Tachyon Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Slayer Cannon",
+      "class": "Ballistic Cannon",
+      "size": 5.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Sledge I Mass Driver Cannon",
+      "class": "Mass Driver Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Sledge II Mass Driver Cannon",
+      "class": "Mass Driver Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Sledge III Mass Driver Cannon",
+      "class": "Mass Driver Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Strife Mass Driver Cannon",
+      "class": "Mass Driver Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Suckerpunch Cannon",
+      "class": "Distortion Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Suckerpunch-L Cannon",
+      "class": "Distortion Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Suckerpunch-XL Cannon",
+      "class": "Distortion Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Supremacy-10T Laser Beam",
+      "class": "Laser Beam",
+      "size": 10.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "SureGrip TH2 Tractor Beam",
+      "class": "Tractor Beam",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "SW16BR1 \"Buzzsaw\" Repeater",
+      "class": "Ballistic Repeater",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "SW16BR2 \"Sawbuck\" Repeater",
+      "class": "Ballistic Repeater",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": 901.0
+    },
+    {
+      "type": "weapon",
+      "model": "SW16BR3 \"Shredder\" Repeater",
+      "class": "Ballistic Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": 3239.0
+    },
+    {
+      "type": "weapon",
+      "model": "Tarantula GT-870 Mark 1 Cannon",
+      "class": "Ballistic Cannon",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Tarantula GT-870 Mark 2 Cannon",
+      "class": "Ballistic Cannon",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Tarantula GT-870 Mark 3 Cannon",
+      "class": "Ballistic Cannon",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Thlilye Laser Gatling",
+      "class": "Laser Gatling",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Tigerstrike T-19P",
+      "class": "Ballistic Gatling",
+      "size": 2.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "TMSB-5 Gatling",
+      "class": "Ballistic Gatling (x2)",
+      "size": 4.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Tormenter S3 Repeater",
+      "class": "Laser Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Vanduul Mauler 'ANNIHILATOR' Cannon",
+      "class": "Tachyon Cannon",
+      "size": 10.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Vanduul Mauler 'ERADICATOR' Cannon",
+      "class": "Tachyon Cannon",
+      "size": 7.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Vanduul Mauler 'IGNITER' Beam",
+      "class": "Laser Beam",
+      "size": 9.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Vanduul Mauler 'RAGE' Cannon",
+      "class": "Plasma Cannon",
+      "size": 8.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Vanduul Mauler 'STRIKER' Repeater",
+      "class": "Laser Repeater",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Wakame Laser Beam",
+      "class": "Laser Beam",
+      "size": 6.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "YellowJacket GT-210 Gatling",
+      "class": "Ballistic Gatling",
+      "size": 1.0,
+      "grade": null,
+      "sellPrice": null
+    },
+    {
+      "type": "weapon",
+      "model": "Yeng'tu Repeater",
+      "class": "Laser Repeater",
+      "size": 3.0,
+      "grade": null,
+      "sellPrice": 1.0
+    }
+  ],
+  "haulers": [
+    {
+      "name": "Prowler Utility",
+      "gridScu": 32.0
+    },
+    {
+      "name": "Golem Ox",
+      "gridScu": 64.0
+    },
+    {
+      "name": "C1",
+      "gridScu": 64.0
+    },
+    {
+      "name": "Zeus CL",
+      "gridScu": 128.0
+    },
+    {
+      "name": "Hermes",
+      "gridScu": 288.0
+    },
+    {
+      "name": "Hull B",
+      "gridScu": 512.0
+    },
+    {
+      "name": "C2",
+      "gridScu": 696.0
+    },
+    {
+      "name": "Ironclad",
+      "gridScu": 2204.0
+    },
+    {
+      "name": "Hull C",
+      "gridScu": 4608.0
+    }
+  ]
+}

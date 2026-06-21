@@ -16,6 +16,13 @@ import type {
   BackfillProgress,
   LogPathInfo,
   PickLogFolderResult,
+  AppMode,
+  SalvageRun,
+  SalvageRunInput,
+  SalvageRunPatch,
+  StrippedComponentInput,
+  StrippedComponentPatch,
+  SalvageReferenceData,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -38,12 +45,27 @@ export const IPC = {
   SETTINGS_GET_LOG_PATH: "settings:getLogPath",
   SETTINGS_PICK_LOG_FOLDER: "settings:pickLogFolder",
   SETTINGS_SET_LOG_PATH: "settings:setLogPath",
+  SETTINGS_GET_MODE: "settings:getMode",
+  SETTINGS_SET_MODE: "settings:setMode",
+
+  // salvage tracker (additive — separate domain, separate tables)
+  SALVAGE_LIST_RUNS: "salvage:listRuns",
+  SALVAGE_GET_ACTIVE_RUN: "salvage:getActiveRun",
+  SALVAGE_CREATE_RUN: "salvage:createRun",
+  SALVAGE_UPDATE_RUN: "salvage:updateRun",
+  SALVAGE_ADD_STRIPPED: "salvage:addStripped",
+  SALVAGE_UPDATE_STRIPPED: "salvage:updateStripped",
+  SALVAGE_REMOVE_STRIPPED: "salvage:removeStripped",
+  SALVAGE_COMPLETE_RUN: "salvage:completeRun",
+  SALVAGE_DELETE_RUN: "salvage:deleteRun",
+  SALVAGE_REFERENCE: "salvage:reference",
 
   // push events (main.send -> renderer.on)
   MISSIONS_CHANGED: "missions:changed",
   LOG_STATUS_CHANGED: "log:status:changed",
   BACKFILL_PROGRESS: "backfill:progress",
   CURRENT_LOCATION_CHANGED: "currentLocation:changed",
+  SALVAGE_RUNS_CHANGED: "salvage:runs:changed",
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -79,6 +101,47 @@ export interface IpcRequestMap {
     args: [liveFolder: string];
     result: PickLogFolderResult;
   };
+  /** Current app mode ('cargo' | 'salvage') from persisted settings. */
+  [IPC.SETTINGS_GET_MODE]: { args: []; result: AppMode };
+  /** Persist a new app mode; returns the saved mode (defaults defensively). */
+  [IPC.SETTINGS_SET_MODE]: { args: [mode: AppMode]; result: AppMode };
+
+  // --- salvage tracker ---
+  /** All salvage runs, newest first. */
+  [IPC.SALVAGE_LIST_RUNS]: { args: []; result: SalvageRun[] };
+  /** The single active run, or null when none is open. */
+  [IPC.SALVAGE_GET_ACTIVE_RUN]: { args: []; result: SalvageRun | null };
+  /** Create (and open) a new run. Returns the created run. */
+  [IPC.SALVAGE_CREATE_RUN]: {
+    args: [input: SalvageRunInput];
+    result: SalvageRun;
+  };
+  /** Patch a run's materials / crewSize / notes / status. Returns the updated run. */
+  [IPC.SALVAGE_UPDATE_RUN]: {
+    args: [runId: string, patch: SalvageRunPatch];
+    result: SalvageRun;
+  };
+  /** Add a stripped component to a run. Returns the updated run. */
+  [IPC.SALVAGE_ADD_STRIPPED]: {
+    args: [runId: string, input: StrippedComponentInput];
+    result: SalvageRun;
+  };
+  /** Patch a stripped component (qty / price / sold). Returns the updated run. */
+  [IPC.SALVAGE_UPDATE_STRIPPED]: {
+    args: [runId: string, componentId: string, patch: StrippedComponentPatch];
+    result: SalvageRun;
+  };
+  /** Remove a stripped component from a run. Returns the updated run. */
+  [IPC.SALVAGE_REMOVE_STRIPPED]: {
+    args: [runId: string, componentId: string];
+    result: SalvageRun;
+  };
+  /** Mark a run sold (terminal). Returns the updated run. */
+  [IPC.SALVAGE_COMPLETE_RUN]: { args: [runId: string]; result: SalvageRun };
+  /** Hard-delete a run (and its components/wrecks). */
+  [IPC.SALVAGE_DELETE_RUN]: { args: [runId: string]; result: void };
+  /** The bundled salvage reference snapshot (ships/components/prices/haulers). */
+  [IPC.SALVAGE_REFERENCE]: { args: []; result: SalvageReferenceData };
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +154,7 @@ export interface IpcEventMap {
   [IPC.LOG_STATUS_CHANGED]: { payload: LogStatus };
   [IPC.BACKFILL_PROGRESS]: { payload: BackfillProgress };
   [IPC.CURRENT_LOCATION_CHANGED]: { payload: string | null };
+  [IPC.SALVAGE_RUNS_CHANGED]: { payload: SalvageRun[] };
 }
 
 // ---------------------------------------------------------------------------
@@ -120,10 +184,48 @@ export interface ApiBridge {
   pickLogFolder(): Promise<PickLogFolderResult>;
   /** Set a typed LIVE folder; same validate + save + retarget flow as the picker. */
   setLogFolder(liveFolder: string): Promise<PickLogFolderResult>;
+  /** Read the persisted app mode ('cargo' | 'salvage'). */
+  getMode(): Promise<AppMode>;
+  /** Persist the app mode; resolves to the saved mode. */
+  setMode(mode: AppMode): Promise<AppMode>;
+
+  // --- salvage tracker ---
+  /** All salvage runs, newest first. */
+  listSalvageRuns(): Promise<SalvageRun[]>;
+  /** The single active run, or null when none is open. */
+  getActiveSalvageRun(): Promise<SalvageRun | null>;
+  /** Create + open a new run. */
+  createSalvageRun(input: SalvageRunInput): Promise<SalvageRun>;
+  /** Patch a run's materials / crewSize / notes / status. */
+  updateSalvageRun(runId: string, patch: SalvageRunPatch): Promise<SalvageRun>;
+  /** Add a stripped component to a run. */
+  addStrippedComponent(
+    runId: string,
+    input: StrippedComponentInput,
+  ): Promise<SalvageRun>;
+  /** Patch a stripped component (qty / price / sold). */
+  updateStrippedComponent(
+    runId: string,
+    componentId: string,
+    patch: StrippedComponentPatch,
+  ): Promise<SalvageRun>;
+  /** Remove a stripped component from a run. */
+  removeStrippedComponent(
+    runId: string,
+    componentId: string,
+  ): Promise<SalvageRun>;
+  /** Mark a run sold (terminal). */
+  completeSalvageRun(runId: string): Promise<SalvageRun>;
+  /** Hard-delete a run. */
+  deleteSalvageRun(runId: string): Promise<void>;
+  /** The bundled salvage reference snapshot. */
+  getSalvageReference(): Promise<SalvageReferenceData>;
 
   // subscriptions — each returns an unsubscribe function
   onMissionsChanged(cb: (missions: Mission[]) => void): () => void;
   onLogStatusChanged(cb: (status: LogStatus) => void): () => void;
   onBackfillProgress(cb: (progress: BackfillProgress) => void): () => void;
   onCurrentLocationChanged(cb: (location: string | null) => void): () => void;
+  /** Salvage runs changed (mutation broadcast). */
+  onSalvageRunsChanged(cb: (runs: SalvageRun[]) => void): () => void;
 }

@@ -14,9 +14,12 @@ import type {
   BackfillProgress,
   ManualMissionInput,
   LogPathInfo,
+  AppMode,
 } from "@shared/types";
 
 import { TopBar } from "./components/TopBar";
+import { SalvageShell } from "./components/SalvageShell";
+import { applyTheme } from "./lib/theme";
 import { LogMissingBanner } from "./components/LogMissingBanner";
 import { TabBar, type TabKey } from "./components/TabBar";
 import { DropoffView } from "./components/DropoffView";
@@ -37,7 +40,53 @@ import {
 
 const EMPTY_REFERENCE: ReferenceData = { commodities: [], terminals: [] };
 
+// ============================================================================
+// App — the top-level shell. Owns the app MODE (cargo | salvage), applies the
+// matching theme to <html data-mode>, and routes to the cargo tracker (the
+// existing, unchanged CargoApp) or the salvage shell. Mode is read once on
+// mount from window.api and persisted on every switch, so it survives a restart.
+// Cargo and salvage keep entirely separate component trees — switching mode
+// unmounts one and mounts the other, so neither touches the other's state.
+// ============================================================================
 export function App(): React.JSX.Element {
+  // null while we read the persisted mode on mount — render nothing rather than
+  // flash cargo then snap to salvage (or vice versa) on a one-tick delay.
+  const [mode, setMode] = useState<AppMode | null>(null);
+
+  // Read the persisted mode once, then keep <html data-mode> in sync with it.
+  useEffect(() => {
+    void window.api.getMode().then((m) => {
+      setMode(m);
+      applyTheme(m);
+    });
+  }, []);
+
+  const toggleMode = (): void => {
+    setMode((cur) => {
+      const next: AppMode = cur === "salvage" ? "cargo" : "salvage";
+      applyTheme(next);
+      // Persist; the resolved value from main is authoritative but identical.
+      void window.api.setMode(next);
+      return next;
+    });
+  };
+
+  if (mode === null)
+    return <div style={{ height: "100%", background: "var(--bg)" }} />;
+  if (mode === "salvage") return <SalvageShell onToggleMode={toggleMode} />;
+  return <CargoApp onToggleMode={toggleMode} />;
+}
+
+// ============================================================================
+// CargoApp — the original SC Cargo Tracker, unchanged except it now receives an
+// `onToggleMode` callback to feed the top-left switcher in its TopBar. All cargo
+// state, selectors and interactions are exactly as before.
+// ============================================================================
+function CargoApp({
+  onToggleMode,
+}: {
+  onToggleMode: () => void;
+}): React.JSX.Element {
   // --- server-backed state (via window.api) ---
   // `missions` = the full list (drives History). `activeMissions` = the store's
   // current-session, non-terminal set (drives the Mission List + by-dropoff), so
@@ -278,6 +327,7 @@ export function App(): React.JSX.Element {
         onManualAdd={() => setShowForm(true)}
         onReset={resetAll}
         onPickLogFolder={pickLogFolder}
+        onToggleMode={onToggleMode}
       />
 
       {/* Log-not-found warning strip — full width, directly under the TopBar and

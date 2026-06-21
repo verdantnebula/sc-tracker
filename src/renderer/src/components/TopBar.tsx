@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { LogStatus, LogPathInfo } from "@shared/types";
 import { LogStatusIndicator } from "./LogStatusIndicator";
+import { ModeSwitcher } from "./ModeSwitcher";
 
 export function TopBar({
   logStatus,
@@ -12,6 +13,7 @@ export function TopBar({
   onManualAdd,
   onReset,
   onPickLogFolder,
+  onToggleMode,
 }: {
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
@@ -21,6 +23,8 @@ export function TopBar({
   onReset: () => void;
   /** Open the native folder picker to choose a custom LIVE folder. */
   onPickLogFolder: () => void;
+  /** Switch to salvage mode (the top-left Cargo<->Salvage switcher). */
+  onToggleMode: () => void;
 }): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   return (
@@ -37,42 +41,8 @@ export function TopBar({
           "linear-gradient(180deg, rgba(12,22,28,0.92), rgba(7,12,16,0.6))",
       }}
     >
-      {/* Diamond logo */}
-      <div
-        style={{
-          width: 26,
-          height: 26,
-          flex: "none",
-          border: "1.5px solid var(--primary)",
-          transform: "rotate(45deg)",
-          boxShadow: "0 0 14px rgba(52,224,224,0.4)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            background: "var(--primary)",
-            boxShadow: "0 0 8px var(--primary)",
-            display: "block",
-          }}
-        />
-      </div>
-      <span
-        style={{
-          fontFamily: "var(--font-display)",
-          fontWeight: 800,
-          fontSize: 16,
-          color: "var(--text-bright)",
-          letterSpacing: 0.5,
-          whiteSpace: "nowrap",
-        }}
-      >
-        SC CARGO<span style={{ color: "var(--primary)" }}>TRACKER</span>
-      </span>
+      {/* Top-left Cargo<->Salvage switcher (replaces the static diamond+wordmark) */}
+      <ModeSwitcher mode="cargo" onToggle={onToggleMode} />
 
       {/* Location chip */}
       <div

@@ -48,6 +48,15 @@ export type PayoutConfidence = "confirmed" | "approximate" | "unknown";
 /** Where a mission came from. 'log' = parsed from Game.log, 'manual' = user form. */
 export type MissionSource = "log" | "manual";
 
+/**
+ * Which tracker the app is showing. The app ships two modes that share the same
+ * window, log watcher and DB infrastructure but render different domains:
+ *  - cargo   : the original SC Cargo Tracker (default).
+ *  - salvage : the SC Salvage Tracker (Drake-Interplanetary themed).
+ * Persisted in settings.json so the chosen mode survives a restart.
+ */
+export type AppMode = "cargo" | "salvage";
+
 // ---------------------------------------------------------------------------
 // Core records
 // ---------------------------------------------------------------------------
@@ -321,4 +330,198 @@ export interface MissionPatch {
   }>;
   /** Leg ids to DELETE from the mission (remove ✕ in the detail panel). */
   removeLegIds?: string[];
+}
+
+// ===========================================================================
+// SALVAGE TRACKER (Phase 2 backend contract)
+// ---------------------------------------------------------------------------
+// These are ADDITIVE to the cargo contract above and frozen for the salvage UI
+// phase to build against. The two trackers share the window/log/DB infra but
+// keep their domain data on separate IPC channels + tables — they never share
+// mutable state. Salvage is about stripping wrecks for materials (RMC / CMAT /
+// construction) and components, then splitting the payout across a crew.
+// ===========================================================================
+
+/** Lifecycle of a salvage run. 'active' = in progress; terminal otherwise. */
+export type SalvageRunStatus = "active" | "sold" | "abandoned";
+
+/** The strippable component categories (mirror the reference component types). */
+export type SalvageComponentType =
+  | "powerplant"
+  | "shield"
+  | "quantumdrive"
+  | "cooler"
+  | "radar"
+  | "weapon";
+
+/**
+ * A component pulled off a wreck during a run. `sold` gates whether its value
+ * counts toward the run's component payout (unsold components are excluded).
+ */
+export interface StrippedComponent {
+  id: string;
+  runId: string;
+  type: SalvageComponentType;
+  /** Component model name, e.g. "AD4B Ballistic Gatling". */
+  model: string;
+  /** How many of this component were pulled. */
+  qty: number;
+  /** Sell price for ONE unit (aUEC). */
+  sellPriceEach: number;
+  /** True once sold — only sold components contribute to component value. */
+  sold: boolean;
+}
+
+/**
+ * A wreck claimed/processed within a run. Claim cost is the insurance/claim fee
+ * paid to acquire the hull (a cost, tracked for the run ledger). Both the tier
+ * and the resolved cost are nullable — not every wreck is claimed for credits.
+ */
+export interface Wreck {
+  id: string;
+  runId: string;
+  shipName: string;
+  /** Cost tier bucket from the reference data (e.g. 300/500/10000), or null. */
+  claimCostTier: number | null;
+  /** Resolved claim cost in aUEC, or null when not applicable. */
+  claimCost: number | null;
+  notes: string;
+}
+
+/**
+ * One salvage run: a session of stripping wrecks for materials + components,
+ * sold and split across a crew. `rmcScu` / `cmatScu` / `constructionScu` are the
+ * raw material SCU yields entered for the run.
+ */
+export interface SalvageRun {
+  id: string;
+  /** Epoch ms when the run started. */
+  startedAt: number;
+  /** Epoch ms when sold/abandoned; null while active. */
+  completedAt: number | null;
+  status: SalvageRunStatus;
+  /** Number of players splitting the payout (min 1). */
+  crewSize: number;
+  notes: string;
+  /** Reclaimed Material Composite SCU. */
+  rmcScu: number;
+  /** Construction Material SCU. */
+  cmatScu: number;
+  /** Construction-piece SCU (sold separately; reserved for future pricing). */
+  constructionScu: number;
+  stripped: StrippedComponent[];
+  wrecks: Wreck[];
+}
+
+/** Derived payout figures for a run (computed; never persisted as source). */
+export interface SalvageTotals {
+  /** rmcScu * materialPrices.rmcPerScu. */
+  rmcValue: number;
+  /** cmatScu * materialPrices.cmatPerScu. */
+  cmatValue: number;
+  /** Σ over SOLD stripped components of qty * sellPriceEach. */
+  componentValue: number;
+  /** rmcValue + cmatValue + componentValue. */
+  totalValue: number;
+  /** totalValue / max(1, crewSize). */
+  valuePerPlayer: number;
+}
+
+// --- bundled salvage reference data (electron/data/salvage-reference.json) ---
+
+/** A salvageable ship and its known loadout, grouped by claim cost tier. */
+export interface SalvageReferenceShip {
+  name: string;
+  /** Cost-tier bucket (e.g. 300/500/10000/20000), or null when unknown. */
+  costTier: number | null;
+  /** Personal claim cost in aUEC, or null. */
+  claimCost: number | null;
+  /** Org-discounted claim cost in aUEC, or null. */
+  claimCostOrg: number | null;
+  /** CMAT yield (SCU), or null when not recorded. */
+  cmat: number | null;
+  /** Cargo capacity (SCU), or null when not recorded. */
+  cargoScu: number | null;
+  components: {
+    powerplant: string | null;
+    shield: string | null;
+    quantumdrive: string | null;
+    cooler: string | null;
+    radar: string | null;
+    weapons: string[];
+  };
+}
+
+/** A reference component with its sell price (from the component sheets). */
+export interface SalvageReferenceComponent {
+  type: SalvageComponentType;
+  model: string;
+  /** Manufacturer class / weapon type, or null. */
+  class: string | null;
+  /** Component size, or null. */
+  size: number | null;
+  /** Grade letter (A/B/C/D), or null (weapons have none). */
+  grade: string | null;
+  /** Sell price in aUEC, or null when the worksheet had no price. */
+  sellPrice: number | null;
+}
+
+/** A hauler ship usable to ferry salvage, with its cargo grid capacity. */
+export interface SalvageHauler {
+  name: string;
+  /** Cargo grid capacity in SCU. */
+  gridScu: number;
+}
+
+/** Default material sale rates (aUEC per SCU). */
+export interface SalvageMaterialPrices {
+  rmcPerScu: number;
+  cmatPerScu: number;
+}
+
+/** The full bundled salvage reference snapshot served over salvage:reference. */
+export interface SalvageReferenceData {
+  ships: SalvageReferenceShip[];
+  components: SalvageReferenceComponent[];
+  materialPrices: SalvageMaterialPrices;
+  haulers: SalvageHauler[];
+}
+
+// --- salvage mutation payloads (renderer -> main) ---------------------------
+
+/** Fields to create a new run with. All optional except defaults are sensible. */
+export interface SalvageRunInput {
+  crewSize?: number;
+  notes?: string;
+  rmcScu?: number;
+  cmatScu?: number;
+  constructionScu?: number;
+}
+
+/** Partial edit of a run's material yields / crew / notes / status. */
+export interface SalvageRunPatch {
+  crewSize?: number;
+  notes?: string;
+  status?: SalvageRunStatus;
+  rmcScu?: number;
+  cmatScu?: number;
+  constructionScu?: number;
+}
+
+/** A stripped component to add to a run (id/runId assigned by the store). */
+export interface StrippedComponentInput {
+  type: SalvageComponentType;
+  model: string;
+  qty: number;
+  sellPriceEach: number;
+  sold?: boolean;
+}
+
+/** Partial edit of a stripped component (qty / price / sold flag). */
+export interface StrippedComponentPatch {
+  type?: SalvageComponentType;
+  model?: string;
+  qty?: number;
+  sellPriceEach?: number;
+  sold?: boolean;
 }

@@ -54,4 +54,75 @@
     calc(100% - 13px) 100%,
     0 100%
   );
+
+  /* Hazard-stripe accent (used by the salvage header). Cargo defines a cyan
+     variant so any component that opts into the stripe stays on-brand. */
+  --hazard-stripe: repeating-linear-gradient(
+    45deg,
+    rgba(52, 224, 224, 0.16) 0,
+    rgba(52, 224, 224, 0.16) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+}
+
+/* ===========================================================================
+   SALVAGE MODE — Drake Interplanetary theme.
+   Applied when `document.documentElement[data-mode="salvage"]` is set (see
+   src/renderer/src/lib/theme.ts). These override ONLY the design tokens; every
+   component reads var(--…) so the whole UI re-skins from this one block. Cargo
+   is untouched (no [data-mode="cargo"] overrides exist — it uses :root above).
+
+   The look: warm industrial charcoals + Drake orange/amber, with HEAVIER,
+   blockier surfaces than cargo's thin cyan glow (thicker borders, denser cards).
+   =========================================================================== */
+:root[data-mode="salvage"] {
+  /* Surfaces — warm charcoals */
+  --bg: #0d0a07;
+  --window: #140f0a;
+  --surface: #1c1712;
+  --surface-2: #241d16;
+  --card-grad: linear-gradient(
+    180deg,
+    rgba(40, 30, 21, 0.95),
+    rgba(20, 15, 10, 0.82)
+  );
+
+  /* Accents — Drake orange / amber */
+  --primary: #f2691b;
+  --primary-hover: #ff8235;
+  --primary-dim: #a8501a;
+  --secondary: #ffc24a;
+  --success: #7ed957;
+  --danger: #ff5c4d;
+
+  /* Text — warm bone */
+  --text: #f3e9df;
+  --text-bright: #fff6ec;
+  --text-2: #d7c4b2;
+  --muted: #9a8b7c;
+  --muted-done: #7a6d60;
+
+  /* Borders — thicker, orange-tinted, more present than cargo's faint cyan */
+  --border: rgba(242, 105, 27, 0.18);
+  --border-strong: rgba(242, 105, 27, 0.4);
+
+  /* Status — re-tinted to the warm palette */
+  --status-accepted: #b09a86;
+  --status-accepted-bg: rgba(176, 154, 134, 0.14);
+  --status-progress: #ffc24a;
+  --status-progress-bg: rgba(255, 194, 74, 0.14);
+  --status-complete: #7ed957;
+  --status-complete-bg: rgba(126, 217, 87, 0.14);
+  --status-abandoned: #ff5c4d;
+  --status-abandoned-bg: rgba(255, 92, 77, 0.14);
+
+  /* Hazard stripe — Drake's signature orange/black warning chevrons */
+  --hazard-stripe: repeating-linear-gradient(
+    45deg,
+    #f2691b 0,
+    #f2691b 14px,
+    #161009 14px,
+    #161009 28px
+  );
 }

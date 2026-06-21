@@ -15,7 +15,7 @@ import Database from "better-sqlite3";
 import type { Database as DB } from "better-sqlite3";
 
 /** Current schema version. Bump + add a migration block when the shape changes. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS missions (
@@ -85,6 +85,53 @@ CREATE TABLE IF NOT EXISTS uex_cache (
   resource    TEXT PRIMARY KEY,
   payload     TEXT NOT NULL,
   fetched_at  INTEGER NOT NULL
+);
+
+-- ===========================================================================
+-- SALVAGE TRACKER tables (schema v4). ADDITIVE — the cargo tables above are
+-- untouched, so an existing cargo DB migrates cleanly (these tables are simply
+-- created on next open). The two trackers never share rows.
+-- ===========================================================================
+
+-- One salvage run: a stripping session sold + split across a crew.
+CREATE TABLE IF NOT EXISTS salvage_runs (
+  id                TEXT PRIMARY KEY,
+  started_at        INTEGER NOT NULL,
+  completed_at      INTEGER,                  -- epoch ms, null while active
+  status            TEXT NOT NULL DEFAULT 'active',  -- active | sold | abandoned
+  crew_size         INTEGER NOT NULL DEFAULT 1,
+  notes             TEXT NOT NULL DEFAULT '',
+  rmc_scu           REAL NOT NULL DEFAULT 0,
+  cmat_scu          REAL NOT NULL DEFAULT 0,
+  construction_scu  REAL NOT NULL DEFAULT 0,
+  created_seq       INTEGER                   -- monotonic insert order (newest-first)
+);
+
+-- Components stripped off wrecks during a run. Only sold=1 rows count toward
+-- the run's component payout. id is unique; run_id FK cascades on delete.
+CREATE TABLE IF NOT EXISTS salvage_stripped (
+  id              TEXT PRIMARY KEY,
+  run_id          TEXT NOT NULL,
+  type            TEXT NOT NULL,             -- powerplant|shield|quantumdrive|cooler|radar|weapon
+  model           TEXT NOT NULL DEFAULT '',
+  qty             INTEGER NOT NULL DEFAULT 1,
+  sell_price_each INTEGER NOT NULL DEFAULT 0,
+  sold            INTEGER NOT NULL DEFAULT 0,  -- 0/1
+  created_seq     INTEGER,
+  FOREIGN KEY (run_id) REFERENCES salvage_runs(id) ON DELETE CASCADE
+);
+
+-- Wrecks claimed/processed within a run. Reserved for the UI phase; the store
+-- exposes runs with an (initially empty) wrecks list so the contract is stable.
+CREATE TABLE IF NOT EXISTS salvage_wrecks (
+  id               TEXT PRIMARY KEY,
+  run_id           TEXT NOT NULL,
+  ship_name        TEXT NOT NULL DEFAULT '',
+  claim_cost_tier  INTEGER,                  -- nullable cost tier bucket
+  claim_cost       INTEGER,                  -- nullable aUEC
+  notes            TEXT NOT NULL DEFAULT '',
+  created_seq      INTEGER,
+  FOREIGN KEY (run_id) REFERENCES salvage_runs(id) ON DELETE CASCADE
 );
 `;
 
@@ -156,4 +203,10 @@ function migrate(db: DB): void {
   if (!legCols.some((c) => c.name === "manual_override")) {
     db.exec(`ALTER TABLE legs ADD COLUMN manual_override INTEGER`);
   }
+
+  // v4: salvage tracker tables (salvage_runs / salvage_stripped / salvage_wrecks).
+  // These are BRAND-NEW tables, so the `CREATE TABLE IF NOT EXISTS` in DDL above
+  // already creates them on the next open of an older (cargo-only) DB — no ALTER
+  // is required and the cargo tables are untouched (additive migration). This
+  // block is intentionally a no-op placeholder documenting the v4 step.
 }

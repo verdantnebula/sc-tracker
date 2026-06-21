@@ -24,6 +24,7 @@
     "rebuild:node": "npm rebuild better-sqlite3",
     "dev:fresh": "npm run rebuild:electron && electron-vite dev",
     "fetch:reference": "node scripts/fetch-reference.mjs",
+    "fetch:salvage-reference": "python scripts/fetch-salvage-reference.py",
     "package:exe": "npm run rebuild:electron && electron-vite build && npx --yes @electron/packager . --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"config\\.local\\.json\"",
     "dist": "electron-vite build && electron-builder"
   },

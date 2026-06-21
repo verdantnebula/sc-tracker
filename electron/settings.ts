@@ -20,6 +20,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { app } from "electron";
 
+import type { AppMode } from "@shared/types";
+
 import { DEFAULT_GAME_LOG_PATH } from "./logWatcher";
 
 // ---------------------------------------------------------------------------
@@ -35,12 +37,24 @@ export interface AppSettings {
    * sibling is derived from it.
    */
   liveFolder: string | null;
+  /**
+   * Which tracker the app shows on launch ('cargo' | 'salvage'). Defaults to
+   * 'cargo' so existing users see no change. Persisted so the chosen mode
+   * survives a restart.
+   */
+  mode: AppMode;
 }
 
 /** The safe default used when no settings file exists or it is unreadable. */
 export const DEFAULT_SETTINGS: AppSettings = {
   liveFolder: null,
+  mode: "cargo",
 };
+
+/** Coerce an arbitrary value to a valid AppMode, defaulting to 'cargo'. */
+function normalizeMode(value: unknown): AppMode {
+  return value === "salvage" ? "salvage" : "cargo";
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit testing — no real fs unless you pass it one)
@@ -73,9 +87,14 @@ export function mergeSettings(
   patch: Partial<AppSettings>,
 ): AppSettings {
   const next: AppSettings = { ...DEFAULT_SETTINGS, ...base };
+  // Re-normalize a base mode that may have been forged in memory (defensive).
+  next.mode = normalizeMode(next.mode);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
     next.liveFolder = typeof v === "string" && v.length > 0 ? v : null;
+  }
+  if ("mode" in patch) {
+    next.mode = normalizeMode(patch.mode);
   }
   return next;
 }
@@ -93,7 +112,7 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     typeof raw.liveFolder === "string" && raw.liveFolder.length > 0
       ? raw.liveFolder
       : null;
-  return { liveFolder };
+  return { liveFolder, mode: normalizeMode(raw.mode) };
 }
 
 /**
