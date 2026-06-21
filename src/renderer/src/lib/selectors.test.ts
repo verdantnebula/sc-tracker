@@ -422,6 +422,58 @@ describe("routeEdges", () => {
     expect(edges.map((e) => e.scu).sort((a, b) => a - b)).toEqual([40, 60]);
   });
 
+  it("single-to-multi with DIFFERING commodities: each edge carries its own dropoff's commodity + SCU (drives map labels)", () => {
+    // One pickup fanning out to three dropoffs, each hauling a DIFFERENT
+    // commodity at a DISTINCT SCU. The map labels each edge per-dropoff, so the
+    // commodity/SCU must be taken from the dropoff leg — never shared across the
+    // fan-out. This guards the RouteMapView label being correct per haul.
+    const m = mission([
+      leg({
+        id: "p0",
+        kind: "pickup",
+        commodity: "Aluminum",
+        scuTotal: 96,
+        location: "Origin",
+      }),
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Aluminum",
+        scuTotal: 16,
+        location: "A",
+      }),
+      leg({
+        id: "d1",
+        kind: "dropoff",
+        commodity: "Titanium",
+        scuTotal: 32,
+        location: "B",
+      }),
+      leg({
+        id: "d2",
+        kind: "dropoff",
+        commodity: "Quantanium",
+        scuTotal: 48,
+        location: "C",
+      }),
+    ]);
+    const edges = routeEdges([m]);
+    expect(edges).toHaveLength(3);
+    expect(edges.every((e) => e.fromLocation === "Origin")).toBe(true);
+
+    // Each edge pairs the right destination with the right commodity + SCU.
+    const byDest = new Map(edges.map((e) => [e.toLocation, e]));
+    expect(byDest.get("A")!.commodity).toBe("Aluminum");
+    expect(byDest.get("A")!.scu).toBe(16);
+    expect(byDest.get("B")!.commodity).toBe("Titanium");
+    expect(byDest.get("B")!.scu).toBe(32);
+    expect(byDest.get("C")!.commodity).toBe("Quantanium");
+    expect(byDest.get("C")!.scu).toBe(48);
+
+    // The commodities are genuinely distinct (not a shared/repeated value).
+    expect(new Set(edges.map((e) => e.commodity)).size).toBe(3);
+  });
+
   it("multi-to-single: N pickups + one dropoff yields N edges sharing the dropoff", () => {
     const m = mission([
       leg({

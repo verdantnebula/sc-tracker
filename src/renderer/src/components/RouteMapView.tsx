@@ -35,6 +35,10 @@ export function RouteMapView({
 }): React.JSX.Element {
   const { nodes, height } = useMemo(() => buildLayout(edges), [edges]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const labels = useMemo(
+    () => layoutLabels(edges, nodeById),
+    [edges, nodeById],
+  );
 
   if (edges.length === 0) {
     return (
@@ -85,6 +89,12 @@ export function RouteMapView({
         {/* Nodes. */}
         {nodes.map((n) => (
           <NodeBox key={n.id} node={n} />
+        ))}
+
+        {/* Labels last, on top of everything, with collision-resolved plates so
+            fan-out edges (shared midpoint x) don't stack their text. */}
+        {labels.map((l) => (
+          <EdgeLabel key={l.edge.id} placement={l} />
         ))}
       </svg>
 
@@ -244,11 +254,6 @@ function EdgeLine({
   const y1 = from.y + NODE_H / 2;
   const x2 = goingRight ? to.x : to.x + NODE_W;
   const y2 = to.y + NODE_H / 2;
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-
-  const label = `${edge.commodity || "?"} · ${fmt(edge.scu)}`;
-
   return (
     <g opacity={edge.done ? 0.32 : 1}>
       <line
@@ -264,19 +269,112 @@ function EdgeLine({
       />
       {/* amber pick-up dot at the source end */}
       <circle cx={x1} cy={y1} r={3.6} fill="var(--secondary)" />
-      {/* commodity + SCU label with a dark halo for legibility */}
+      {/* The commodity+SCU label is rendered in a later pass (see EdgeLabel) so
+          it sits above all edges on an opaque plate, de-overlapped per column. */}
+    </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edge labels — a small opaque plate (rounded rect) with the commodity + SCU
+// text on top, so crossing edge lines can't smear or pass through the text.
+// Positions are resolved centrally in layoutLabels (below) so fan-out edges
+// that share a midpoint x don't stack their plates.
+// ---------------------------------------------------------------------------
+const LABEL_H = 18; // plate height
+const LABEL_CHAR_W = 6.6; // est. mono glyph advance at 11px
+const LABEL_PAD = 12; // horizontal padding inside the plate
+const LABEL_GAP = 4; // min vertical gap between stacked plates
+
+interface LabelPlacement {
+  edge: RouteEdge;
+  text: string;
+  cx: number; // plate center x
+  cy: number; // plate center y (post de-overlap)
+  w: number; // plate width
+  h: number; // plate height
+  dim: boolean; // dim (done) hauls
+}
+
+// Build label placements for every drawable edge, then greedily nudge plates
+// down so x-overlapping plates don't collide. Pure: uses estimated widths, no
+// DOM measurement. Deterministic given the (already sorted) edge order.
+function layoutLabels(
+  edges: RouteEdge[],
+  nodeById: Map<string, MapNode>,
+): LabelPlacement[] {
+  const placements: LabelPlacement[] = [];
+  for (const edge of edges) {
+    const from = nodeById.get(edge.fromLocation);
+    const to = nodeById.get(edge.toLocation);
+    if (!from || !to) continue;
+
+    const goingRight = to.x >= from.x;
+    const x1 = goingRight ? from.x + NODE_W : from.x;
+    const y1 = from.y + NODE_H / 2;
+    const x2 = goingRight ? to.x : to.x + NODE_W;
+    const y2 = to.y + NODE_H / 2;
+
+    const text = `${edge.commodity || "?"} · ${fmt(edge.scu)}`;
+    const w = text.length * LABEL_CHAR_W + LABEL_PAD;
+    placements.push({
+      edge,
+      text,
+      cx: (x1 + x2) / 2,
+      cy: (y1 + y2) / 2,
+      w,
+      h: LABEL_H,
+      dim: edge.done,
+    });
+  }
+
+  // Greedy vertical de-overlap: sort by intended y, then push each plate below
+  // the previous one whenever their x-ranges overlap.
+  const order = placements
+    .map((_, i) => i)
+    .sort((a, b) => placements[a].cy - placements[b].cy);
+  for (let i = 1; i < order.length; i++) {
+    const cur = placements[order[i]];
+    for (let j = 0; j < i; j++) {
+      const prev = placements[order[j]];
+      const xOverlap = Math.abs(cur.cx - prev.cx) < (cur.w + prev.w) / 2;
+      if (!xOverlap) continue;
+      const minCy = prev.cy + prev.h / 2 + LABEL_GAP + cur.h / 2;
+      if (cur.cy < minCy) cur.cy = minCy;
+    }
+  }
+
+  return placements;
+}
+
+function EdgeLabel({
+  placement,
+}: {
+  placement: LabelPlacement;
+}): React.JSX.Element {
+  const { text, cx, cy, w, h, dim } = placement;
+  return (
+    <g opacity={dim ? 0.32 : 1}>
+      <rect
+        x={cx - w / 2}
+        y={cy - h / 2}
+        width={w}
+        height={h}
+        rx={3}
+        fill="var(--window)"
+        stroke="var(--border)"
+        strokeWidth={1}
+      />
       <text
-        x={mx}
-        y={my - 5}
+        x={cx}
+        y={cy}
         textAnchor="middle"
+        dominantBaseline="central"
         fontFamily="var(--font-mono)"
         fontSize={11}
         fill="var(--text)"
-        stroke="var(--window)"
-        strokeWidth={3}
-        paintOrder="stroke"
       >
-        {label}
+        {text}
       </text>
     </g>
   );
