@@ -153,7 +153,7 @@ any machine.
 npm run package:exe    # rebuild native for Electron, build, package a Windows x64 app to release/
 ```
 
-(`npm run dist` builds an NSIS installer via electron-builder.)
+(`npm run dist` is an alias for `package:exe`.)
 
 ## Configuration
 
