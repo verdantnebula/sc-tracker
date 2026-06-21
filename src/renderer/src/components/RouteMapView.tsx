@@ -5,15 +5,19 @@
 //   col 1 = pass-through (source & sink)  -> middle
 //   col 2 = pure sinks (dropoff-only)     -> destinations on the right
 // Directed edges flow left->right: amber dot at the pick-up end, cyan arrow at the
-// drop-off end, commodity+SCU label at the midpoint. Fully-delivered edges (done)
-// are dimmed + dashed. Read-only overview (no editing in v1).
+// drop-off end. The commodity+SCU is listed inside each drop-off (sink) node card
+// under its "DROP OFF" role label — one line per incoming edge. Fully-delivered
+// edges (done) are dimmed + dashed. Read-only overview (no editing in v1).
 import { useMemo } from "react";
 import type { RouteEdge } from "../lib/selectors";
 import { fmt } from "../lib/selectors";
 
-const NODE_W = 128;
-const NODE_H = 48;
-const ROW_PITCH = 70;
+const NODE_W = 140;
+const HEADER_H = 44; // name + role rows (used by sinks for the cargo-line offset)
+const BASE_H = 48; // pure-source (pickup-only) node height
+const LINE_H = 15; // per cargo line inside a sink card
+const PAD = 8; // bottom padding under the cargo lines in a sink card
+const ROW_GAP = 22; // vertical gap between stacked nodes in a column
 const TOP_PAD = 24;
 const COL_X = [60, 286, 548]; // left / middle / right column x-origins
 const VIEW_W = 700;
@@ -26,6 +30,16 @@ interface MapNode {
   col: number;
   x: number;
   y: number;
+  h: number; // computed node height (varies for sinks with cargo lines)
+  incoming: RouteEdge[]; // edges terminating at this node (cargo it receives)
+}
+
+// Pure height calc for a node, exported for unit testing. Sinks grow to fit one
+// cargo line per incoming edge; pure-source (pickup-only) nodes stay at BASE_H.
+// A sink with zero incoming edges also collapses to BASE_H (just name + role).
+export function mapNodeHeight(isSink: boolean, incomingCount: number): number {
+  if (!isSink || incomingCount <= 0) return BASE_H;
+  return HEADER_H + incomingCount * LINE_H + PAD;
 }
 
 export function RouteMapView({
@@ -35,10 +49,6 @@ export function RouteMapView({
 }): React.JSX.Element {
   const { nodes, height } = useMemo(() => buildLayout(edges), [edges]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
-  const labels = useMemo(
-    () => layoutLabels(edges, nodeById),
-    [edges, nodeById],
-  );
 
   if (edges.length === 0) {
     return (
@@ -86,15 +96,9 @@ export function RouteMapView({
           return <EdgeLine key={e.id} edge={e} from={from} to={to} />;
         })}
 
-        {/* Nodes. */}
+        {/* Nodes (drop-off cards carry their incoming-cargo lines). */}
         {nodes.map((n) => (
           <NodeBox key={n.id} node={n} />
-        ))}
-
-        {/* Labels last, on top of everything, with collision-resolved plates so
-            fan-out edges (shared midpoint x) don't stack their text. */}
-        {labels.map((l) => (
-          <EdgeLabel key={l.edge.id} placement={l} />
         ))}
       </svg>
 
@@ -133,7 +137,8 @@ export function RouteMapView({
 
 // ---------------------------------------------------------------------------
 // Layout — classify stations into source/sink/both, bucket into 3 columns, then
-// stack each column vertically with an even pitch. Deterministic (sorted by id).
+// stack each column vertically. Node heights now vary (sinks list their cargo),
+// so columns stack cumulatively by each node's height. Deterministic (sorted id).
 // ---------------------------------------------------------------------------
 function buildLayout(edges: RouteEdge[]): { nodes: MapNode[]; height: number } {
   const sources = new Set<string>();
@@ -141,6 +146,15 @@ function buildLayout(edges: RouteEdge[]): { nodes: MapNode[]; height: number } {
   for (const e of edges) {
     sources.add(e.fromLocation);
     sinks.add(e.toLocation);
+  }
+
+  // Group incoming edges per destination so each sink can list its cargo and we
+  // can size its card. Edge order is preserved (routeEdges is already sorted).
+  const incomingByNode = new Map<string, RouteEdge[]>();
+  for (const e of edges) {
+    const list = incomingByNode.get(e.toLocation);
+    if (list) list.push(e);
+    else incomingByNode.set(e.toLocation, [e]);
   }
 
   const allIds = Array.from(new Set([...sources, ...sinks])).sort();
@@ -156,22 +170,32 @@ function buildLayout(edges: RouteEdge[]): { nodes: MapNode[]; height: number } {
   }
 
   const nodes: MapNode[] = [];
+  const colHeights: number[] = [];
   cols.forEach((ids, col) => {
-    ids.forEach((id, i) => {
+    let runningY = TOP_PAD;
+    ids.forEach((id) => {
+      const isSink = sinks.has(id);
+      const incoming = incomingByNode.get(id) ?? [];
+      const h = mapNodeHeight(isSink, incoming.length);
       nodes.push({
         id,
         label: id,
         isSource: sources.has(id),
-        isSink: sinks.has(id),
+        isSink,
         col,
         x: COL_X[col],
-        y: TOP_PAD + i * ROW_PITCH,
+        y: runningY,
+        h,
+        incoming,
       });
+      runningY += h + ROW_GAP;
     });
+    // runningY overshoots by one ROW_GAP after the last node; subtract it back.
+    colHeights.push(ids.length > 0 ? runningY - ROW_GAP : TOP_PAD);
   });
 
-  const maxRows = Math.max(1, ...cols.map((c) => c.length));
-  const height = TOP_PAD * 2 + (maxRows - 1) * ROW_PITCH + NODE_H;
+  const tallest = Math.max(TOP_PAD + BASE_H, ...colHeights);
+  const height = tallest + TOP_PAD;
   return { nodes, height };
 }
 
@@ -196,9 +220,19 @@ function NodeBox({ node }: { node: MapNode }): React.JSX.Element {
       </tspan>,
     );
 
-  // Truncate long station names to fit the node width (~16 chars at 13px).
+  // Truncate long station names to fit the node width.
   const label =
-    node.label.length > 17 ? node.label.slice(0, 16) + "…" : node.label;
+    node.label.length > 18 ? node.label.slice(0, 17) + "…" : node.label;
+
+  // Cargo lines: one per incoming edge, only for sinks. Pure-source nodes show
+  // just the name + role. Long commodity names are truncated so the line fits.
+  const cargoLines = node.isSink
+    ? node.incoming.map((e) => ({
+        id: e.id,
+        text: `${truncCommodity(e.commodity)} · ${fmt(e.scu)}`,
+        done: e.done,
+      }))
+    : [];
 
   return (
     <g>
@@ -206,7 +240,7 @@ function NodeBox({ node }: { node: MapNode }): React.JSX.Element {
         x={node.x}
         y={node.y}
         width={NODE_W}
-        height={NODE_H}
+        height={node.h}
         rx={6}
         fill="var(--window)"
         stroke="var(--border-strong)"
@@ -234,8 +268,27 @@ function NodeBox({ node }: { node: MapNode }): React.JSX.Element {
       >
         {roleParts}
       </text>
+      {cargoLines.map((line, i) => (
+        <text
+          key={line.id}
+          x={node.x + NODE_W / 2}
+          y={node.y + HEADER_H + i * LINE_H + 4}
+          textAnchor="middle"
+          fontFamily="var(--font-mono)"
+          fontSize={11}
+          fill={line.done ? "var(--muted)" : "var(--primary)"}
+        >
+          {line.text}
+        </text>
+      ))}
     </g>
   );
+}
+
+// Truncate a commodity name so a "<commodity> · <scu>" line fits the node width.
+function truncCommodity(name: string): string {
+  const n = name || "?";
+  return n.length > 18 ? n.slice(0, 17) + "…" : n;
 }
 
 function EdgeLine({
@@ -247,13 +300,14 @@ function EdgeLine({
   from: MapNode;
   to: MapNode;
 }): React.JSX.Element {
-  // Anchor on the node edges facing the flow direction. Same-column or
-  // right-to-left layouts still connect sensibly (left/right midpoints).
+  // Anchor on the node edges facing the flow direction, at each node's actual
+  // vertical center (heights now vary). Same-column or right-to-left layouts
+  // still connect sensibly (left/right midpoints).
   const goingRight = to.x >= from.x;
   const x1 = goingRight ? from.x + NODE_W : from.x;
-  const y1 = from.y + NODE_H / 2;
+  const y1 = from.y + from.h / 2;
   const x2 = goingRight ? to.x : to.x + NODE_W;
-  const y2 = to.y + NODE_H / 2;
+  const y2 = to.y + to.h / 2;
   return (
     <g opacity={edge.done ? 0.32 : 1}>
       <line
@@ -261,7 +315,7 @@ function EdgeLine({
         y1={y1}
         x2={x2}
         y2={y2}
-        stroke="var(--primary)"
+        stroke={edge.done ? "var(--muted)" : "var(--primary)"}
         strokeWidth={1.6}
         strokeOpacity={0.7}
         strokeDasharray={edge.done ? "5 4" : undefined}
@@ -269,113 +323,6 @@ function EdgeLine({
       />
       {/* amber pick-up dot at the source end */}
       <circle cx={x1} cy={y1} r={3.6} fill="var(--secondary)" />
-      {/* The commodity+SCU label is rendered in a later pass (see EdgeLabel) so
-          it sits above all edges on an opaque plate, de-overlapped per column. */}
-    </g>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Edge labels — a small opaque plate (rounded rect) with the commodity + SCU
-// text on top, so crossing edge lines can't smear or pass through the text.
-// Positions are resolved centrally in layoutLabels (below) so fan-out edges
-// that share a midpoint x don't stack their plates.
-// ---------------------------------------------------------------------------
-const LABEL_H = 18; // plate height
-const LABEL_CHAR_W = 6.6; // est. mono glyph advance at 11px
-const LABEL_PAD = 12; // horizontal padding inside the plate
-const LABEL_GAP = 4; // min vertical gap between stacked plates
-
-interface LabelPlacement {
-  edge: RouteEdge;
-  text: string;
-  cx: number; // plate center x
-  cy: number; // plate center y (post de-overlap)
-  w: number; // plate width
-  h: number; // plate height
-  dim: boolean; // dim (done) hauls
-}
-
-// Build label placements for every drawable edge, then greedily nudge plates
-// down so x-overlapping plates don't collide. Pure: uses estimated widths, no
-// DOM measurement. Deterministic given the (already sorted) edge order.
-function layoutLabels(
-  edges: RouteEdge[],
-  nodeById: Map<string, MapNode>,
-): LabelPlacement[] {
-  const placements: LabelPlacement[] = [];
-  for (const edge of edges) {
-    const from = nodeById.get(edge.fromLocation);
-    const to = nodeById.get(edge.toLocation);
-    if (!from || !to) continue;
-
-    const goingRight = to.x >= from.x;
-    const x1 = goingRight ? from.x + NODE_W : from.x;
-    const y1 = from.y + NODE_H / 2;
-    const x2 = goingRight ? to.x : to.x + NODE_W;
-    const y2 = to.y + NODE_H / 2;
-
-    const text = `${edge.commodity || "?"} · ${fmt(edge.scu)}`;
-    const w = text.length * LABEL_CHAR_W + LABEL_PAD;
-    placements.push({
-      edge,
-      text,
-      cx: (x1 + x2) / 2,
-      cy: (y1 + y2) / 2,
-      w,
-      h: LABEL_H,
-      dim: edge.done,
-    });
-  }
-
-  // Greedy vertical de-overlap: sort by intended y, then push each plate below
-  // the previous one whenever their x-ranges overlap.
-  const order = placements
-    .map((_, i) => i)
-    .sort((a, b) => placements[a].cy - placements[b].cy);
-  for (let i = 1; i < order.length; i++) {
-    const cur = placements[order[i]];
-    for (let j = 0; j < i; j++) {
-      const prev = placements[order[j]];
-      const xOverlap = Math.abs(cur.cx - prev.cx) < (cur.w + prev.w) / 2;
-      if (!xOverlap) continue;
-      const minCy = prev.cy + prev.h / 2 + LABEL_GAP + cur.h / 2;
-      if (cur.cy < minCy) cur.cy = minCy;
-    }
-  }
-
-  return placements;
-}
-
-function EdgeLabel({
-  placement,
-}: {
-  placement: LabelPlacement;
-}): React.JSX.Element {
-  const { text, cx, cy, w, h, dim } = placement;
-  return (
-    <g opacity={dim ? 0.32 : 1}>
-      <rect
-        x={cx - w / 2}
-        y={cy - h / 2}
-        width={w}
-        height={h}
-        rx={3}
-        fill="var(--window)"
-        stroke="var(--border)"
-        strokeWidth={1}
-      />
-      <text
-        x={cx}
-        y={cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontFamily="var(--font-mono)"
-        fontSize={11}
-        fill="var(--text)"
-      >
-        {text}
-      </text>
     </g>
   );
 }
