@@ -20,7 +20,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "vitest run",
     "test:watch": "vitest",
-    "rebuild:electron": "cd node_modules/better-sqlite3 && prebuild-install -r electron -t 33.4.11 --arch x64 --force",
+    "rebuild:electron": "node scripts/rebuild-electron.mjs",
     "rebuild:node": "npm rebuild better-sqlite3",
     "dev:fresh": "npm run rebuild:electron && electron-vite dev",
     "fetch:reference": "node scripts/fetch-reference.mjs",
@@ -29,21 +29,21 @@
     "dist": "npm run package:exe"
   },
   "dependencies": {
-    "better-sqlite3": "^12.2.0",
-    "chokidar": "^4.0.3"
+    "better-sqlite3": "^12.11.1",
+    "chokidar": "^5.0.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.10.5",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^33.3.1",
-    "electron-vite": "^2.3.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "typescript": "^5.7.3",
-    "vite": "^5.4.11",
-    "vitest": "^2.1.8"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^39.8.10",
+    "electron-vite": "^5.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.5",
+    "vitest": "^3.2.6"
   }
 }
