@@ -15,8 +15,9 @@
 // typed window.api preload bridge; all fs/network stays in this process.
 // ============================================================================
 
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import { join } from "node:path";
+import { userInfo } from "node:os";
 import { IPC } from "@shared/ipc";
 import type {
   Mission,
@@ -39,6 +40,7 @@ import {
   openMissionStore,
   DatabaseRecoveredError,
   type MissionStore,
+  type CaptureEntry,
 } from "./missionStore";
 import { openSalvageStore, type SalvageStore } from "./salvageStore";
 import {
@@ -65,6 +67,8 @@ import {
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { installConsoleLogger, buildAppInfo, writeAppInfo } from "./logger";
+import { buildDiagnosticsReport } from "./diagnosticsExport";
+import type { ExportReportResult } from "@shared/types";
 
 // ---------------------------------------------------------------------------
 // Process-wide singletons, created on app-ready (need app.getPath('userData')).
@@ -165,6 +169,73 @@ function resetCurrentLocation(): void {
 // store ignores (transient), so we handle it here.
 // ---------------------------------------------------------------------------
 
+/**
+ * Parser-side capture trace: log one concise `[capture]` line per lifecycle-
+ * defining domain event, mirrored into main.log by the file logger. Deliberately
+ * narrow — only accepted / marker / objective / ended carry diagnostic weight; the
+ * high-frequency locationInventory + payout/fine lines are skipped to avoid spam.
+ * Fully guarded (a diagnostics aid must never break the tail).
+ */
+function logCaptureForEvent(event: DomainEvent, source: EventSource): void {
+  try {
+    switch (event.type) {
+      case "missionAccepted":
+        console.log(
+          `[capture] accepted mission ${event.missionId} "${event.title}" (${source})`,
+        );
+        return;
+      case "missionMarker":
+        console.log(
+          `[capture] marker mission ${event.missionId} objective ${event.objectiveId} (${event.kind})`,
+        );
+        return;
+      case "objectiveDeclared":
+        console.log(
+          `[capture] objective mission ${event.missionId} ${event.objectiveId} ${event.scuTotal} SCU ${event.commodity} -> ${event.location}`,
+        );
+        return;
+      case "objectiveCompleted":
+        console.log(
+          `[capture] objective-complete mission ${event.missionId} ${event.objectiveId}`,
+        );
+        return;
+      case "missionEnded":
+        console.log(
+          `[capture] ended mission ${event.missionId} (${event.completionType})`,
+        );
+        return;
+      default:
+        // payoutAwarded / fined / locationInventory: not lifecycle-defining for
+        // the "accepted vs stored" comparison — skip to keep the log readable.
+        return;
+    }
+  } catch {
+    /* never break the tail for a log line */
+  }
+}
+
+/**
+ * Store-side capture trace: the store reports add / update / skip decisions here
+ * (wired via openMissionStore's onCapture). Pairs with logCaptureForEvent so a
+ * drop is visible as `added` for the stored mission and `skipped (reason …)` for
+ * the rest. Guarded by the store already; we just format the line.
+ */
+function logStoreCapture(entry: CaptureEntry): void {
+  try {
+    if (entry.kind === "skipped") {
+      console.log(
+        `[capture] store: skipped ${entry.what} ${entry.missionId} (reason: ${entry.reason ?? "unknown"})`,
+      );
+    } else {
+      console.log(
+        `[capture] store: ${entry.kind} ${entry.what} ${entry.missionId}`,
+      );
+    }
+  } catch {
+    /* never break the tail for a log line */
+  }
+}
+
 function onDomainEvent(event: DomainEvent, source: EventSource): void {
   if (event.type === "locationInventory") {
     // Only LIVE observations update the current location; historical backfill
@@ -176,6 +247,11 @@ function onDomainEvent(event: DomainEvent, source: EventSource): void {
     return;
   }
   if (!store) return;
+  // Capture-trace (parser side): a concise line per meaningful mission event so
+  // that, for a "5 accepted, 1 stored" bug, main.log shows 5 `[capture] accepted`
+  // lines and the store side shows 1 `added` + 4 `skipped`. Guarded so it never
+  // throws; only the lifecycle-defining events are logged (no per-noise-line spam).
+  logCaptureForEvent(event, source);
   try {
     // guard() recovers-and-rebuilds (then rethrows DatabaseRecoveredError) if a
     // SQLITE_CORRUPT is thrown mid-apply, so a corrupt db rebuilds instead of
@@ -529,6 +605,68 @@ function registerIpc(): void {
     return settings.mode;
   });
 
+  // --- Diagnostics / issue report ("Collect Logs") ------------------------
+  // Build a timestamped, REDACTED report folder + zip on the Desktop from the
+  // user's problem description. Fully defensive: any failure returns an { error }
+  // result instead of throwing into the renderer (a reporting tool must never
+  // crash the app). The report pairs the Game.log mission-event extract (what the
+  // game logged) with the store's captured state (what the app captured).
+
+  ipcMain.handle(
+    IPC.DIAGNOSTICS_EXPORT_REPORT,
+    (_e, input: { description: string }): ExportReportResult => {
+      try {
+        const description =
+          typeof input?.description === "string" ? input.description : "";
+        const userDataDir = app.getPath("userData");
+        let desktopDir = userDataDir;
+        try {
+          desktopDir = app.getPath("desktop");
+        } catch {
+          desktopDir = userDataDir;
+        }
+        let windowsUsername: string | null = null;
+        try {
+          windowsUsername = userInfo().username || null;
+        } catch {
+          windowsUsername = process.env["USERNAME"] ?? null;
+        }
+
+        const out = buildDiagnosticsReport({
+          description,
+          desktopDir,
+          userDataDir,
+          appVersion: app.getVersion(),
+          mode: settings.mode,
+          gameLogPath: resolvedLogPath(),
+          windowsUsername,
+          missions: safeRead(() => store!.listMissions(), []),
+          salvageRuns: salvage ? salvage.listRuns() : [],
+        });
+        console.log("[main] diagnostics report written:", out.zip);
+        return { outcome: "ok", folder: out.folder, zip: out.zip };
+      } catch (err) {
+        console.error("[main] diagnostics export failed:", err);
+        return {
+          outcome: "error",
+          error:
+            "Could not create the report. " +
+            String(err instanceof Error ? err.message : err),
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(IPC.DIAGNOSTICS_OPEN_PATH, (_e, targetPath: string): void => {
+    try {
+      if (typeof targetPath === "string" && targetPath.length > 0) {
+        shell.showItemInFolder(targetPath);
+      }
+    } catch (err) {
+      console.error("[main] showItemInFolder failed:", err);
+    }
+  });
+
   // --- Salvage tracker -----------------------------------------------------
   // Separate domain backed by the salvage store + bundled reference. Every
   // mutation re-broadcasts the full run list (salvage:runs:changed) so any open
@@ -659,6 +797,8 @@ async function boot(): Promise<void> {
         "[main] corrupt database recovered on open; quarantined to:",
         quarantinedTo,
       ),
+    // Store-side capture trace -> console -> main.log (see logStoreCapture).
+    onCapture: logStoreCapture,
   });
   // Reference data is a bundled local snapshot — no token, no network, no TTL.
   uex = createUexClient();

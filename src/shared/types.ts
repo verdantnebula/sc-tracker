@@ -265,6 +265,22 @@ export interface PickLogFolderResult {
   error?: string;
 }
 
+/**
+ * Result of the in-app "Collect Logs" issue-report export. On success a report
+ * folder + zip were written to the Desktop (or userData fallback). On failure
+ * nothing usable was produced and `error` explains why — the export is fully
+ * defensive and never throws into the renderer.
+ */
+export interface ExportReportResult {
+  outcome: "ok" | "error";
+  /** Populated on "ok": absolute path to the created report folder. */
+  folder?: string;
+  /** Populated on "ok": absolute path to the created zip beside the folder. */
+  zip?: string;
+  /** Populated on "error": a human-readable message for the dialog. */
+  error?: string;
+}
+
 /** Backfill progress, driven by the real logbackups scan (design README §7). */
 export interface BackfillProgress {
   /** 0..100. */

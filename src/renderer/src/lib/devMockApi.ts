@@ -26,6 +26,7 @@ import type {
   Leg,
   LogPathInfo,
   PickLogFolderResult,
+  ExportReportResult,
   AppMode,
   SalvageRun,
   SalvageRunInput,
@@ -512,6 +513,18 @@ function createMockApi(): ApiBridge {
     setMode: async (next: AppMode): Promise<AppMode> => {
       mode = next === "salvage" ? "salvage" : "cargo";
       return mode;
+    },
+
+    // --- diagnostics / issue report (dev stub — no fs in a browser tab) ---
+    exportDiagnostics: async (input: {
+      description: string;
+    }): Promise<ExportReportResult> => ({
+      outcome: "ok",
+      folder: "C:/[dev-mock]/Desktop/sc-tracker-report-00000000-000000",
+      zip: `C:/[dev-mock]/Desktop/sc-tracker-report-00000000-000000.zip (desc: ${input.description.slice(0, 24)}…)`,
+    }),
+    openReportPath: async (): Promise<void> => {
+      /* dev no-op: no OS shell in a plain browser tab */
     },
 
     // --- salvage tracker (in-memory dev stubs) ---

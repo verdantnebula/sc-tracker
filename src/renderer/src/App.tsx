@@ -29,6 +29,7 @@ import { MissionDetailPanel } from "./components/MissionDetailPanel";
 import { ManualEntryForm } from "./components/ManualEntryForm";
 import { BackfillOverlay } from "./components/BackfillOverlay";
 import { EmptyState } from "./components/EmptyState";
+import { CollectLogsDialog } from "./components/CollectLogsDialog";
 
 import {
   dropoffGroups,
@@ -105,6 +106,7 @@ function CargoApp({
   const [tab, setTab] = useState<TabKey>("dropoff");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showCollectLogs, setShowCollectLogs] = useState(false);
   const [density, setDensity] = useState<"comfortable" | "compact">(
     "comfortable",
   );
@@ -327,6 +329,7 @@ function CargoApp({
         onManualAdd={() => setShowForm(true)}
         onReset={resetAll}
         onPickLogFolder={pickLogFolder}
+        onCollectLogs={() => setShowCollectLogs(true)}
         onToggleMode={onToggleMode}
       />
 
@@ -467,6 +470,11 @@ function CargoApp({
             onCancel={() => setShowForm(false)}
             onSave={saveManual}
           />
+        )}
+
+        {/* Collect Logs / Report a Problem dialog */}
+        {showCollectLogs && (
+          <CollectLogsDialog onClose={() => setShowCollectLogs(false)} />
         )}
 
         {/* backfill overlay */}

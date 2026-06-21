@@ -16,6 +16,7 @@ import type {
   BackfillProgress,
   LogPathInfo,
   PickLogFolderResult,
+  ExportReportResult,
   AppMode,
   SalvageRun,
   SalvageRunInput,
@@ -47,6 +48,10 @@ export const IPC = {
   SETTINGS_SET_LOG_PATH: "settings:setLogPath",
   SETTINGS_GET_MODE: "settings:getMode",
   SETTINGS_SET_MODE: "settings:setMode",
+
+  // diagnostics / issue report ("Collect Logs")
+  DIAGNOSTICS_EXPORT_REPORT: "diagnostics:exportReport",
+  DIAGNOSTICS_OPEN_PATH: "diagnostics:openPath",
 
   // salvage tracker (additive — separate domain, separate tables)
   SALVAGE_LIST_RUNS: "salvage:listRuns",
@@ -105,6 +110,15 @@ export interface IpcRequestMap {
   [IPC.SETTINGS_GET_MODE]: { args: []; result: AppMode };
   /** Persist a new app mode; returns the saved mode (defaults defensively). */
   [IPC.SETTINGS_SET_MODE]: { args: [mode: AppMode]; result: AppMode };
+
+  // --- diagnostics / issue report ---
+  /** Build a redacted issue-report folder + zip on the Desktop from a description. */
+  [IPC.DIAGNOSTICS_EXPORT_REPORT]: {
+    args: [input: { description: string }];
+    result: ExportReportResult;
+  };
+  /** Reveal a path in the OS file manager (shell.showItemInFolder). */
+  [IPC.DIAGNOSTICS_OPEN_PATH]: { args: [targetPath: string]; result: void };
 
   // --- salvage tracker ---
   /** All salvage runs, newest first. */
@@ -188,6 +202,14 @@ export interface ApiBridge {
   getMode(): Promise<AppMode>;
   /** Persist the app mode; resolves to the saved mode. */
   setMode(mode: AppMode): Promise<AppMode>;
+
+  // --- diagnostics / issue report ("Collect Logs") ---
+  /** Build a redacted issue-report folder + zip on the Desktop. */
+  exportDiagnostics(input: {
+    description: string;
+  }): Promise<ExportReportResult>;
+  /** Reveal a saved report path in the OS file manager. */
+  openReportPath(targetPath: string): Promise<void>;
 
   // --- salvage tracker ---
   /** All salvage runs, newest first. */

@@ -12,8 +12,11 @@ import { ModeSwitcher } from "./ModeSwitcher";
 
 export function SalvageTopBar({
   onToggleMode,
+  onCollectLogs,
 }: {
   onToggleMode: () => void;
+  /** Open the "Collect Logs" / Report a Problem dialog. */
+  onCollectLogs: () => void;
 }): React.JSX.Element {
   return (
     <header
@@ -33,7 +36,29 @@ export function SalvageTopBar({
 
       <div style={{ flex: 1 }} />
 
-      {/* Right-hand slot reserved for later-phase salvage controls. */}
+      {/* Report a Problem ("Collect Logs") — token-driven so it skins to Drake. */}
+      <button
+        className="sc-ghost-btn"
+        onClick={onCollectLogs}
+        title="Report a problem (collect logs)"
+        aria-label="Report a problem (collect logs)"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          padding: "8px 13px",
+          background: "transparent",
+          border: "1px solid var(--border-strong)",
+          color: "var(--text-2)",
+          fontFamily: "var(--font-display)",
+          fontWeight: 600,
+          fontSize: 12,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        🛟 COLLECT LOGS
+      </button>
     </header>
   );
 }

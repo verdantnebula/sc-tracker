@@ -158,6 +158,25 @@ export interface MissionStoreOptions {
    * argument is where the bad files were quarantined (null = nothing to move).
    */
   onRecover?: (quarantinedTo: string | null) => void;
+  /**
+   * Optional capture-trace sink. The store calls this at the decisions a
+   * diagnostics report needs to explain an "N accepted, M stored" bug: when it
+   * ADDS a new mission, when it SKIPS adding one (and why), and when a leg is
+   * added/skipped. The host wires this to console (mirrored into main.log) so
+   * the log self-explains the drop. Best-effort: the store guards every call, so
+   * a throwing sink can never disturb event application.
+   */
+  onCapture?: (entry: CaptureEntry) => void;
+}
+
+/** One capture-trace entry emitted by the store for the diagnostics log. */
+export interface CaptureEntry {
+  kind: "added" | "updated" | "skipped";
+  /** What was added/updated/skipped. */
+  what: "mission" | "leg";
+  missionId: string;
+  /** Present for skips: why the action was a no-op. */
+  reason?: string;
 }
 
 const DEFAULT_PAYOUT_WINDOW_MS = 2000;
@@ -269,12 +288,14 @@ class SqliteMissionStore implements MissionStore {
   private seq = 0;
   private recovered = false;
   private readonly onRecover?: (quarantinedTo: string | null) => void;
+  private readonly onCapture?: (entry: CaptureEntry) => void;
   /** Source of the event currently being applied (set per applyEvent call). */
   private currentSource: EventSource = "live";
 
   constructor(opts: MissionStoreOptions) {
     this.dbPath = opts.dbPath;
     this.onRecover = opts.onRecover;
+    this.onCapture = opts.onCapture;
     // Resilient open: detect a malformed image (PRAGMA quick_check or a thrown
     // SQLITE_CORRUPT) and auto-recover by quarantining the bad files aside and
     // recreating a fresh db — the data is re-derivable from the logs, so a
@@ -374,6 +395,16 @@ class SqliteMissionStore implements MissionStore {
     return this.seq++;
   }
 
+  /** Emit a capture-trace entry, guarded so a bad sink never breaks ingest. */
+  private capture(entry: CaptureEntry): void {
+    if (!this.onCapture) return;
+    try {
+      this.onCapture(entry);
+    } catch {
+      /* a diagnostics sink must never disturb event application */
+    }
+  }
+
   /** Idempotent upsert of the mission shell. Never clobbers richer existing data. */
   private ensureMission(
     id: string,
@@ -381,6 +412,7 @@ class SqliteMissionStore implements MissionStore {
   ): void {
     const existing = this.rawMission(id);
     if (existing) return;
+    this.capture({ kind: "added", what: "mission", missionId: id });
     this.db
       .prepare(
         `INSERT INTO missions
@@ -410,7 +442,16 @@ class SqliteMissionStore implements MissionStore {
     const existing = this.rawMission(e.missionId);
     if (existing) {
       // Idempotent: fill in title/acceptedAt if we learned them later, but never
-      // downgrade a terminal status back to 'accepted'.
+      // downgrade a terminal status back to 'accepted'. For the capture trace
+      // this is a SKIP (the mission was already stored) — the common, benign
+      // case on a re-read; a genuine "accepted but never stored" bug shows up as
+      // the ABSENCE of any 'added mission' line for that id.
+      this.capture({
+        kind: "skipped",
+        what: "mission",
+        missionId: e.missionId,
+        reason: "already stored (idempotent re-accept)",
+      });
       this.db
         .prepare(
           `UPDATE missions
@@ -628,6 +669,7 @@ class SqliteMissionStore implements MissionStore {
       .prepare(`SELECT 1 FROM legs WHERE mission_id = @m AND objective_id = @o`)
       .get({ m: missionId, o: objectiveId });
     if (!exists) {
+      this.capture({ kind: "added", what: "leg", missionId });
       this.db
         .prepare(
           `INSERT INTO legs

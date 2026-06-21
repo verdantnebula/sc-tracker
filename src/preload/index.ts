@@ -18,6 +18,7 @@ import type {
   BackfillProgress,
   LogPathInfo,
   PickLogFolderResult,
+  ExportReportResult,
   AppMode,
   SalvageRun,
   SalvageRunInput,
@@ -73,6 +74,15 @@ const api: ApiBridge = {
   getMode: () => ipcRenderer.invoke(IPC.SETTINGS_GET_MODE) as Promise<AppMode>,
   setMode: (mode: AppMode) =>
     ipcRenderer.invoke(IPC.SETTINGS_SET_MODE, mode) as Promise<AppMode>,
+
+  // --- diagnostics / issue report ("Collect Logs") ---
+  exportDiagnostics: (input: { description: string }) =>
+    ipcRenderer.invoke(
+      IPC.DIAGNOSTICS_EXPORT_REPORT,
+      input,
+    ) as Promise<ExportReportResult>,
+  openReportPath: (targetPath: string) =>
+    ipcRenderer.invoke(IPC.DIAGNOSTICS_OPEN_PATH, targetPath) as Promise<void>,
 
   // --- salvage tracker ---
   listSalvageRuns: () =>

@@ -18,6 +18,7 @@ import { SalvageActiveRunView } from "./salvage/SalvageActiveRunView";
 import { SalvageSellSplitView } from "./salvage/SalvageSellSplitView";
 import { SalvageHistoryView } from "./salvage/SalvageHistoryView";
 import { SalvageReferenceView } from "./salvage/SalvageReferenceView";
+import { CollectLogsDialog } from "./CollectLogsDialog";
 
 /** The salvage tabs. */
 export type SalvageTab = "run" | "split" | "history" | "reference";
@@ -45,6 +46,7 @@ export function SalvageShell({
   onToggleMode: () => void;
 }): React.JSX.Element {
   const [tab, setTab] = useState<SalvageTab>("run");
+  const [showCollectLogs, setShowCollectLogs] = useState(false);
 
   // --- server-backed state (via window.api salvage channels) ---
   const [runs, setRuns] = useState<SalvageRun[]>([]);
@@ -116,7 +118,14 @@ export function SalvageShell({
         background: "var(--bg)",
       }}
     >
-      <SalvageTopBar onToggleMode={onToggleMode} />
+      <SalvageTopBar
+        onToggleMode={onToggleMode}
+        onCollectLogs={() => setShowCollectLogs(true)}
+      />
+
+      {showCollectLogs && (
+        <CollectLogsDialog onClose={() => setShowCollectLogs(false)} />
+      )}
 
       {/* Hazard-stripe accent bar — Drake's industrial signature. */}
       <div
