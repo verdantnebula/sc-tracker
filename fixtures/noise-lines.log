@@ -1,0 +1,7 @@
+<2026-06-19T21:40:07.042Z> [Error] <CommsNotifications> Failed to get tags from ContractTemplate[00000000-0000-0000-0000-000000000000][HaulCargo_Multi2ToSingle_Waste_Waste_Stanton1_SupplyGrade], could not find ObjectiveTokenDef with phaseId[5fd91d53-bf84-4ebd-8431-294eccf274bd] [Team_MissionFeatures][Missions]
+<2026-06-19T22:09:03.620Z> [Notice] <CObjectiveMarkerComponent::RemoveFromPlayerDataBank> Removing objective marker from player data bank: objectiveId [dropoff_b813c5bb-6bc3-4275-9c88-e25760312ac6_0] [Team_MissionFeatures][Missions]
+<2026-06-19T21:03:51.969Z> [Notice] <CObjectiveMarkerComponent::AddToPlayerDataBank> Adding objective marker to player data bank: objectiveId [dropoff_b813c5bb-6bc3-4275-9c88-e25760312ac6_0] [Team_MissionFeatures][Missions]
+<2026-06-19T21:03:52.001Z> [Notice] <CMissionLogEntry::UpdateActiveObjective> Updating active objective: uiDisplay[Text=<= UNINITIALIZED =>] [Team_MissionFeatures][Missions]
+<2026-06-19T22:11:52.400Z> [Notice] <CSCPlayerMissionLog::MissionStartCommsNotification> Mission start comms notification fired [Team_MissionFeatures][Missions]
+<2026-06-19T21:48:04.520Z> [Notice] <Requesting Transition> Some unrelated transition log line [Team_Network]
+

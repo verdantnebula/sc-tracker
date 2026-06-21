@@ -1,0 +1,49 @@
+{
+  "name": "sc-cargo-tracker",
+  "version": "1.0.0",
+  "description": "Desktop companion for Star Citizen cargo hauling — log-driven mission tracking and by-dropoff unload aggregation.",
+  "private": true,
+  "author": "verdantnebula",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/verdantnebula/sc-tracker"
+  },
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "rebuild:electron": "cd node_modules/better-sqlite3 && prebuild-install -r electron -t 33.4.11 --arch x64 --force",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "dev:fresh": "npm run rebuild:electron && electron-vite dev",
+    "fetch:reference": "node scripts/fetch-reference.mjs",
+    "package:exe": "npm run rebuild:electron && electron-vite build && npx --yes @electron/packager . --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"config\\.local\\.json\"",
+    "dist": "electron-vite build && electron-builder"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "chokidar": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,57 @@
+/* Design tokens — source of truth: design_handoff_sc_cargo_tracker/README.md §Design Tokens.
+   Phase-4 (UI) builds components against these. Do not redefine ad-hoc colors. */
+:root {
+  /* Surfaces */
+  --bg: #04070a;
+  --window: #070c10;
+  --surface: #0a1116;
+  --surface-2: #0c151b;
+  --card-grad: linear-gradient(
+    180deg,
+    rgba(13, 24, 30, 0.92),
+    rgba(8, 14, 18, 0.7)
+  );
+
+  /* Accents */
+  --primary: #34e0e0;
+  --primary-hover: #5ff0e8;
+  --primary-dim: #1c9aa0;
+  --secondary: #ffb24a;
+  --success: #54e08a;
+  --danger: #ff6b6b;
+
+  /* Text */
+  --text: #cfe3ea;
+  --text-bright: #eafcff;
+  --text-2: #9fc0cc;
+  --muted: #6f8794;
+  --muted-done: #5b7079;
+
+  /* Borders */
+  --border: rgba(86, 180, 200, 0.16);
+  --border-strong: rgba(86, 180, 200, 0.3);
+
+  /* Status */
+  --status-accepted: #7d93a0;
+  --status-accepted-bg: rgba(125, 147, 160, 0.12);
+  --status-progress: #ffb24a;
+  --status-progress-bg: rgba(255, 178, 74, 0.13);
+  --status-complete: #54e08a;
+  --status-complete-bg: rgba(84, 224, 138, 0.13);
+  --status-abandoned: #ff6b6b;
+  --status-abandoned-bg: rgba(255, 107, 107, 0.12);
+
+  /* Typography */
+  --font-display: "Oxanium", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Signature angular notch (cards) */
+  --notch: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 13px),
+    calc(100% - 13px) 100%,
+    0 100%
+  );
+}

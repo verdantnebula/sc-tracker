@@ -1,0 +1,1271 @@
+{
+  "fetchedAt": 1781917412569,
+  "source": "uexcorp.space API 2.0",
+  "commodities": [
+    {
+      "name": "Agricium",
+      "code": "AGRI",
+      "kind": "Metal"
+    },
+    {
+      "name": "Agricium (Ore)",
+      "code": "AGRI",
+      "kind": "Metal"
+    },
+    {
+      "name": "Agricultural Supplies",
+      "code": "AGRS",
+      "kind": "Agricultural"
+    },
+    {
+      "name": "Altruciatoxin",
+      "code": "AUTR",
+      "kind": "Drug"
+    },
+    {
+      "name": "Aluminum",
+      "code": "ALUM",
+      "kind": "Metal"
+    },
+    {
+      "name": "Aluminum (Ore)",
+      "code": "ALUM",
+      "kind": "Metal"
+    },
+    {
+      "name": "Amioshi Plague",
+      "code": "AMIP",
+      "kind": "Natural"
+    },
+    {
+      "name": "Aphorite",
+      "code": "APHO",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Astatine",
+      "code": "ASTA",
+      "kind": "Halogen"
+    },
+    {
+      "name": "Audio-Visual Equipment",
+      "code": "AUDI",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Beryl",
+      "code": "BERY",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Beryl (Raw)",
+      "code": "BERY",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Bexalite",
+      "code": "BEXA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Bexalite (Raw)",
+      "code": "BEXA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Borase",
+      "code": "BORA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Borase (Ore)",
+      "code": "BORA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Chlorine",
+      "code": "CHLO",
+      "kind": "Halogen"
+    },
+    {
+      "name": "Compboard",
+      "code": "COMP",
+      "kind": "Scrap"
+    },
+    {
+      "name": "Construction Materials",
+      "code": "CMAT",
+      "kind": "Scrap"
+    },
+    {
+      "name": "Copper",
+      "code": "COPP",
+      "kind": "Metal"
+    },
+    {
+      "name": "Copper (Ore)",
+      "code": "COPP",
+      "kind": "Metal"
+    },
+    {
+      "name": "Corundum",
+      "code": "CORU",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Corundum (Raw)",
+      "code": "CORU",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Degnous Root",
+      "code": "DEGR",
+      "kind": "Natural"
+    },
+    {
+      "name": "Diamond",
+      "code": "DIAM",
+      "kind": "Metal"
+    },
+    {
+      "name": "Diamond (Raw)",
+      "code": "DIAM",
+      "kind": "Metal"
+    },
+    {
+      "name": "Distilled Spirits",
+      "code": "DIST",
+      "kind": "Vice"
+    },
+    {
+      "name": "Dolivine",
+      "code": "DOLI",
+      "kind": "Mineral"
+    },
+    {
+      "name": "E'tam",
+      "code": "ETAM",
+      "kind": "Drug"
+    },
+    {
+      "name": "Fireworks",
+      "code": "FIRE",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Fluorine",
+      "code": "FLUO",
+      "kind": "Halogen"
+    },
+    {
+      "name": "Gasping Weevil Eggs",
+      "code": "GAWE",
+      "kind": "Natural"
+    },
+    {
+      "name": "Gold",
+      "code": "GOLD",
+      "kind": "Metal"
+    },
+    {
+      "name": "Gold (Ore)",
+      "code": "GOLD",
+      "kind": "Metal"
+    },
+    {
+      "name": "Golden Medmon",
+      "code": "GOLM",
+      "kind": "Natural"
+    },
+    {
+      "name": "Hadanite",
+      "code": "HADA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Heart of the Woods",
+      "code": "HOTW",
+      "kind": "Natural"
+    },
+    {
+      "name": "Helium",
+      "code": "HELI",
+      "kind": "Gas"
+    },
+    {
+      "name": "Hephaestanite",
+      "code": "HEPH",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Hephaestanite (Raw)",
+      "code": "HEPH",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Hydrogen",
+      "code": "HYDR",
+      "kind": "Gas"
+    },
+    {
+      "name": "Inert Materials",
+      "code": "INER",
+      "kind": "Other"
+    },
+    {
+      "name": "Iodine",
+      "code": "IODI",
+      "kind": "Halogen"
+    },
+    {
+      "name": "Iron",
+      "code": "IRON",
+      "kind": "Metal"
+    },
+    {
+      "name": "Iron (Ore)",
+      "code": "IRONO",
+      "kind": "Metal"
+    },
+    {
+      "name": "Janalite",
+      "code": "JANA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Laranite",
+      "code": "LARA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Laranite (Raw)",
+      "code": "LARA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Luminalia Gift",
+      "code": "LUMG",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Maze",
+      "code": "MAZE",
+      "kind": "Drug"
+    },
+    {
+      "name": "Medical Supplies",
+      "code": "MEDS",
+      "kind": "Medical"
+    },
+    {
+      "name": "Neon",
+      "code": "NEON",
+      "kind": "Drug"
+    },
+    {
+      "name": "Osoian Hides",
+      "code": "OSOH",
+      "kind": "Vice"
+    },
+    {
+      "name": "Party Favors",
+      "code": "PART",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Pitambu",
+      "code": "PITA",
+      "kind": "Food"
+    },
+    {
+      "name": "Processed Food",
+      "code": "PFOO",
+      "kind": "Food"
+    },
+    {
+      "name": "Prota",
+      "code": "PROT",
+      "kind": "Natural"
+    },
+    {
+      "name": "Quantainium",
+      "code": "QUAN",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Quantainium (Raw)",
+      "code": "QUAN",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Quartz",
+      "code": "QUAR",
+      "kind": "Metal"
+    },
+    {
+      "name": "Quartz (Raw)",
+      "code": "QUAR",
+      "kind": "Metal"
+    },
+    {
+      "name": "Ranta Dung",
+      "code": "RAND",
+      "kind": "Agricultural"
+    },
+    {
+      "name": "Recycled Material Composite",
+      "code": "RMC",
+      "kind": "Scrap"
+    },
+    {
+      "name": "Year of the Monkey Envelope",
+      "code": "YTMO",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Revenant Pod",
+      "code": "REVP",
+      "kind": "Natural"
+    },
+    {
+      "name": "Revenant Tree Pollen",
+      "code": "REVE",
+      "kind": "Vice"
+    },
+    {
+      "name": "Scrap",
+      "code": "SCRA",
+      "kind": "Scrap"
+    },
+    {
+      "name": "SLAM",
+      "code": "SLAM",
+      "kind": "Drug"
+    },
+    {
+      "name": "Souvenirs",
+      "code": "SOUV",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Stims",
+      "code": "STIM",
+      "kind": "Vice"
+    },
+    {
+      "name": "Stone Bug Shell",
+      "code": "STBS",
+      "kind": "Natural"
+    },
+    {
+      "name": "Sunset Berries",
+      "code": "SUNB",
+      "kind": "Natural"
+    },
+    {
+      "name": "Taranite",
+      "code": "TARA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Taranite (Raw)",
+      "code": "TARA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Titanium",
+      "code": "TITA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Titanium (Ore)",
+      "code": "TITA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Tungsten",
+      "code": "TUNG",
+      "kind": "Metal"
+    },
+    {
+      "name": "Tungsten (Ore)",
+      "code": "TUNG",
+      "kind": "Metal"
+    },
+    {
+      "name": "Waste",
+      "code": "WAST",
+      "kind": "Waste"
+    },
+    {
+      "name": "WiDoW",
+      "code": "WIDO",
+      "kind": "Drug"
+    },
+    {
+      "name": "Year of the Rooster Envelope",
+      "code": "YTRO",
+      "kind": "Temporary"
+    },
+    {
+      "name": "AcryliPlex Composite",
+      "code": "ACCO",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Diluthermex",
+      "code": "DILU",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Zeta-Prolanide",
+      "code": "ZEPR",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Ammonia",
+      "code": "AMMO",
+      "kind": "Raw Materials"
+    },
+    {
+      "name": "Quantum Fuel",
+      "code": "QFUE",
+      "kind": "Fuel"
+    },
+    {
+      "name": "Year of the Dog Envelope",
+      "code": "YTDO",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Marok Gem",
+      "code": "MARG",
+      "kind": "Animal"
+    },
+    {
+      "name": "Kopion Horn",
+      "code": "KOPH",
+      "kind": "Medical"
+    },
+    {
+      "name": "DynaFlex",
+      "code": "DYNF",
+      "kind": "Man-Made"
+    },
+    {
+      "name": "Redfin Energy Modulators",
+      "code": "REMO",
+      "kind": "Electronics"
+    },
+    {
+      "name": "LifeCure Medsticks",
+      "code": "LMED",
+      "kind": "Medical"
+    },
+    {
+      "name": "Human Food Bars",
+      "code": "HFBA",
+      "kind": "Commodity"
+    },
+    {
+      "name": "DCSR2",
+      "code": "DCSR",
+      "kind": "Agricultural"
+    },
+    {
+      "name": "Silicon",
+      "code": "SILI",
+      "kind": "Raw Materials"
+    },
+    {
+      "name": "Pressurized Ice",
+      "code": "PICE",
+      "kind": "Raw Materials"
+    },
+    {
+      "name": "Carbon",
+      "code": "CARB",
+      "kind": "Raw Materials"
+    },
+    {
+      "name": "Tin",
+      "code": "TIN",
+      "kind": "Metal"
+    },
+    {
+      "name": "Hydrogen Fuel",
+      "code": "HYDF",
+      "kind": "Fuel"
+    },
+    {
+      "name": "Decari Pod",
+      "code": "DECA",
+      "kind": "Natural"
+    },
+    {
+      "name": "Nitrogen",
+      "code": "NITR",
+      "kind": "Gas"
+    },
+    {
+      "name": "Apoxygenite",
+      "code": "APOX",
+      "kind": "Chemical"
+    },
+    {
+      "name": "Steel",
+      "code": "STEE",
+      "kind": "Alloy"
+    },
+    {
+      "name": "Cobalt",
+      "code": "COBA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Argon",
+      "code": "ARGO",
+      "kind": "Gas"
+    },
+    {
+      "name": "Bioplastic",
+      "code": "BIOPL",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Carbon-Silk",
+      "code": "CSIL",
+      "kind": "Natural"
+    },
+    {
+      "name": "Methane",
+      "code": "METH",
+      "kind": "Gas"
+    },
+    {
+      "name": "Omnapoxy",
+      "code": "OMPO",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Potassium",
+      "code": "POTA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Xa'Pyen",
+      "code": "XAPY",
+      "kind": "Alloy"
+    },
+    {
+      "name": "Diamond Laminate",
+      "code": "DIAL",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Fresh Food",
+      "code": "FFOO",
+      "kind": "Food"
+    },
+    {
+      "name": "Partillium",
+      "code": "PRTL",
+      "kind": "Gas"
+    },
+    {
+      "name": "Stileron",
+      "code": "STIL",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Mercury",
+      "code": "MERC",
+      "kind": "Metal"
+    },
+    {
+      "name": "Riccite",
+      "code": "RICC",
+      "kind": "Metal"
+    },
+    {
+      "name": "Ice (Raw)",
+      "code": "ICEW",
+      "kind": "Liquid"
+    },
+    {
+      "name": "CK13-GID Seed Blend",
+      "code": "CK13",
+      "kind": "Seed"
+    },
+    {
+      "name": "Dymantium",
+      "code": "DYMA",
+      "kind": "Explosive"
+    },
+    {
+      "name": "Ship Ammunition",
+      "code": "SHPA",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "HexaPolyMesh Coating",
+      "code": "HPMC",
+      "kind": "Crafting"
+    },
+    {
+      "name": "Atlasium",
+      "code": "ATLA",
+      "kind": "Metal"
+    },
+    {
+      "name": "Thermalfoam",
+      "code": "FOAM",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Neograph",
+      "code": "NEOG",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Sarilus",
+      "code": "SARI",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Silnex",
+      "code": "SILN",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Lycara",
+      "code": "LYCA",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Lastaphrene",
+      "code": "LAST",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Elespo",
+      "code": "ELES",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Cadmium Allinide",
+      "code": "CAAL",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Krypton",
+      "code": "KRYP",
+      "kind": "Gas"
+    },
+    {
+      "name": "Anti-Hydrogen",
+      "code": "AHYD",
+      "kind": "Gas"
+    },
+    {
+      "name": "Jahlium",
+      "code": "JAHL",
+      "kind": "Metal"
+    },
+    {
+      "name": "Magnesium",
+      "code": "MAGN",
+      "kind": "Metal"
+    },
+    {
+      "name": "Jumping Limes",
+      "code": "JUMP",
+      "kind": "Food"
+    },
+    {
+      "name": "Lunes",
+      "code": "LUNE",
+      "kind": "Food"
+    },
+    {
+      "name": "Arsenic",
+      "code": "ARSE",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Boron",
+      "code": "BORO",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Coal",
+      "code": "COAL",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Crude Oil",
+      "code": "COIL",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Phosphorus",
+      "code": "PHOS",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Selenium",
+      "code": "SELE",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Tellurium",
+      "code": "TELL",
+      "kind": "Non-Metal"
+    },
+    {
+      "name": "Tritium",
+      "code": "TRIT",
+      "kind": "Gas"
+    },
+    {
+      "name": "Xenon",
+      "code": "XENO",
+      "kind": "Gas"
+    },
+    {
+      "name": "Dopple",
+      "code": "DOPP",
+      "kind": "Vice"
+    },
+    {
+      "name": "Freeze",
+      "code": "FREE",
+      "kind": "Vice"
+    },
+    {
+      "name": "Glow",
+      "code": "GLOW",
+      "kind": "Vice"
+    },
+    {
+      "name": "Mala",
+      "code": "MALA",
+      "kind": "Vice"
+    },
+    {
+      "name": "Thrust",
+      "code": "THRU",
+      "kind": "Vice"
+    },
+    {
+      "name": "Zip",
+      "code": "ZIP",
+      "kind": "Vice"
+    },
+    {
+      "name": "Silicon (Raw)",
+      "code": "SILI",
+      "kind": "Raw Materials"
+    },
+    {
+      "name": "Stileron (Raw)",
+      "code": "STIL",
+      "kind": "Man-made"
+    },
+    {
+      "name": "Riccite (Ore)",
+      "code": "RICO",
+      "kind": "Metal"
+    },
+    {
+      "name": "Year of the Pig Envelope",
+      "code": "YTPO",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Cobalt (Raw)",
+      "code": "COBA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Detatrine",
+      "code": "DETA",
+      "kind": "Explosive"
+    },
+    {
+      "name": "Beradom",
+      "code": "BERA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Glacosite",
+      "code": "GLAC",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Feynmaline",
+      "code": "FEYN",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Carinite",
+      "code": "CARI",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Jaclium",
+      "code": "JACL",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Saldynium (Ore)",
+      "code": "SALD",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Jaclium (Ore)",
+      "code": "JACO",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Cave Kopion Horn",
+      "code": "CAVEK",
+      "kind": "Medical"
+    },
+    {
+      "name": "Tundra Kopion Horn",
+      "code": "KOPT",
+      "kind": "Medical"
+    },
+    {
+      "name": "Tin (Ore)",
+      "code": "TINO",
+      "kind": "Metal"
+    },
+    {
+      "name": "Carinite (Pure)",
+      "code": "CARP",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Atacamite",
+      "code": "ATAC",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Irradiated Kopion Horn",
+      "code": "IKOP",
+      "kind": "Natural"
+    },
+    {
+      "name": "Construction Material Rubble",
+      "code": "CMATR",
+      "kind": "Scrap"
+    },
+    {
+      "name": "Construction Material Pebbles",
+      "code": "CMATP",
+      "kind": "Scrap"
+    },
+    {
+      "name": "Construction Material Salvage",
+      "code": "CMATS",
+      "kind": "Scrap"
+    },
+    {
+      "name": "Lindinium",
+      "code": "LIND",
+      "kind": "Metal"
+    },
+    {
+      "name": "Lindinium (Ore)",
+      "code": "LINW",
+      "kind": "Metal"
+    },
+    {
+      "name": "Organics",
+      "code": "ORGN",
+      "kind": "Organics"
+    },
+    {
+      "name": "Savrilium (Ore)",
+      "code": "SAVW",
+      "kind": "Metal"
+    },
+    {
+      "name": "Savrilium",
+      "code": "SAVR",
+      "kind": "Metal"
+    },
+    {
+      "name": "Torite (Ore)",
+      "code": "TORIO",
+      "kind": "Metal"
+    },
+    {
+      "name": "Torite",
+      "code": "TORI",
+      "kind": "Metal"
+    },
+    {
+      "name": "CryoPod",
+      "code": "CRYP",
+      "kind": "Medical"
+    },
+    {
+      "name": "Year of the Rat Envelope",
+      "code": "YTRO",
+      "kind": "Temporary"
+    },
+    {
+      "name": "Aslarite",
+      "code": "ASLA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Ouratite",
+      "code": "OURA",
+      "kind": "mineral"
+    },
+    {
+      "name": "Molina Mold Treatment",
+      "code": "MOLMT",
+      "kind": "Medicine"
+    },
+    {
+      "name": "Molina Ventilation Filters",
+      "code": "MOLVF",
+      "kind": "Medicine"
+    },
+    {
+      "name": "Molina Mold Samples",
+      "code": "MOLMS",
+      "kind": "Medicine"
+    },
+    {
+      "name": "Wuotan Seed",
+      "code": "WUOT",
+      "kind": "Organic"
+    },
+    {
+      "name": "Aslarite (Raw)",
+      "code": "ASLW",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Sadaryx",
+      "code": "SADA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Ship Ammunition - Size 1",
+      "code": "SHPA1",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Ammunition - Size 2",
+      "code": "SHPA2",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Ammunition - Size 3",
+      "code": "SHPA3",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Ammunition - Size 4",
+      "code": "SHPA4",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Ammunition - Size 5",
+      "code": "SHPA5",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Ammunition - Size 6",
+      "code": "SHPA6",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Ammunition - Size 7",
+      "code": "SHPA7",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Decoy Countermeasures",
+      "code": "SHPDC",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ship Noise Countermeasures",
+      "code": "SHPNC",
+      "kind": "Ammunition"
+    },
+    {
+      "name": "Ouratite (Raw)",
+      "code": "OURW",
+      "kind": "Minteral"
+    },
+    {
+      "name": "Sadaryx (Raw)",
+      "code": "SADA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Caranite (Raw)",
+      "code": "CARW",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Caranite",
+      "code": "CARA",
+      "kind": "Mineral"
+    },
+    {
+      "name": "Blue Bilva",
+      "code": "BLUE",
+      "kind": "Food"
+    }
+  ],
+  "terminals": [
+    {
+      "name": "Admin - ARC-L4",
+      "displayname": "ARC-L4 Faint Glen Station",
+      "nickname": "ARC-L4",
+      "isCargoCenter": true,
+      "maxContainerSize": 32
+    },
+    {
+      "name": "Cargo Center Supplies - Baijini Point",
+      "displayname": "Baijini Point",
+      "nickname": "Cargo Baijini",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Center Supplies - Port Tressler",
+      "displayname": "Port Tressler",
+      "nickname": "Cargo Tressler",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Refinery Shop - Nyx Gateway (Stanton)",
+      "displayname": "Nyx Gateway",
+      "nickname": "Refinery Nyx Gtwy (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Refinery Shop - Pyro Gateway (Stanton)",
+      "displayname": "Pyro Gateway",
+      "nickname": "Refinery Pyro Gtwy (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Traveler Rentals - Cargo Center - Seraphim",
+      "displayname": "Seraphim Station",
+      "nickname": "Traveler Seraphim",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Admin - Checkmate",
+      "displayname": "Checkmate",
+      "nickname": "Checkmate",
+      "isCargoCenter": true,
+      "maxContainerSize": 32
+    },
+    {
+      "name": "Refinery Ore Sales - Checkmate",
+      "displayname": "Checkmate Station",
+      "nickname": "Checkmate",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Admin - Orbituary",
+      "displayname": "Orbituary",
+      "nickname": "Orbituary",
+      "isCargoCenter": true,
+      "maxContainerSize": 32
+    },
+    {
+      "name": "Admin - Starlight Service",
+      "displayname": "Starlight Service Station",
+      "nickname": "Starlight Service",
+      "isCargoCenter": true,
+      "maxContainerSize": 32
+    },
+    {
+      "name": "Admin - Ruin Station",
+      "displayname": "Ruin Station",
+      "nickname": "Ruin Station",
+      "isCargoCenter": true,
+      "maxContainerSize": 32
+    },
+    {
+      "name": "Cargo Services - Ruin Station",
+      "displayname": "Ruin Station",
+      "nickname": "Cargo Ruin",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Checkmate",
+      "displayname": "Checkmate Station",
+      "nickname": "Cargo Checkmate",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Gaslight",
+      "displayname": "Gaslight",
+      "nickname": "Cargo Gaslight",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Admin - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 32
+    },
+    {
+      "name": "Cargo Services - Orbituary",
+      "displayname": "Orbituary",
+      "nickname": "Cargo Orbituary",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Center Supplies - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Cargo Supplies Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Ship Parts - Ruin Station",
+      "displayname": "Ruin Station",
+      "nickname": "Ship Parts Ruin",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Landing Services - Ruin Station",
+      "displayname": "Ruin Station",
+      "nickname": "Ruin",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Pharmacy - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Pharmacy Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Megumi Refueling",
+      "displayname": "Megumi Refueling",
+      "nickname": "Cargo Megumi",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Landing Services - Gaslight",
+      "displayname": "Gaslight",
+      "nickname": "Gaslight",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Ellroy's - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Ellroy's Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Hot Dogs - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Hot Dogs Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Juice Bar - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Juice Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Noodle Bar - Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Noodle Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Ellroy's - Nyx Gateway (Stanton)",
+      "displayname": "Nyx Gateway",
+      "nickname": "Ellroy's Nyx Gateway (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Juice Bar - Nyx Gateway (Stanton)",
+      "displayname": "Nyx Gateway",
+      "nickname": "Juice Nyx Gateway (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Noodle Bar - Nyx Gateway (Stanton)",
+      "displayname": "Nyx Gateway",
+      "nickname": "Noodle Nyx Gateway (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Refinery Ore Sales - Orbituary",
+      "displayname": "Orbituary",
+      "nickname": "Orbituary",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Nyx Gateway (Pyro)",
+      "displayname": "Nyx Gateway",
+      "nickname": "Cargo Services Nyx Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Pyro Gateway (Nyx)",
+      "displayname": "Pyro Gateway",
+      "nickname": "Cargo Services Pyro Gateway (Nyx)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Levski",
+      "displayname": "Levski",
+      "nickname": "Cargo Levski",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    },
+    {
+      "name": "Cargo Services - Stanton Gateway (Nyx)",
+      "displayname": "Stanton Gateway",
+      "nickname": "Cargo Services Stanton Gateway (Nyx)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0
+    }
+  ]
+}

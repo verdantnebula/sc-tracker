@@ -1,0 +1,18 @@
+appId: com.wren.sccargotracker
+productName: SC Cargo Tracker
+# No code signing for v1 (personal use — accept SmartScreen). SPEC §3.
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+# better-sqlite3 is a native module — ship its prebuilt binary unpacked.
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

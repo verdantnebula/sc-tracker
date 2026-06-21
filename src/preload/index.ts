@@ -1,0 +1,75 @@
+// ============================================================================
+// preload — typed contextBridge  (SPEC §3, §6 /preload.ts)
+// ----------------------------------------------------------------------------
+// Exposes the ApiBridge contract (src/shared/ipc.ts) on window.api. The renderer
+// NEVER touches ipcRenderer directly — only this typed surface. contextIsolation
+// is on, so this is the only channel between worlds.
+// ============================================================================
+
+import { contextBridge, ipcRenderer } from "electron";
+import { IPC } from "@shared/ipc";
+import type { ApiBridge } from "@shared/ipc";
+import type {
+  Mission,
+  ManualMissionInput,
+  MissionPatch,
+  ReferenceData,
+  LogStatus,
+  BackfillProgress,
+  LogPathInfo,
+  PickLogFolderResult,
+} from "@shared/types";
+
+/** Subscribe to a push channel; returns an unsubscribe fn. */
+function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
+  const listener = (_e: Electron.IpcRendererEvent, payload: T): void =>
+    cb(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
+const api: ApiBridge = {
+  listMissions: () =>
+    ipcRenderer.invoke(IPC.MISSION_LIST) as Promise<Mission[]>,
+  listActiveMissions: () =>
+    ipcRenderer.invoke(IPC.MISSION_ACTIVE) as Promise<Mission[]>,
+  addMission: (input: ManualMissionInput) =>
+    ipcRenderer.invoke(IPC.MISSION_ADD, input) as Promise<Mission>,
+  updateMission: (missionId: string, patch: MissionPatch) =>
+    ipcRenderer.invoke(
+      IPC.MISSION_UPDATE,
+      missionId,
+      patch,
+    ) as Promise<Mission>,
+  abandonMission: (missionId: string) =>
+    ipcRenderer.invoke(IPC.MISSION_ABANDON, missionId) as Promise<void>,
+  clearActiveMissions: () =>
+    ipcRenderer.invoke(IPC.MISSION_CLEAR_ACTIVE) as Promise<number>,
+  resetAllData: () => ipcRenderer.invoke(IPC.DATA_RESET) as Promise<number>,
+  getReferenceData: () =>
+    ipcRenderer.invoke(IPC.REF_GET) as Promise<ReferenceData>,
+  getLogStatus: () => ipcRenderer.invoke(IPC.LOG_STATUS) as Promise<LogStatus>,
+  getCurrentLocation: () =>
+    ipcRenderer.invoke(IPC.CURRENT_LOCATION_GET) as Promise<string | null>,
+  startBackfill: () => ipcRenderer.invoke(IPC.BACKFILL_START) as Promise<void>,
+  getLogPathInfo: () =>
+    ipcRenderer.invoke(IPC.SETTINGS_GET_LOG_PATH) as Promise<LogPathInfo>,
+  pickLogFolder: () =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_PICK_LOG_FOLDER,
+    ) as Promise<PickLogFolderResult>,
+  setLogFolder: (liveFolder: string) =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_SET_LOG_PATH,
+      liveFolder,
+    ) as Promise<PickLogFolderResult>,
+
+  onMissionsChanged: (cb) => subscribe<Mission[]>(IPC.MISSIONS_CHANGED, cb),
+  onLogStatusChanged: (cb) => subscribe<LogStatus>(IPC.LOG_STATUS_CHANGED, cb),
+  onBackfillProgress: (cb) =>
+    subscribe<BackfillProgress>(IPC.BACKFILL_PROGRESS, cb),
+  onCurrentLocationChanged: (cb) =>
+    subscribe<string | null>(IPC.CURRENT_LOCATION_CHANGED, cb),
+};
+
+contextBridge.exposeInMainWorld("api", api);

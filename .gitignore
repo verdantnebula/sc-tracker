@@ -1,0 +1,12 @@
+node_modules/
+out/
+dist/
+release/
+Public Release/
+config.local.json
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Test fixtures are scrubbed sample log slices — keep them tracked despite *.log above.
+!fixtures/*.log
