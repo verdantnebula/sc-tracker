@@ -26,6 +26,14 @@ import type {
   Leg,
   LogPathInfo,
   PickLogFolderResult,
+  AppMode,
+  SalvageRun,
+  SalvageRunInput,
+  SalvageRunPatch,
+  StrippedComponent,
+  StrippedComponentInput,
+  StrippedComponentPatch,
+  SalvageReferenceData,
 } from "@shared/types";
 
 let idSeq = 0;
@@ -293,6 +301,49 @@ const DEV_REFERENCE: ReferenceData = {
 
 const DEV_CURRENT_LOCATION = "Dev Current Stop";
 
+// Clearly-synthetic salvage reference (mirrors the bundled snapshot shape) so
+// the salvage UI phase can develop dropdowns/pricing in a plain browser tab.
+const DEV_SALVAGE_REFERENCE: SalvageReferenceData = {
+  ships: [
+    {
+      name: "Dev Wreck Alpha",
+      costTier: 500,
+      claimCost: 500,
+      claimCostOrg: 250,
+      cmat: 12,
+      cargoScu: 0,
+      components: {
+        powerplant: "1x Dev Plant",
+        shield: "2x Dev Shield",
+        quantumdrive: "1x Dev Drive",
+        cooler: "2x Dev Cooler",
+        radar: "1x Dev Radar",
+        weapons: ["2x Dev Cannon"],
+      },
+    },
+  ],
+  components: [
+    {
+      type: "weapon",
+      model: "Dev Cannon",
+      class: "Dev Ballistic",
+      size: 4,
+      grade: null,
+      sellPrice: 3000,
+    },
+    {
+      type: "powerplant",
+      model: "Dev Plant",
+      class: "Dev Civilian",
+      size: 2,
+      grade: "C",
+      sellPrice: 2400,
+    },
+  ],
+  materialPrices: { rmcPerScu: 7200, cmatPerScu: 12000 },
+  haulers: [{ name: "Dev Hauler", gridScu: 64 }],
+};
+
 /**
  * Build a mock ApiBridge backed by in-memory state. Mutations behave like the
  * real backend would (returning updated missions, broadcasting changes) so the
@@ -300,6 +351,24 @@ const DEV_CURRENT_LOCATION = "Dev Current Stop";
  */
 function createMockApi(): ApiBridge {
   let missions = seedMissions();
+  // In-memory mode so the Cargo<->Salvage switcher works in standalone dev.
+  let mode: AppMode = "cargo";
+  // In-memory salvage runs for standalone-dev of the salvage views.
+  let salvageRuns: SalvageRun[] = [];
+  const salvageListeners = new Set<(r: SalvageRun[]) => void>();
+  const emitSalvage = (): void => {
+    const snap = salvageRuns.map((r) => ({
+      ...r,
+      stripped: r.stripped.map((s) => ({ ...s })),
+      wrecks: r.wrecks.map((w) => ({ ...w })),
+    }));
+    salvageListeners.forEach((cb) => cb(snap));
+  };
+  const findRun = (id: string): SalvageRun => {
+    const r = salvageRuns.find((x) => x.id === id);
+    if (!r) throw new Error(`salvage run not found: ${id}`);
+    return r;
+  };
   const missionListeners = new Set<(m: Mission[]) => void>();
   const emit = (): void => {
     const snapshot = missions.map((m) => ({
@@ -439,6 +508,120 @@ function createMockApi(): ApiBridge {
         gameLogExists: true,
       },
     }),
+    getMode: async (): Promise<AppMode> => mode,
+    setMode: async (next: AppMode): Promise<AppMode> => {
+      mode = next === "salvage" ? "salvage" : "cargo";
+      return mode;
+    },
+
+    // --- salvage tracker (in-memory dev stubs) ---
+    listSalvageRuns: async () =>
+      salvageRuns.map((r) => ({
+        ...r,
+        stripped: r.stripped.map((s) => ({ ...s })),
+        wrecks: r.wrecks.map((w) => ({ ...w })),
+      })),
+    getActiveSalvageRun: async () =>
+      salvageRuns.find((r) => r.status === "active") ?? null,
+    createSalvageRun: async (input: SalvageRunInput) => {
+      const run: SalvageRun = {
+        id: uid("run"),
+        startedAt: Date.now(),
+        completedAt: null,
+        status: "active",
+        crewSize: Math.max(1, Math.trunc(input.crewSize ?? 1)),
+        notes: input.notes ?? "",
+        rmcScu: input.rmcScu ?? 0,
+        cmatScu: input.cmatScu ?? 0,
+        constructionScu: input.constructionScu ?? 0,
+        stripped: [],
+        wrecks: [],
+      };
+      salvageRuns = [run, ...salvageRuns];
+      emitSalvage();
+      return run;
+    },
+    updateSalvageRun: async (runId: string, patch: SalvageRunPatch) => {
+      const run = findRun(runId);
+      if (patch.crewSize !== undefined)
+        run.crewSize = Math.max(1, Math.trunc(patch.crewSize));
+      if (patch.notes !== undefined) run.notes = patch.notes;
+      if (patch.rmcScu !== undefined) run.rmcScu = patch.rmcScu;
+      if (patch.cmatScu !== undefined) run.cmatScu = patch.cmatScu;
+      if (patch.constructionScu !== undefined)
+        run.constructionScu = patch.constructionScu;
+      if (patch.status !== undefined) {
+        run.status = patch.status;
+        run.completedAt =
+          patch.status === "active" ? null : (run.completedAt ?? Date.now());
+      }
+      emitSalvage();
+      return run;
+    },
+    addStrippedComponent: async (
+      runId: string,
+      input: StrippedComponentInput,
+    ) => {
+      const run = findRun(runId);
+      const comp: StrippedComponent = {
+        id: uid("strip"),
+        runId,
+        type: input.type,
+        model: input.model,
+        qty: Math.max(0, Math.trunc(input.qty)),
+        sellPriceEach: Math.max(0, Math.trunc(input.sellPriceEach)),
+        sold: input.sold ?? false,
+      };
+      run.stripped = [...run.stripped, comp];
+      emitSalvage();
+      return run;
+    },
+    updateStrippedComponent: async (
+      runId: string,
+      componentId: string,
+      patch: StrippedComponentPatch,
+    ) => {
+      const run = findRun(runId);
+      run.stripped = run.stripped.map((s) =>
+        s.id === componentId
+          ? {
+              ...s,
+              ...(patch.type !== undefined ? { type: patch.type } : {}),
+              ...(patch.model !== undefined ? { model: patch.model } : {}),
+              ...(patch.qty !== undefined
+                ? { qty: Math.max(0, Math.trunc(patch.qty)) }
+                : {}),
+              ...(patch.sellPriceEach !== undefined
+                ? {
+                    sellPriceEach: Math.max(0, Math.trunc(patch.sellPriceEach)),
+                  }
+                : {}),
+              ...(patch.sold !== undefined ? { sold: patch.sold } : {}),
+            }
+          : s,
+      );
+      emitSalvage();
+      return run;
+    },
+    removeStrippedComponent: async (runId: string, componentId: string) => {
+      const run = findRun(runId);
+      run.stripped = run.stripped.filter((s) => s.id !== componentId);
+      emitSalvage();
+      return run;
+    },
+    completeSalvageRun: async (runId: string) => {
+      const run = findRun(runId);
+      run.status = "sold";
+      run.completedAt = run.completedAt ?? Date.now();
+      emitSalvage();
+      return run;
+    },
+    deleteSalvageRun: async (runId: string) => {
+      salvageRuns = salvageRuns.filter((r) => r.id !== runId);
+      emitSalvage();
+    },
+    getSalvageReference: async (): Promise<SalvageReferenceData> =>
+      DEV_SALVAGE_REFERENCE,
 
     onMissionsChanged: (cb) => {
       missionListeners.add(cb);
@@ -447,6 +630,10 @@ function createMockApi(): ApiBridge {
     onLogStatusChanged: () => () => {},
     onBackfillProgress: () => () => {},
     onCurrentLocationChanged: () => () => {},
+    onSalvageRunsChanged: (cb) => {
+      salvageListeners.add(cb);
+      return () => salvageListeners.delete(cb);
+    },
   };
 }
 

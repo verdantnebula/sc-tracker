@@ -64,7 +64,7 @@ describe("loadSettings / saveSettings", () => {
   it("writes valid, pretty-printed JSON", () => {
     saveSettings({ liveFolder: "E:/SC/LIVE" }, file);
     const onDisk = JSON.parse(readFileSync(file, "utf-8"));
-    expect(onDisk).toEqual({ liveFolder: "E:/SC/LIVE" });
+    expect(onDisk).toEqual({ liveFolder: "E:/SC/LIVE", mode: "cargo" });
   });
 
   it("merges onto existing on-disk settings (a partial write can't drop keys)", () => {
@@ -79,6 +79,60 @@ describe("loadSettings / saveSettings", () => {
     const cleared = saveSettings({ liveFolder: null }, file);
     expect(cleared.liveFolder).toBeNull();
     expect(loadSettings(file).liveFolder).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mode (cargo / salvage) persistence — the Phase-1 salvage-mode switch
+// ---------------------------------------------------------------------------
+
+describe("app mode persistence", () => {
+  it("defaults to cargo when the file does not exist", () => {
+    expect(loadSettings(file).mode).toBe("cargo");
+    expect(DEFAULT_SETTINGS.mode).toBe("cargo");
+  });
+
+  it("round-trips a saved salvage mode", () => {
+    const saved = saveSettings({ mode: "salvage" }, file);
+    expect(saved.mode).toBe("salvage");
+    // Re-read from disk to prove it persisted across a (simulated) restart.
+    expect(loadSettings(file).mode).toBe("salvage");
+  });
+
+  it("can switch back to cargo", () => {
+    saveSettings({ mode: "salvage" }, file);
+    const back = saveSettings({ mode: "cargo" }, file);
+    expect(back.mode).toBe("cargo");
+    expect(loadSettings(file).mode).toBe("cargo");
+  });
+
+  it("preserves liveFolder when only the mode changes (and vice versa)", () => {
+    saveSettings({ liveFolder: "D:/SC/LIVE" }, file);
+    const merged = saveSettings({ mode: "salvage" }, file);
+    expect(merged.liveFolder).toBe("D:/SC/LIVE");
+    expect(merged.mode).toBe("salvage");
+    // ...and changing the folder must not reset the mode.
+    const merged2 = saveSettings({ liveFolder: "E:/SC/LIVE" }, file);
+    expect(merged2.mode).toBe("salvage");
+  });
+
+  it("falls back to cargo for a corrupt/unknown mode value", () => {
+    writeFileSync(file, JSON.stringify({ mode: "wormhole" }), "utf-8");
+    expect(loadSettings(file).mode).toBe("cargo");
+    writeFileSync(file, JSON.stringify({ mode: 42 }), "utf-8");
+    expect(loadSettings(file).mode).toBe("cargo");
+  });
+
+  it("falls back to cargo for an invalid-JSON file (never throws)", () => {
+    writeFileSync(file, "{ not json ", "utf-8");
+    expect(loadSettings(file).mode).toBe("cargo");
+  });
+
+  it("collapses an unknown mode in a merge patch to cargo", () => {
+    const merged = mergeSettings(DEFAULT_SETTINGS, {
+      mode: "bogus",
+    } as unknown as Partial<AppSettings>);
+    expect(merged.mode).toBe("cargo");
   });
 });
 
@@ -126,7 +180,7 @@ describe("corrupt / malformed settings fallback", () => {
 // ---------------------------------------------------------------------------
 
 describe("mergeSettings", () => {
-  const base: AppSettings = { liveFolder: "A:/old" };
+  const base: AppSettings = { liveFolder: "A:/old", mode: "cargo" };
 
   it("collapses an empty-string liveFolder to null", () => {
     expect(mergeSettings(base, { liveFolder: "" }).liveFolder).toBeNull();
@@ -140,7 +194,7 @@ describe("mergeSettings", () => {
     const merged = mergeSettings(base, {
       bogus: "x",
     } as unknown as Partial<AppSettings>);
-    expect(merged).toEqual({ liveFolder: "A:/old" });
+    expect(merged).toEqual({ liveFolder: "A:/old", mode: "cargo" });
   });
 });
 
@@ -184,25 +238,36 @@ describe("resolveGameLogPath", () => {
     const folder = "D:/Games/SC/LIVE";
     const expected = gameLogPathForFolder(folder);
     const exists = (p: string) => p === expected;
-    expect(resolveGameLogPath({ liveFolder: folder }, exists)).toBe(expected);
+    expect(
+      resolveGameLogPath({ liveFolder: folder, mode: "cargo" }, exists),
+    ).toBe(expected);
   });
 
   it("falls back to default when the configured folder's Game.log is missing", () => {
     expect(
-      resolveGameLogPath({ liveFolder: "D:/Games/SC/LIVE" }, () => false),
+      resolveGameLogPath(
+        { liveFolder: "D:/Games/SC/LIVE", mode: "cargo" },
+        () => false,
+      ),
     ).toBe(FALLBACK);
   });
 
   it("uses the default when no folder is configured (unset)", () => {
     // exists() returns true for everything; with no folder set it must STILL
     // return the default (the unset branch never consults the predicate).
-    expect(resolveGameLogPath({ liveFolder: null }, () => true)).toBe(FALLBACK);
+    expect(
+      resolveGameLogPath({ liveFolder: null, mode: "cargo" }, () => true),
+    ).toBe(FALLBACK);
   });
 
   it("honors a custom default path argument", () => {
     const custom = "Z:/custom/Game.log";
-    expect(resolveGameLogPath({ liveFolder: null }, () => true, custom)).toBe(
-      custom,
-    );
+    expect(
+      resolveGameLogPath(
+        { liveFolder: null, mode: "cargo" },
+        () => true,
+        custom,
+      ),
+    ).toBe(custom);
   });
 });

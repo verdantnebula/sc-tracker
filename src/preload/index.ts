@@ -18,6 +18,13 @@ import type {
   BackfillProgress,
   LogPathInfo,
   PickLogFolderResult,
+  AppMode,
+  SalvageRun,
+  SalvageRunInput,
+  SalvageRunPatch,
+  StrippedComponentInput,
+  StrippedComponentPatch,
+  SalvageReferenceData,
 } from "@shared/types";
 
 /** Subscribe to a push channel; returns an unsubscribe fn. */
@@ -63,6 +70,54 @@ const api: ApiBridge = {
       IPC.SETTINGS_SET_LOG_PATH,
       liveFolder,
     ) as Promise<PickLogFolderResult>,
+  getMode: () => ipcRenderer.invoke(IPC.SETTINGS_GET_MODE) as Promise<AppMode>,
+  setMode: (mode: AppMode) =>
+    ipcRenderer.invoke(IPC.SETTINGS_SET_MODE, mode) as Promise<AppMode>,
+
+  // --- salvage tracker ---
+  listSalvageRuns: () =>
+    ipcRenderer.invoke(IPC.SALVAGE_LIST_RUNS) as Promise<SalvageRun[]>,
+  getActiveSalvageRun: () =>
+    ipcRenderer.invoke(
+      IPC.SALVAGE_GET_ACTIVE_RUN,
+    ) as Promise<SalvageRun | null>,
+  createSalvageRun: (input: SalvageRunInput) =>
+    ipcRenderer.invoke(IPC.SALVAGE_CREATE_RUN, input) as Promise<SalvageRun>,
+  updateSalvageRun: (runId: string, patch: SalvageRunPatch) =>
+    ipcRenderer.invoke(
+      IPC.SALVAGE_UPDATE_RUN,
+      runId,
+      patch,
+    ) as Promise<SalvageRun>,
+  addStrippedComponent: (runId: string, input: StrippedComponentInput) =>
+    ipcRenderer.invoke(
+      IPC.SALVAGE_ADD_STRIPPED,
+      runId,
+      input,
+    ) as Promise<SalvageRun>,
+  updateStrippedComponent: (
+    runId: string,
+    componentId: string,
+    patch: StrippedComponentPatch,
+  ) =>
+    ipcRenderer.invoke(
+      IPC.SALVAGE_UPDATE_STRIPPED,
+      runId,
+      componentId,
+      patch,
+    ) as Promise<SalvageRun>,
+  removeStrippedComponent: (runId: string, componentId: string) =>
+    ipcRenderer.invoke(
+      IPC.SALVAGE_REMOVE_STRIPPED,
+      runId,
+      componentId,
+    ) as Promise<SalvageRun>,
+  completeSalvageRun: (runId: string) =>
+    ipcRenderer.invoke(IPC.SALVAGE_COMPLETE_RUN, runId) as Promise<SalvageRun>,
+  deleteSalvageRun: (runId: string) =>
+    ipcRenderer.invoke(IPC.SALVAGE_DELETE_RUN, runId) as Promise<void>,
+  getSalvageReference: () =>
+    ipcRenderer.invoke(IPC.SALVAGE_REFERENCE) as Promise<SalvageReferenceData>,
 
   onMissionsChanged: (cb) => subscribe<Mission[]>(IPC.MISSIONS_CHANGED, cb),
   onLogStatusChanged: (cb) => subscribe<LogStatus>(IPC.LOG_STATUS_CHANGED, cb),
@@ -70,6 +125,8 @@ const api: ApiBridge = {
     subscribe<BackfillProgress>(IPC.BACKFILL_PROGRESS, cb),
   onCurrentLocationChanged: (cb) =>
     subscribe<string | null>(IPC.CURRENT_LOCATION_CHANGED, cb),
+  onSalvageRunsChanged: (cb) =>
+    subscribe<SalvageRun[]>(IPC.SALVAGE_RUNS_CHANGED, cb),
 };
 
 contextBridge.exposeInMainWorld("api", api);
