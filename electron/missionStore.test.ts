@@ -161,6 +161,93 @@ describe("state machine", () => {
     expect(leg.kind).toBe("dropoff");
   });
 
+  // FIX 2: when the game suppresses the New Objective line (no objectiveDeclared),
+  // the marker's contract template still encodes the commodity. The store must
+  // auto-fill the leg's commodity from the template so it isn't "(no commodity)".
+  it("marker auto-fills leg commodity from the template when objectiveDeclared is suppressed", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    // No objectiveDeclared ever arrives (the suppression bug).
+    const leg = store
+      .getMission("m1")!
+      .legs.find((l) => l.id === "dropoff_p_0")!;
+    expect(leg.commodity).toBe("Waste"); // from the template, not "(no commodity)"
+    // SCU + location still come from the suppressed line -> remain blank.
+    expect(leg.scuTotal).toBe(0);
+    expect(leg.location).toBeNull();
+  });
+
+  it("marker auto-fills commodity for a RedWind template (Hydrogen)", () => {
+    store.applyEvent(accepted("m2", "Haul", 1000));
+    store.applyEvent(
+      marker(
+        "m2",
+        "dropoff_p_0",
+        "dropoff",
+        "Redwind_Stanton_SmallGrade_Planetary_Hydrogen",
+        1000,
+        "RedWind_Hauling",
+      ),
+    );
+    const leg = store
+      .getMission("m2")!
+      .legs.find((l) => l.id === "dropoff_p_0")!;
+    expect(leg.commodity).toBe("Hydrogen");
+  });
+
+  it("a real objectiveDeclared commodity OVERRIDES the template-derived one (declared wins)", () => {
+    store.applyEvent(accepted("m3", "Haul", 1000));
+    store.applyEvent(
+      marker(
+        "m3",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    // Template pre-fills "Waste"; then the authoritative declared line arrives.
+    store.applyEvent(
+      declared("m3", "dropoff_p_0", "Pressurized Ice", 13, "HDPC-Cassillo"),
+    );
+    const leg = store
+      .getMission("m3")!
+      .legs.find((l) => l.id === "dropoff_p_0")!;
+    expect(leg.commodity).toBe("Pressurized Ice"); // declared, not template "Waste"
+  });
+
+  it("a later marker re-fire does NOT clobber a declared commodity", () => {
+    store.applyEvent(accepted("m4", "Haul", 1000));
+    store.applyEvent(
+      marker(
+        "m4",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    store.applyEvent(declared("m4", "dropoff_p_0", "Titanium", 50, "Lorville"));
+    // Marker fires again (idempotent re-read) — must not revert to "Waste".
+    store.applyEvent(
+      marker(
+        "m4",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    const leg = store
+      .getMission("m4")!
+      .legs.find((l) => l.id === "dropoff_p_0")!;
+    expect(leg.commodity).toBe("Titanium");
+  });
+
   it("first objectiveCompleted -> in_progress; missionEnded(complete) -> complete", () => {
     store.applyEvent(accepted("m1", "Haul", 1000));
     store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
@@ -768,13 +855,15 @@ describe("leg field edits — fill in token-suppressed details", () => {
     );
   };
 
-  it("reproduces the bug: a marker-only leg is blank and absent from by-dropoff", () => {
+  it("a marker-only leg auto-fills commodity from the template, but SCU/location stay blank", () => {
     seedBlankLeg();
     const leg = store.getMission("m1")!.legs.find((l) => l.id === "d0")!;
-    expect(leg.commodity).toBe("");
+    // FIX 2: commodity is now seeded from the contract template (was "").
+    expect(leg.commodity).toBe("Waste");
+    // SCU + location still come from the suppressed New Objective line -> blank.
     expect(leg.scuTotal).toBe(0);
     expect(leg.location).toBeNull();
-    // Not in by-dropoff (no location).
+    // Still not in by-dropoff (no location yet) — the user must add a destination.
     const refs = store
       .dropoffGroups(null)
       .flatMap((g) => [...g.todo, ...g.delivered].flatMap((c) => c.legRefs));
@@ -943,8 +1032,7 @@ describe("updateMission add/remove legs", () => {
     // manual_override must be stamped so a historical replay can't clobber it.
     const raw = (
       store as unknown as { db: import("better-sqlite3").Database }
-    )// eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .db
+    ).db // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .prepare(
         "SELECT manual_override FROM legs WHERE mission_id = 'm1' AND objective_id = @o",
       )

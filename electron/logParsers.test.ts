@@ -11,7 +11,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 import type { DomainEvent } from "@shared/events";
-import { parseLine, parseContractTemplate } from "./logParsers";
+import {
+  parseLine,
+  parseContractTemplate,
+  commodityDisplayFromToken,
+} from "./logParsers";
 
 // ---------------------------------------------------------------------------
 // Fixture loading helpers
@@ -293,5 +297,64 @@ describe("parseContractTemplate", () => {
     expect(r.variant).toBe("UNKNOWN");
     expect(r.grade).toBe("UNKNOWN");
     expect(() => parseContractTemplate("")).not.toThrow();
+  });
+
+  // FIX 2: a clean DISPLAY commodity derived from the template token. Used to
+  // auto-fill a leg's commodity when the game suppressed the New Objective line.
+  it("derives a clean display commodity from a single-token commodity", () => {
+    const r = parseContractTemplate(
+      "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+    );
+    expect(r.commodityDisplay).toBe("Waste");
+  });
+
+  it("derives commodity display for RedWind (Hydrogen)", () => {
+    const r = parseContractTemplate(
+      "Redwind_Stanton_SmallGrade_Planetary_Hydrogen",
+    );
+    expect(r.commodityDisplay).toBe("Hydrogen");
+  });
+
+  it("derives Titanium from a RefinedOre RedWind-style title token", () => {
+    const r = parseContractTemplate(
+      "Redwind_Stanton_SmallGrade_Planetary_Titanium",
+    );
+    expect(r.commodityDisplay).toBe("Titanium");
+  });
+
+  it("expands a known abbreviation token (PressIce -> Pressurized Ice)", () => {
+    const r = parseContractTemplate(
+      "Redwind_Stanton_SmallGrade_Planetary_PressIce",
+    );
+    expect(r.commodityDisplay).toBe("Pressurized Ice");
+  });
+
+  it("title-cases / splits CamelCase tokens it doesn't know", () => {
+    const r = parseContractTemplate(
+      "Redwind_Stanton_SmallGrade_Planetary_ScrapMetal",
+    );
+    expect(r.commodityDisplay).toBe("Scrap Metal");
+  });
+
+  it("commodityDisplay is '' when no commodity token is derivable", () => {
+    expect(parseContractTemplate("SomethingWeird").commodityDisplay).toBe("");
+    expect(parseContractTemplate("").commodityDisplay).toBe("");
+  });
+});
+
+describe("commodityDisplayFromToken", () => {
+  it("returns '' for empty / non-string", () => {
+    expect(commodityDisplayFromToken("")).toBe("");
+    // @ts-expect-error defensive: non-string input
+    expect(commodityDisplayFromToken(undefined)).toBe("");
+  });
+
+  it("expands known abbreviations", () => {
+    expect(commodityDisplayFromToken("PressIce")).toBe("Pressurized Ice");
+  });
+
+  it("splits CamelCase and title-cases unknown tokens", () => {
+    expect(commodityDisplayFromToken("RefinedOre")).toBe("Refined Ore");
+    expect(commodityDisplayFromToken("Titanium")).toBe("Titanium");
   });
 });

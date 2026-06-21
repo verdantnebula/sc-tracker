@@ -33,6 +33,7 @@ const terminalsPayload = {
       nickname: "Cassillo",
       is_cargo_center: 1,
       max_container_size: 32,
+      type: "distribution",
     },
     {
       name: "teasa-spaceport",
@@ -40,13 +41,17 @@ const terminalsPayload = {
       nickname: "Teasa",
       is_cargo_center: true,
       max_container_size: "24",
+      type: "venue",
     },
     {
-      name: "some-shop",
-      displayname: "Some Shop",
-      nickname: "shop",
-      is_cargo_center: 0, // dropped (not a cargo center)
+      // A non-cargo-center destination: it must NOT be dropped any more (the bug
+      // fix) — players deliver to plenty of non-cargo-center locations.
+      name: "everus-harbor",
+      displayname: "Everus Harbor",
+      nickname: "Everus",
+      is_cargo_center: 0,
       max_container_size: null,
+      type: "station",
     },
   ],
 };
@@ -66,18 +71,48 @@ describe("mapping", () => {
     });
   });
 
-  it("maps terminals, filters to is_cargo_center, coerces flags + sizes", () => {
+  it("maps ALL terminals (no cargo-center filter), coerces flags + sizes + type", () => {
     const out = mapTerminals(terminalsPayload);
-    expect(out).toHaveLength(2); // the non-cargo-center shop is filtered out
+    // The non-cargo-center destination is KEPT now (the bug fix): every named
+    // delivery location must be offerable.
+    expect(out).toHaveLength(3);
     expect(out[0]).toEqual({
       name: "hdpc-cassillo",
       displayname: "HDPC-Cassillo",
       nickname: "Cassillo",
       isCargoCenter: true,
       maxContainerSize: 32,
+      type: "distribution",
     });
     // numeric string container size coerced to number
     expect(out[1].maxContainerSize).toBe(24);
+    // non-cargo-center row survives, carries its type, flag is false
+    const everus = out.find((t) => t.name === "everus-harbor");
+    expect(everus?.isCargoCenter).toBe(false);
+    expect(everus?.type).toBe("station");
+  });
+
+  it("accepts the bundled snapshot shape (isCargoCenter / maxContainerSize keys)", () => {
+    // The bundled snapshot stores already-normalized rows (isCargoCenter, not
+    // is_cargo_center). mapTerminals must round-trip them unchanged in shape.
+    const out = mapTerminals([
+      {
+        name: "Everus Harbor",
+        displayname: "Everus Harbor",
+        nickname: "Everus Harbor",
+        isCargoCenter: true,
+        maxContainerSize: 32,
+        type: "station",
+      },
+    ]);
+    expect(out[0]).toEqual({
+      name: "Everus Harbor",
+      displayname: "Everus Harbor",
+      nickname: "Everus Harbor",
+      isCargoCenter: true,
+      maxContainerSize: 32,
+      type: "station",
+    });
   });
 
   it("accepts a bare array payload too", () => {
@@ -104,11 +139,12 @@ describe("uexClient (bundled snapshot)", () => {
     const client = createUexClient();
     const ref = client.getReferenceData();
 
-    // Non-empty and the documented per-patch sizes (205 commodities, 34 cargo
-    // centers). If a future patch changes these, update the snapshot via
-    // `npm run fetch:reference` and adjust these numbers deliberately.
+    // Non-empty and the documented per-patch sizes. Locations are now the FULL
+    // unioned destination set (stations + outposts + cities + venues +
+    // distribution + curated), not just cargo centers. If a future patch changes
+    // these, update via `npm run fetch:reference` and adjust deliberately.
     expect(ref.commodities).toHaveLength(205);
-    expect(ref.terminals).toHaveLength(34);
+    expect(ref.terminals.length).toBeGreaterThan(150);
     expect(fetchSpy).not.toHaveBeenCalled();
 
     fetchSpy.mockRestore();
@@ -133,18 +169,36 @@ describe("uexClient (bundled snapshot)", () => {
     expect(ref.commodities.some((c) => c.name === "Agricium")).toBe(true);
   });
 
-  it("terminals are all cargo centers with the correct shape", () => {
+  it("terminals have the correct shape (cargo-center is a flag, not a filter)", () => {
     const ref = createUexClient().getReferenceData();
     for (const t of ref.terminals as Terminal[]) {
       expect(typeof t.name).toBe("string");
       expect(t.name.length).toBeGreaterThan(0);
       expect(typeof t.displayname).toBe("string");
       expect(typeof t.nickname).toBe("string");
-      expect(t.isCargoCenter).toBe(true); // SPEC §2: dropdowns are cargo centers
+      expect(typeof t.isCargoCenter).toBe("boolean");
       expect(
         t.maxContainerSize === null || typeof t.maxContainerSize === "number",
       ).toBe(true);
     }
+    // The fix: the set is NOT limited to cargo centers — most destinations are
+    // not flagged cargo centers, so the list must contain non-cargo-center rows.
+    expect(ref.terminals.some((t) => !t.isCargoCenter)).toBe(true);
+  });
+
+  it("offers the real haul destinations users were missing (the bug fix)", () => {
+    const ref = createUexClient().getReferenceData();
+    const has = (needle: string) =>
+      ref.terminals.some((t) =>
+        t.name.toLowerCase().includes(needle.toLowerCase()),
+      );
+    // Every destination from the bug report must now be pickable.
+    expect(has("Everus Harbor")).toBe(true);
+    expect(has("HDPC")).toBe(true);
+    expect(has("Teasa")).toBe(true);
+    expect(has("Lorville")).toBe(true);
+    expect(has("Port Tressler")).toBe(true);
+    expect(has("Baijini")).toBe(true);
   });
 
   it("isActive() is true (the bundled snapshot is always present)", () => {

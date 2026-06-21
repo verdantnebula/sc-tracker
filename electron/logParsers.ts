@@ -117,6 +117,56 @@ export interface ParsedContractTemplate {
   grade: MissionGrade;
   /** Best-effort raw commodity token from the template; "" when not derivable. */
   commodityToken: string;
+  /**
+   * Clean, human display name derived from `commodityToken` (FIX 2). Known
+   * abbreviations are expanded (PressIce -> Pressurized Ice); otherwise the
+   * CamelCase token is split + title-cased (RefinedOre -> Refined Ore). "" when
+   * no commodity token is derivable. Used to auto-fill a leg's commodity when the
+   * game suppressed the authoritative New Objective line.
+   */
+  commodityDisplay: string;
+}
+
+/**
+ * Known commodity-token abbreviations that don't cleanly title-case. Keep this
+ * SMALL and conservative — anything not listed falls back to CamelCase splitting,
+ * which is correct for the vast majority of tokens (Titanium, Hydrogen, Waste…).
+ * Keys are matched case-insensitively. Game data only; no personal data.
+ */
+const COMMODITY_TOKEN_ALIASES: Record<string, string> = {
+  pressice: "Pressurized Ice",
+  procfood: "Processed Food",
+  rmc: "Recycled Material Composite",
+  cmat: "Construction Materials",
+};
+
+/**
+ * Map a raw template commodity token to a clean display name (FIX 2). Expands a
+ * few known abbreviations; otherwise splits CamelCase and title-cases. Pure;
+ * never throws; returns "" for empty/non-string input.
+ */
+export function commodityDisplayFromToken(token: string): string {
+  if (typeof token !== "string") return "";
+  const raw = token.trim();
+  if (raw.length === 0) return "";
+
+  const alias = COMMODITY_TOKEN_ALIASES[raw.toLowerCase()];
+  if (alias) return alias;
+
+  // Split CamelCase / digit boundaries, collapse separators, then title-case.
+  const words = raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2") // RefinedOre -> Refined Ore
+    .replace(/([A-Za-z])([0-9])/g, "$1 $2") // Stanton1 -> Stanton 1
+    .replace(/[_\-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return words
+    .map((w) =>
+      w.length <= 1 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1),
+    )
+    .join(" ");
 }
 
 /**
@@ -139,10 +189,12 @@ export function parseContractTemplate(
 ): ParsedContractTemplate {
   const t = typeof template === "string" ? template : "";
 
+  const commodityToken = parseCommodityToken(t);
   return {
     variant: parseVariant(t),
     grade: parseGrade(t),
-    commodityToken: parseCommodityToken(t),
+    commodityToken,
+    commodityDisplay: commodityDisplayFromToken(commodityToken),
   };
 }
 

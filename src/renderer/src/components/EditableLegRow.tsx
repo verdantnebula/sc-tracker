@@ -2,11 +2,12 @@
 // fields (the intermittent objectiveDeclared bug leaves commodity/scuTotal/
 // location blank). Combines the completion checkbox (as in LegRow) with editable
 // commodity (datalist autocomplete over UEX commodities), SCU (number), and
-// location (datalist over UEX cargo terminals + free text). Edits commit on
+// location (datalist over ALL UEX destinations + free text). Edits commit on
 // change via onEditLeg; the store stamps manual_override so historical replay
 // can't clobber them.
 import { useEffect, useState } from "react";
 import type { Leg, ReferenceData } from "@shared/types";
+import { sortDestinations } from "@shared/location";
 import { isLegIncomplete } from "../lib/selectors";
 
 export function EditableLegRow({
@@ -51,7 +52,10 @@ export function EditableLegRow({
     setLocation(leg.location ?? "");
   }, [leg.missionId, leg.id, leg.commodity, leg.scuTotal, leg.location]);
 
-  const terminals = reference.terminals.filter((t) => t.isCargoCenter);
+  // Offer EVERY known destination (the bug fix), not just cargo centers — but
+  // surface cargo centers first so the common drops are easy to reach. Free-text
+  // entry still works for anything not in the list.
+  const terminals = sortDestinations(reference.terminals);
 
   const checkbox = (
     <button

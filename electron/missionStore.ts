@@ -222,6 +222,54 @@ function parseGrade(template: string): MissionGrade {
   return "UNKNOWN";
 }
 
+// FIX 2: when the game suppresses the New Objective line, the marker's contract
+// template still encodes the commodity. We extract it here (kept local + minimal
+// per the seam note above) so a token-suppressed leg shows a commodity instead
+// of "(no commodity)". objectiveDeclared remains authoritative and overrides this.
+const COMMODITY_TOKEN_ALIASES: Record<string, string> = {
+  pressice: "Pressurized Ice",
+  procfood: "Processed Food",
+  rmc: "Recycled Material Composite",
+  cmat: "Construction Materials",
+};
+
+/** Best-effort raw commodity token from a contract template; "" when not derivable. */
+function parseCommodityToken(template: string): string {
+  const parts = template.split("_").filter((p) => p.length > 0);
+  if (parts.length === 0) return "";
+  // Covalex: HaulCargo_<Variant>_<Category…>_<Commodity>_<System>_<Grade>.
+  // Commodity is the 3rd-from-last token (stable <System>_<Grade> tail).
+  if (/^HaulCargo$/i.test(parts[0]) && parts.length >= 6) {
+    return parts[parts.length - 3] ?? "";
+  }
+  // RedWind: Redwind_<System>_<Grade>_<Style>_<Commodity> -> last token.
+  if (/^Redwind$/i.test(parts[0]) && parts.length >= 5) {
+    return parts[parts.length - 1] ?? "";
+  }
+  return "";
+}
+
+/** Clean display commodity from a contract template; "" when not derivable. */
+function parseCommodityDisplay(template: string): string {
+  const token = parseCommodityToken(
+    typeof template === "string" ? template : "",
+  );
+  if (token.length === 0) return "";
+  const alias = COMMODITY_TOKEN_ALIASES[token.toLowerCase()];
+  if (alias) return alias;
+  return token
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Za-z])([0-9])/g, "$1 $2")
+    .replace(/[_\-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) =>
+      w.length <= 1 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1),
+    )
+    .join(" ");
+}
+
 // ---------------------------------------------------------------------------
 // Row <-> domain mapping
 // ---------------------------------------------------------------------------
@@ -499,8 +547,15 @@ class SqliteMissionStore implements MissionStore {
         defId: e.contractDefinitionId ?? null,
       });
     // Create/locate the leg by (missionId, objectiveId); set kind + position.
+    // FIX 2: also seed the commodity from the contract template so a leg whose
+    // New Objective line was suppressed still shows a commodity. This is FILL-
+    // ONLY: it never overwrites a commodity already set by an authoritative
+    // objectiveDeclared (declared wins), and a later marker re-fire can't revert
+    // a declared value back to the template token.
     this.upsertLeg(e.missionId, e.objectiveId, {
       kind: e.kind,
+      commodity: parseCommodityDisplay(e.contractTemplate),
+      commodityFillOnly: true,
       pos: e.position,
     });
   }
@@ -663,6 +718,13 @@ class SqliteMissionStore implements MissionStore {
       scuTotal?: number;
       location?: string | null;
       pos?: { x: number; y: number; z: number };
+      /**
+       * FIX 2: when true, the commodity is only written if the leg's commodity is
+       * currently empty (fill-the-gap from the contract template). This keeps an
+       * authoritative objectiveDeclared commodity from being clobbered by a later
+       * marker re-fire, while still seeding token-suppressed legs.
+       */
+      commodityFillOnly?: boolean;
     },
   ): void {
     const exists = this.db
@@ -709,6 +771,7 @@ class SqliteMissionStore implements MissionStore {
            kind = COALESCE(@kind, kind),
            commodity = CASE
                          WHEN @guard = 1 AND manual_override IS NOT NULL THEN commodity
+                         WHEN @fillOnly = 1 AND commodity IS NOT NULL AND commodity <> '' THEN commodity
                          WHEN @commodity IS NOT NULL AND @commodity <> '' THEN @commodity
                          ELSE commodity END,
            scu_total = CASE
@@ -728,6 +791,7 @@ class SqliteMissionStore implements MissionStore {
         m: missionId,
         o: objectiveId,
         guard,
+        fillOnly: patch.commodityFillOnly ? 1 : 0,
         kind: patch.kind ?? null,
         commodity: patch.commodity ?? null,
         scuTotal: patch.scuTotal ?? null,

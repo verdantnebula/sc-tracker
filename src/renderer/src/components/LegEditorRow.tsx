@@ -1,8 +1,10 @@
 // LegEditorRow — design README §6. One editable leg on a 108px 1fr 1fr 78px 32px
 // grid: type / commodity / location / SCU + remove. Commodity + location options
-// come from UEX ReferenceData (no hardcoded lists). Locations filter to cargo
-// centers. Defaults are blank/unselected.
+// come from UEX ReferenceData (no hardcoded lists). Locations offer EVERY known
+// destination (cargo centers sorted first), not just cargo centers. Defaults are
+// blank/unselected.
 import type { ReferenceData, ManualLegInput, LegKind } from "@shared/types";
+import { sortDestinations } from "@shared/location";
 
 export function LegEditorRow({
   leg,
@@ -35,7 +37,9 @@ export function LegEditorRow({
   };
   const typeColor =
     leg.kind === "pickup" ? "var(--secondary)" : "var(--primary)";
-  const locations = reference.terminals.filter((t) => t.isCargoCenter);
+  // Offer EVERY known destination (cargo centers sorted first); free-text via the
+  // detail panel. This dropdown is a hard <select>, so the full set must be here.
+  const locations = sortDestinations(reference.terminals);
 
   return (
     <div

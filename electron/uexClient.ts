@@ -20,7 +20,12 @@
 // and the IPC contract (ref:get) do not change shape.
 // ============================================================================
 
-import type { ReferenceData, Commodity, Terminal } from "@shared/types";
+import type {
+  ReferenceData,
+  Commodity,
+  Terminal,
+  TerminalType,
+} from "@shared/types";
 
 // The bundled per-patch snapshot. resolveJsonModule is enabled (tsconfig.node),
 // and electron-vite inlines the JSON into the main bundle at build time.
@@ -85,23 +90,48 @@ export function mapCommodities(resp: unknown): Commodity[] {
     .filter((c) => c.name.length > 0);
 }
 
+const TERMINAL_TYPES: readonly TerminalType[] = [
+  "station",
+  "city",
+  "outpost",
+  "distribution",
+  "venue",
+  "terminal",
+];
+
+function asTerminalType(v: unknown): TerminalType | undefined {
+  return typeof v === "string" &&
+    (TERMINAL_TYPES as readonly string[]).includes(v)
+    ? (v as TerminalType)
+    : undefined;
+}
+
+/**
+ * Normalize raw location rows to the shared Terminal shape.
+ *
+ * Cargo destinations are EVERY named place a player can deliver to — not just
+ * UEX `is_cargo_center` terminals. We keep `isCargoCenter` only as a sort hint;
+ * it is NOT used to exclude rows. The bundled snapshot is already the unioned,
+ * de-duplicated set produced by scripts/fetch-reference.mjs, so this mapper just
+ * coerces field shapes and passes through the optional `type` tag.
+ */
 export function mapTerminals(resp: unknown): Terminal[] {
-  return (
-    asArray(resp)
-      .map((row) => {
-        const r = row as Record<string, unknown>;
-        return {
-          name: str(r.name),
-          displayname: str(r.displayname),
-          nickname: str(r.nickname),
-          isCargoCenter: truthyFlag(r.is_cargo_center),
-          maxContainerSize: numOrNull(r.max_container_size),
-        };
-      })
-      .filter((t) => t.name.length > 0)
-      // SPEC §2: dropdowns filter to cargo centers.
-      .filter((t) => t.isCargoCenter)
-  );
+  return asArray(resp)
+    .map((row) => {
+      const r = row as Record<string, unknown>;
+      const t: Terminal = {
+        name: str(r.name),
+        displayname: str(r.displayname),
+        nickname: str(r.nickname),
+        isCargoCenter:
+          truthyFlag(r.is_cargo_center) || truthyFlag(r.isCargoCenter),
+        maxContainerSize: numOrNull(r.max_container_size ?? r.maxContainerSize),
+      };
+      const type = asTerminalType(r.type);
+      if (type) t.type = type;
+      return t;
+    })
+    .filter((t) => t.name.length > 0);
 }
 
 // ---------------------------------------------------------------------------

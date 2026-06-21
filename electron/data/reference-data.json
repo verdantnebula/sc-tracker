@@ -1,5 +1,5 @@
 {
-  "fetchedAt": 1781917412569,
+  "fetchedAt": 1782061801150,
   "source": "uexcorp.space API 2.0",
   "commodities": [
     {
@@ -1030,242 +1030,1540 @@
   ],
   "terminals": [
     {
-      "name": "Admin - ARC-L4",
+      "name": "ARC-L1 Wide Forest Station",
+      "displayname": "ARC-L1 Wide Forest Station",
+      "nickname": "ARC-L1 Wide Forest Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "ARC-L2 Lively Pathway Station",
+      "displayname": "ARC-L2 Lively Pathway Station",
+      "nickname": "ARC-L2 Lively Pathway Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "ARC-L3 Modern Express Station",
+      "displayname": "ARC-L3 Modern Express Station",
+      "nickname": "ARC-L3 Modern Express Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "ARC-L4 Faint Glen Station",
       "displayname": "ARC-L4 Faint Glen Station",
-      "nickname": "ARC-L4",
+      "nickname": "ARC-L4 Faint Glen Station",
       "isCargoCenter": true,
-      "maxContainerSize": 32
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Cargo Center Supplies - Baijini Point",
+      "name": "ARC-L5 Yellow Core Station",
+      "displayname": "ARC-L5 Yellow Core Station",
+      "nickname": "ARC-L5 Yellow Core Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "ArcCorp Mining Area 045",
+      "displayname": "ArcCorp Mining Area 045",
+      "nickname": "ArcCorp Mining Area 045",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "ArcCorp Mining Area 048",
+      "displayname": "ArcCorp Mining Area 048",
+      "nickname": "ArcCorp Mining Area 048",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "ArcCorp Mining Area 056",
+      "displayname": "ArcCorp Mining Area 056",
+      "nickname": "ArcCorp Mining Area 056",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "ArcCorp Mining Area 061",
+      "displayname": "ArcCorp Mining Area 061",
+      "nickname": "ArcCorp Mining Area 061",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "ArcCorp Mining Area 141",
+      "displayname": "ArcCorp Mining Area 141",
+      "nickname": "ArcCorp Mining Area 141",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "ArcCorp Mining Area 157",
+      "displayname": "ArcCorp Mining Area 157",
+      "nickname": "ArcCorp Mining Area 157",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Area 18",
+      "displayname": "Area 18",
+      "nickname": "Area 18",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "city"
+    },
+    {
+      "name": "Arid Reach",
+      "displayname": "Arid Reach",
+      "nickname": "Arid Reach",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Ashland",
+      "displayname": "Ashland",
+      "nickname": "Ashland",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Astor's Clearing",
+      "displayname": "Astor's Clearing",
+      "nickname": "Astor's Clearing",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "August Dunlow Spaceport",
+      "displayname": "August Dunlow Spaceport",
+      "nickname": "August Dunlow Spaceport",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "venue"
+    },
+    {
+      "name": "Baijini Point",
       "displayname": "Baijini Point",
-      "nickname": "Cargo Baijini",
+      "nickname": "Baijini Point",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Cargo Center Supplies - Port Tressler",
-      "displayname": "Port Tressler",
-      "nickname": "Cargo Tressler",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Benson Mining Outpost",
+      "displayname": "Benson Mining Outpost",
+      "nickname": "Benson Mining Outpost",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     },
     {
-      "name": "Refinery Shop - Nyx Gateway (Stanton)",
-      "displayname": "Nyx Gateway",
-      "nickname": "Refinery Nyx Gtwy (Stanton)",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Blackrock Exchange",
+      "displayname": "Blackrock Exchange",
+      "nickname": "Blackrock Exchange",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     },
     {
-      "name": "Refinery Shop - Pyro Gateway (Stanton)",
-      "displayname": "Pyro Gateway",
-      "nickname": "Refinery Pyro Gtwy (Stanton)",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Bloodshot Ridge",
+      "displayname": "Bloodshot Ridge",
+      "nickname": "Bloodshot Ridge",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
     },
     {
-      "name": "Traveler Rentals - Cargo Center - Seraphim",
-      "displayname": "Seraphim Station",
-      "nickname": "Traveler Seraphim",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Bountiful Harvest Hydroponics",
+      "displayname": "Bountiful Harvest Hydroponics",
+      "nickname": "Bountiful Harvest Hydroponics",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     },
     {
-      "name": "Admin - Checkmate",
-      "displayname": "Checkmate",
-      "nickname": "Checkmate",
-      "isCargoCenter": true,
-      "maxContainerSize": 32
+      "name": "Brio's Breaker Yard",
+      "displayname": "Brio's Breaker Yard",
+      "nickname": "Brio's Breaker Yard",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
     },
     {
-      "name": "Refinery Ore Sales - Checkmate",
+      "name": "Bud's Growery",
+      "displayname": "Bud's Growery",
+      "nickname": "Bud's Growery",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Bueno Ravine",
+      "displayname": "Bueno Ravine",
+      "nickname": "Bueno Ravine",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Bullock's Reach",
+      "displayname": "Bullock's Reach",
+      "nickname": "Bullock's Reach",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Canard View",
+      "displayname": "Canard View",
+      "nickname": "Canard View",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Carver's Ridge",
+      "displayname": "Carver's Ridge",
+      "nickname": "Carver's Ridge",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Chawla's Beach",
+      "displayname": "Chawla's Beach",
+      "nickname": "Chawla's Beach",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Checkmate Station",
       "displayname": "Checkmate Station",
-      "nickname": "Checkmate",
+      "nickname": "Checkmate Station",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 0,
+      "type": "station"
     },
     {
-      "name": "Admin - Orbituary",
-      "displayname": "Orbituary",
-      "nickname": "Orbituary",
+      "name": "Covalex Distribution Center S4DC05",
+      "displayname": "Covalex Distribution Center S4DC05",
+      "nickname": "Covalex Distribution Center S4DC05",
       "isCargoCenter": true,
-      "maxContainerSize": 32
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Admin - Starlight Service",
-      "displayname": "Starlight Service Station",
-      "nickname": "Starlight Service",
-      "isCargoCenter": true,
-      "maxContainerSize": 32
+      "name": "CRU-L1 Ambitious Dream Station",
+      "displayname": "CRU-L1 Ambitious Dream Station",
+      "nickname": "CRU-L1 Ambitious Dream Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Admin - Ruin Station",
-      "displayname": "Ruin Station",
-      "nickname": "Ruin Station",
+      "name": "CRU-L4 Distribution Center",
+      "displayname": "CRU-L4 Distribution Center",
+      "nickname": "CRU-L4 Distribution Center",
       "isCargoCenter": true,
-      "maxContainerSize": 32
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Cargo Services - Ruin Station",
-      "displayname": "Ruin Station",
-      "nickname": "Cargo Ruin",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "CRU-L4 Shallow Fields Station",
+      "displayname": "CRU-L4 Shallow Fields Station",
+      "nickname": "CRU-L4 Shallow Fields Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Cargo Services - Checkmate",
-      "displayname": "Checkmate Station",
-      "nickname": "Cargo Checkmate",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "CRU-L5 Beautiful Glen Station",
+      "displayname": "CRU-L5 Beautiful Glen Station",
+      "nickname": "CRU-L5 Beautiful Glen Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Cargo Services - Gaslight",
-      "displayname": "Gaslight",
-      "nickname": "Cargo Gaslight",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Cutter's Rig",
+      "displayname": "Cutter's Rig",
+      "nickname": "Cutter's Rig",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
     },
     {
-      "name": "Admin - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Stanton Gateway (Pyro)",
-      "isCargoCenter": true,
-      "maxContainerSize": 32
+      "name": "Deakins Research",
+      "displayname": "Deakins Research",
+      "nickname": "Deakins Research",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
     },
     {
-      "name": "Cargo Services - Orbituary",
-      "displayname": "Orbituary",
-      "nickname": "Cargo Orbituary",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Devlin Scrap & Salvage",
+      "displayname": "Devlin Scrap & Salvage",
+      "nickname": "Devlin Scrap & Salvage",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
     },
     {
-      "name": "Cargo Center Supplies - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Cargo Supplies Stanton Gateway (Pyro)",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Dinger's Depot",
+      "displayname": "Dinger's Depot",
+      "nickname": "Dinger's Depot",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
     },
     {
-      "name": "Ship Parts - Ruin Station",
-      "displayname": "Ruin Station",
-      "nickname": "Ship Parts Ruin",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Dudley & Daughters",
+      "displayname": "Dudley & Daughters",
+      "nickname": "Dudley & Daughters",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
     },
     {
-      "name": "Landing Services - Ruin Station",
-      "displayname": "Ruin Station",
-      "nickname": "Ruin",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Dunboro",
+      "displayname": "Dunboro",
+      "nickname": "Dunboro",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     },
     {
-      "name": "Pharmacy - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Pharmacy Stanton Gateway (Pyro)",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Endgame",
+      "displayname": "Endgame",
+      "nickname": "Endgame",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Cargo Services - Megumi Refueling",
-      "displayname": "Megumi Refueling",
-      "nickname": "Cargo Megumi",
+      "name": "Everus Harbor",
+      "displayname": "Everus Harbor",
+      "nickname": "Everus Harbor",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Landing Services - Gaslight",
+      "name": "Fallow Field",
+      "displayname": "Fallow Field",
+      "nickname": "Fallow Field",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Feo Canyon Depot",
+      "displayname": "Feo Canyon Depot",
+      "nickname": "Feo Canyon Depot",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Finn's Folly",
+      "displayname": "Finn's Folly",
+      "nickname": "Finn's Folly",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Frigid Knot",
+      "displayname": "Frigid Knot",
+      "nickname": "Frigid Knot",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Frostbite",
+      "displayname": "Frostbite",
+      "nickname": "Frostbite",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Gallete Family Farms",
+      "displayname": "Gallete Family Farms",
+      "nickname": "Gallete Family Farms",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Gaslight",
       "displayname": "Gaslight",
       "nickname": "Gaslight",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 32,
+      "type": "station"
     },
     {
-      "name": "Ellroy's - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Ellroy's Stanton Gateway (Pyro)",
+      "name": "Ghost Hollow",
+      "displayname": "Ghost Hollow",
+      "nickname": "Ghost Hollow",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Goner's Deal",
+      "displayname": "Goner's Deal",
+      "nickname": "Goner's Deal",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Gray Gardens Depot",
+      "displayname": "Gray Gardens Depot",
+      "nickname": "Gray Gardens Depot",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Green Imperial Housing Exchange",
+      "displayname": "Green Imperial Housing Exchange",
+      "nickname": "Green Imperial Housing Exchange",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Harper's Point",
+      "displayname": "Harper's Point",
+      "nickname": "Harper's Point",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Anderson",
+      "displayname": "HDMS-Anderson",
+      "nickname": "HDMS-Anderson",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Bezdek",
+      "displayname": "HDMS-Bezdek",
+      "nickname": "HDMS-Bezdek",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Edmond",
+      "displayname": "HDMS-Edmond",
+      "nickname": "HDMS-Edmond",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Hadley",
+      "displayname": "HDMS-Hadley",
+      "nickname": "HDMS-Hadley",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Hahn",
+      "displayname": "HDMS-Hahn",
+      "nickname": "HDMS-Hahn",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Lathan",
+      "displayname": "HDMS-Lathan",
+      "nickname": "HDMS-Lathan",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Norgaard",
+      "displayname": "HDMS-Norgaard",
+      "nickname": "HDMS-Norgaard",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Oparei",
+      "displayname": "HDMS-Oparei",
+      "nickname": "HDMS-Oparei",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Perlman",
+      "displayname": "HDMS-Perlman",
+      "nickname": "HDMS-Perlman",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Pinewood",
+      "displayname": "HDMS-Pinewood",
+      "nickname": "HDMS-Pinewood",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Ryder",
+      "displayname": "HDMS-Ryder",
+      "nickname": "HDMS-Ryder",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Stanhope",
+      "displayname": "HDMS-Stanhope",
+      "nickname": "HDMS-Stanhope",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Thedus",
+      "displayname": "HDMS-Thedus",
+      "nickname": "HDMS-Thedus",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDMS-Woodruff",
+      "displayname": "HDMS-Woodruff",
+      "nickname": "HDMS-Woodruff",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "HDPC-Cassillo",
+      "displayname": "HDPC-Cassillo",
+      "nickname": "HDPC-Cassillo",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Hot Dogs - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Hot Dogs Stanton Gateway (Pyro)",
+      "name": "HDPC-Farnesway",
+      "displayname": "HDPC-Farnesway",
+      "nickname": "HDPC-Farnesway",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Juice Bar - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Juice Stanton Gateway (Pyro)",
+      "name": "Hickes Research",
+      "displayname": "Hickes Research",
+      "nickname": "Hickes Research",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Humboldt Mines",
+      "displayname": "Humboldt Mines",
+      "nickname": "Humboldt Mines",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "HUR-L1 Green Glade Station",
+      "displayname": "HUR-L1 Green Glade Station",
+      "nickname": "HUR-L1 Green Glade Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "HUR-L2 Faithful Dream Station",
+      "displayname": "HUR-L2 Faithful Dream Station",
+      "nickname": "HUR-L2 Faithful Dream Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "HUR-L3 Thundering Express Station",
+      "displayname": "HUR-L3 Thundering Express Station",
+      "nickname": "HUR-L3 Thundering Express Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "HUR-L4 Melodic Fields Station",
+      "displayname": "HUR-L4 Melodic Fields Station",
+      "nickname": "HUR-L4 Melodic Fields Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "HUR-L5 High Course Station",
+      "displayname": "HUR-L5 High Course Station",
+      "nickname": "HUR-L5 High Course Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "INS Jericho",
+      "displayname": "INS Jericho",
+      "nickname": "INS Jericho",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "Jackson's Swap",
+      "displayname": "Jackson's Swap",
+      "nickname": "Jackson's Swap",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Jumptown",
+      "displayname": "Jumptown",
+      "nickname": "Jumptown",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Kabir's Post",
+      "displayname": "Kabir's Post",
+      "nickname": "Kabir's Post",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Kinder Plots",
+      "displayname": "Kinder Plots",
+      "nickname": "Kinder Plots",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Kudre Ore",
+      "displayname": "Kudre Ore",
+      "nickname": "Kudre Ore",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Last Ditch",
+      "displayname": "Last Ditch",
+      "nickname": "Last Ditch",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Last Landings",
+      "displayname": "Last Landings",
+      "nickname": "Last Landings",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Levski",
+      "displayname": "Levski",
+      "nickname": "Levski",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 0,
+      "type": "city"
     },
     {
-      "name": "Noodle Bar - Stanton Gateway (Pyro)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Noodle Stanton Gateway (Pyro)",
+      "name": "Lorville",
+      "displayname": "Lorville",
+      "nickname": "Lorville",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "city"
+    },
+    {
+      "name": "Loveridge Mineral Reserve",
+      "displayname": "Loveridge Mineral Reserve",
+      "nickname": "Loveridge Mineral Reserve",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Ludlow",
+      "displayname": "Ludlow",
+      "nickname": "Ludlow",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Maker's Point",
+      "displayname": "Maker's Point",
+      "nickname": "Maker's Point",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Megumi Refueling",
+      "displayname": "Megumi Refueling",
+      "nickname": "Megumi Refueling",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 0,
+      "type": "station"
     },
     {
-      "name": "Ellroy's - Nyx Gateway (Stanton)",
-      "displayname": "Nyx Gateway",
-      "nickname": "Ellroy's Nyx Gateway (Stanton)",
+      "name": "MIC-L1 Distribution Center",
+      "displayname": "MIC-L1 Distribution Center",
+      "nickname": "MIC-L1 Distribution Center",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Juice Bar - Nyx Gateway (Stanton)",
-      "displayname": "Nyx Gateway",
-      "nickname": "Juice Nyx Gateway (Stanton)",
+      "name": "MIC-L1 Shallow Frontier Station",
+      "displayname": "MIC-L1 Shallow Frontier Station",
+      "nickname": "MIC-L1 Shallow Frontier Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "MIC-L2 Long Forest Station",
+      "displayname": "MIC-L2 Long Forest Station",
+      "nickname": "MIC-L2 Long Forest Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "MIC-L3 Endless Odyssey Station",
+      "displayname": "MIC-L3 Endless Odyssey Station",
+      "nickname": "MIC-L3 Endless Odyssey Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "MIC-L4 Red Crossroads Station",
+      "displayname": "MIC-L4 Red Crossroads Station",
+      "nickname": "MIC-L4 Red Crossroads Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "MIC-L5 Modern Icarus Station",
+      "displayname": "MIC-L5 Modern Icarus Station",
+      "nickname": "MIC-L5 Modern Icarus Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Microtech Logistics Depot S4LD01",
+      "displayname": "Microtech Logistics Depot S4LD01",
+      "nickname": "Microtech Logistics Depot S4LD01",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Noodle Bar - Nyx Gateway (Stanton)",
-      "displayname": "Nyx Gateway",
-      "nickname": "Noodle Nyx Gateway (Stanton)",
+      "name": "Microtech Logistics Depot S4LD13",
+      "displayname": "Microtech Logistics Depot S4LD13",
+      "nickname": "Microtech Logistics Depot S4LD13",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": null,
+      "type": "distribution"
     },
     {
-      "name": "Refinery Ore Sales - Orbituary",
+      "name": "Moreland Hills",
+      "displayname": "Moreland Hills",
+      "nickname": "Moreland Hills",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Narena's Rest",
+      "displayname": "Narena's Rest",
+      "nickname": "Narena's Rest",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "New Babbage",
+      "displayname": "New Babbage",
+      "nickname": "New Babbage",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "city"
+    },
+    {
+      "name": "New Babbage Interstellar Spaceport",
+      "displayname": "New Babbage Interstellar Spaceport",
+      "nickname": "New Babbage Interstellar Spaceport",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "venue"
+    },
+    {
+      "name": "NT-999-XX",
+      "displayname": "NT-999-XX",
+      "nickname": "NT-999-XX",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "NT-999-XXII",
+      "displayname": "NT-999-XXII",
+      "nickname": "NT-999-XXII",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Nuen Waste Management",
+      "displayname": "Nuen Waste Management",
+      "nickname": "Nuen Waste Management",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Nyx Gateway (Pyro)",
+      "displayname": "Nyx Gateway (Pyro)",
+      "nickname": "Nyx Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Nyx Gateway (Stanton)",
+      "displayname": "Nyx Gateway (Stanton)",
+      "nickname": "Nyx Gateway (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Orbituary",
       "displayname": "Orbituary",
       "nickname": "Orbituary",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 0,
+      "type": "station"
     },
     {
-      "name": "Cargo Services - Nyx Gateway (Pyro)",
-      "displayname": "Nyx Gateway",
-      "nickname": "Cargo Services Nyx Gateway (Pyro)",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Orison",
+      "displayname": "Orison",
+      "nickname": "Orison",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "city"
     },
     {
-      "name": "Cargo Services - Pyro Gateway (Nyx)",
-      "displayname": "Pyro Gateway",
-      "nickname": "Cargo Services Pyro Gateway (Nyx)",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Ostler's Claim",
+      "displayname": "Ostler's Claim",
+      "nickname": "Ostler's Claim",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     },
     {
-      "name": "Cargo Services - Levski",
-      "displayname": "Levski",
-      "nickname": "Cargo Levski",
-      "isCargoCenter": true,
-      "maxContainerSize": 0
+      "name": "Outpost 54",
+      "displayname": "Outpost 54",
+      "nickname": "Outpost 54",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     },
     {
-      "name": "Cargo Services - Stanton Gateway (Nyx)",
-      "displayname": "Stanton Gateway",
-      "nickname": "Cargo Services Stanton Gateway (Nyx)",
+      "name": "Paradise Cove",
+      "displayname": "Paradise Cove",
+      "nickname": "Paradise Cove",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Patch City",
+      "displayname": "Patch City",
+      "nickname": "Patch City",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "People's Service Station Alpha",
+      "displayname": "People's Service Station Alpha",
+      "nickname": "People's Service Station Alpha",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "People's Service Station Delta",
+      "displayname": "People's Service Station Delta",
+      "nickname": "People's Service Station Delta",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "People's Service Station Lambda",
+      "displayname": "People's Service Station Lambda",
+      "nickname": "People's Service Station Lambda",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "People's Service Station Theta",
+      "displayname": "People's Service Station Theta",
+      "nickname": "People's Service Station Theta",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Picker's Field",
+      "displayname": "Picker's Field",
+      "nickname": "Picker's Field",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "Port Olisar",
+      "displayname": "Port Olisar",
+      "nickname": "Port Olisar",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Port Tressler",
+      "displayname": "Port Tressler",
+      "nickname": "Port Tressler",
       "isCargoCenter": true,
-      "maxContainerSize": 0
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Private Property",
+      "displayname": "Private Property",
+      "nickname": "Private Property",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Prophet's Peak",
+      "displayname": "Prophet's Peak",
+      "nickname": "Prophet's Peak",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Prospect Depot",
+      "displayname": "Prospect Depot",
+      "nickname": "Prospect Depot",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "PYAM-FARSTAT-1-2",
+      "displayname": "PYAM-FARSTAT-1-2",
+      "nickname": "PYAM-FARSTAT-1-2",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-1-3",
+      "displayname": "PYAM-FARSTAT-1-3",
+      "nickname": "PYAM-FARSTAT-1-3",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-1-5",
+      "displayname": "PYAM-FARSTAT-1-5",
+      "nickname": "PYAM-FARSTAT-1-5",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-2-3",
+      "displayname": "PYAM-FARSTAT-2-3",
+      "nickname": "PYAM-FARSTAT-2-3",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-3-5",
+      "displayname": "PYAM-FARSTAT-3-5",
+      "nickname": "PYAM-FARSTAT-3-5",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-5-1",
+      "displayname": "PYAM-FARSTAT-5-1",
+      "nickname": "PYAM-FARSTAT-5-1",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-5-3",
+      "displayname": "PYAM-FARSTAT-5-3",
+      "nickname": "PYAM-FARSTAT-5-3",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-FARSTAT-6-2",
+      "displayname": "PYAM-FARSTAT-6-2",
+      "nickname": "PYAM-FARSTAT-6-2",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-SUPVISR-3-4",
+      "displayname": "PYAM-SUPVISR-3-4",
+      "nickname": "PYAM-SUPVISR-3-4",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "PYAM-SUPVISR-3-5",
+      "displayname": "PYAM-SUPVISR-3-5",
+      "nickname": "PYAM-SUPVISR-3-5",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "station"
+    },
+    {
+      "name": "Pyro Gateway (Nyx)",
+      "displayname": "Pyro Gateway (Nyx)",
+      "nickname": "Pyro Gateway (Nyx)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Pyro Gateway (Stanton)",
+      "displayname": "Pyro Gateway (Stanton)",
+      "nickname": "Pyro Gateway (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Rappel",
+      "displayname": "Rappel",
+      "nickname": "Rappel",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "Rat's Nest",
+      "displayname": "Rat's Nest",
+      "nickname": "Rat's Nest",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Raven's Roost",
+      "displayname": "Raven's Roost",
+      "nickname": "Raven's Roost",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Rayari Anvik Research Outpost",
+      "displayname": "Rayari Anvik Research Outpost",
+      "nickname": "Rayari Anvik Research Outpost",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Rayari Cantwell Research Outpost",
+      "displayname": "Rayari Cantwell Research Outpost",
+      "nickname": "Rayari Cantwell Research Outpost",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Rayari Deltana Research Outpost",
+      "displayname": "Rayari Deltana Research Outpost",
+      "nickname": "Rayari Deltana Research Outpost",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "Rayari Kaltag Research Outpost",
+      "displayname": "Rayari Kaltag Research Outpost",
+      "nickname": "Rayari Kaltag Research Outpost",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Rayari McGrath Research Outpost",
+      "displayname": "Rayari McGrath Research Outpost",
+      "nickname": "Rayari McGrath Research Outpost",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Razor's Edge",
+      "displayname": "Razor's Edge",
+      "nickname": "Razor's Edge",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Reclamation & Disposal Orinth",
+      "displayname": "Reclamation & Disposal Orinth",
+      "nickname": "Reclamation & Disposal Orinth",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "Riker Memorial Spaceport",
+      "displayname": "Riker Memorial Spaceport",
+      "nickname": "Riker Memorial Spaceport",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "venue"
+    },
+    {
+      "name": "Rod's Fuel 'N Supplies",
+      "displayname": "Rod's Fuel 'N Supplies",
+      "nickname": "Rod's Fuel 'N Supplies",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Rough Landing",
+      "displayname": "Rough Landing",
+      "nickname": "Rough Landing",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Ruin Station",
+      "displayname": "Ruin Station",
+      "nickname": "Ruin Station",
+      "isCargoCenter": true,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Rustville",
+      "displayname": "Rustville",
+      "nickname": "Rustville",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Sacren's Plot",
+      "displayname": "Sacren's Plot",
+      "nickname": "Sacren's Plot",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Sakura Sun Magnolia Workcenter",
+      "displayname": "Sakura Sun Magnolia Workcenter",
+      "nickname": "Sakura Sun Magnolia Workcenter",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Samson & Son's Salvage Center",
+      "displayname": "Samson & Son's Salvage Center",
+      "nickname": "Samson & Son's Salvage Center",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Scarper's Turn",
+      "displayname": "Scarper's Turn",
+      "nickname": "Scarper's Turn",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Seer's Canyon",
+      "displayname": "Seer's Canyon",
+      "nickname": "Seer's Canyon",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Seraphim Station",
+      "displayname": "Seraphim Station",
+      "nickname": "Seraphim Station",
+      "isCargoCenter": true,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Shadowfall",
+      "displayname": "Shadowfall",
+      "nickname": "Shadowfall",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Shady Glen",
+      "displayname": "Shady Glen",
+      "nickname": "Shady Glen",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Shepherd's Rest",
+      "displayname": "Shepherd's Rest",
+      "nickname": "Shepherd's Rest",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SAL-2",
+      "displayname": "Shubin Mining Facility SAL-2",
+      "nickname": "Shubin Mining Facility SAL-2",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SAL-5",
+      "displayname": "Shubin Mining Facility SAL-5",
+      "nickname": "Shubin Mining Facility SAL-5",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SCD-1",
+      "displayname": "Shubin Mining Facility SCD-1",
+      "nickname": "Shubin Mining Facility SCD-1",
+      "isCargoCenter": false,
+      "maxContainerSize": 32,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SM0-10",
+      "displayname": "Shubin Mining Facility SM0-10",
+      "nickname": "Shubin Mining Facility SM0-10",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SM0-13",
+      "displayname": "Shubin Mining Facility SM0-13",
+      "nickname": "Shubin Mining Facility SM0-13",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SM0-18",
+      "displayname": "Shubin Mining Facility SM0-18",
+      "nickname": "Shubin Mining Facility SM0-18",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SM0-22",
+      "displayname": "Shubin Mining Facility SM0-22",
+      "nickname": "Shubin Mining Facility SM0-22",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SMCa-6",
+      "displayname": "Shubin Mining Facility SMCa-6",
+      "nickname": "Shubin Mining Facility SMCa-6",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Shubin Mining Facility SMCa-8",
+      "displayname": "Shubin Mining Facility SMCa-8",
+      "nickname": "Shubin Mining Facility SMCa-8",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "Slowburn Depot",
+      "displayname": "Slowburn Depot",
+      "nickname": "Slowburn Depot",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Stag's Rut",
+      "displayname": "Stag's Rut",
+      "nickname": "Stag's Rut",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Stanton Gateway (Nyx)",
+      "displayname": "Stanton Gateway (Nyx)",
+      "nickname": "Stanton Gateway (Nyx)",
+      "isCargoCenter": true,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Stanton Gateway (Pyro)",
+      "displayname": "Stanton Gateway (Pyro)",
+      "nickname": "Stanton Gateway (Pyro)",
+      "isCargoCenter": true,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Starlight Service Station",
+      "displayname": "Starlight Service Station",
+      "nickname": "Starlight Service Station",
+      "isCargoCenter": true,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Stonetree",
+      "displayname": "Stonetree",
+      "nickname": "Stonetree",
+      "isCargoCenter": false,
+      "maxContainerSize": null,
+      "type": "outpost"
+    },
+    {
+      "name": "Sunset Mesa",
+      "displayname": "Sunset Mesa",
+      "nickname": "Sunset Mesa",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Teasa Spaceport",
+      "displayname": "Teasa Spaceport",
+      "nickname": "Teasa Spaceport",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "venue"
+    },
+    {
+      "name": "Terra Gateway (Stanton)",
+      "displayname": "Terra Gateway (Stanton)",
+      "nickname": "Terra Gateway (Stanton)",
+      "isCargoCenter": true,
+      "maxContainerSize": 32,
+      "type": "station"
+    },
+    {
+      "name": "Terra Mills HydroFarm",
+      "displayname": "Terra Mills HydroFarm",
+      "nickname": "Terra Mills HydroFarm",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "The Golden Riviera",
+      "displayname": "The Golden Riviera",
+      "nickname": "The Golden Riviera",
+      "isCargoCenter": false,
+      "maxContainerSize": 24,
+      "type": "outpost"
+    },
+    {
+      "name": "The Necropolis",
+      "displayname": "The Necropolis",
+      "nickname": "The Necropolis",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "The Orphanage",
+      "displayname": "The Orphanage",
+      "nickname": "The Orphanage",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "The Yard",
+      "displayname": "The Yard",
+      "nickname": "The Yard",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Tram & Myers Mining",
+      "displayname": "Tram & Myers Mining",
+      "nickname": "Tram & Myers Mining",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Watcher's Depot",
+      "displayname": "Watcher's Depot",
+      "nickname": "Watcher's Depot",
+      "isCargoCenter": false,
+      "maxContainerSize": 16,
+      "type": "outpost"
+    },
+    {
+      "name": "Weeping Cove",
+      "displayname": "Weeping Cove",
+      "nickname": "Weeping Cove",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Wikelo Emporium Dasi Station",
+      "displayname": "Wikelo Emporium Dasi Station",
+      "nickname": "Wikelo Emporium Dasi Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Wikelo Emporium Kinga Station",
+      "displayname": "Wikelo Emporium Kinga Station",
+      "nickname": "Wikelo Emporium Kinga Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Wikelo Emporium Selo Station",
+      "displayname": "Wikelo Emporium Selo Station",
+      "nickname": "Wikelo Emporium Selo Station",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "station"
+    },
+    {
+      "name": "Windfall",
+      "displayname": "Windfall",
+      "nickname": "Windfall",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Yang's Place",
+      "displayname": "Yang's Place",
+      "nickname": "Yang's Place",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
+    },
+    {
+      "name": "Zephyr",
+      "displayname": "Zephyr",
+      "nickname": "Zephyr",
+      "isCargoCenter": false,
+      "maxContainerSize": 0,
+      "type": "outpost"
     }
   ]
 }

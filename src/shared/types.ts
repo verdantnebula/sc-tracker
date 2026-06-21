@@ -141,14 +141,37 @@ export interface Commodity {
   kind: string;
 }
 
+/**
+ * Coarse location category, used only for optional sorting/grouping in the
+ * dropdowns. Additive metadata — never used to EXCLUDE a destination.
+ *  - station      : orbital space station (Everus Harbor, Baijini Point…)
+ *  - city         : landing-zone city (Lorville, Area 18…)
+ *  - outpost      : planetary/moon outpost (HDMS-*, mining outposts…)
+ *  - distribution : distribution / logistics depot (S4DC*, S4LD* haul drops)
+ *  - venue        : a named sub-location (e.g. a spaceport) parsed from a terminal
+ *  - terminal     : a UEX terminal that didn't resolve to a parent location
+ */
+export type TerminalType =
+  | "station"
+  | "city"
+  | "outpost"
+  | "distribution"
+  | "venue"
+  | "terminal";
+
 export interface Terminal {
   name: string;
   displayname: string;
   nickname: string;
-  /** UEX `is_cargo_center` — filter dropoff/pickup dropdowns on this. */
+  /** UEX `is_cargo_center` — used to SORT cargo destinations first, NOT to filter. */
   isCargoCenter: boolean;
   /** UEX `max_container_size`; null when unspecified. */
   maxContainerSize: number | null;
+  /**
+   * Optional coarse category for sorting/grouping the dropdown. Additive; older
+   * snapshots without it still validate. Never used to exclude a destination.
+   */
+  type?: TerminalType;
 }
 
 export interface ReferenceData {

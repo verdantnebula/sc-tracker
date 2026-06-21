@@ -9,6 +9,21 @@
 // than none).
 // ============================================================================
 
+import type { Terminal } from "./types";
+
+/**
+ * Order destinations for a dropdown: real cargo centers first (the common drops),
+ * then everything else, each group alphabetical. We OFFER every known location —
+ * this is purely a SORT, never a filter (the dropdown-too-small bug was caused by
+ * filtering to `isCargoCenter`). Returns a new array; input is not mutated.
+ */
+export function sortDestinations(terminals: Terminal[]): Terminal[] {
+  return [...terminals].sort((a, b) => {
+    if (a.isCargoCenter !== b.isCargoCenter) return a.isCargoCenter ? -1 : 1;
+    return (a.displayname || a.name).localeCompare(b.displayname || b.name);
+  });
+}
+
 /**
  * Confident match between the player's humanized current location and a
  * dropoff's display name. True only when:
