@@ -21,6 +21,15 @@ import { isConfidentLocationMatch } from "@shared/location";
 
 export const fmt = (n: number): string => (n || 0).toLocaleString("en-US");
 
+/**
+ * Placeholder location for dropoff legs the game log never gave a destination
+ * (leg.location == null). Exported so the By-Dropoff UI can detect this bucket
+ * via the `DropoffGroup.needsLocation` flag (preferred) or this constant, rather
+ * than hard-coding the magic string in multiple places. The string still serves
+ * as the group's `location` key (and visible fallback) inside dropoffGroups.
+ */
+export const UNKNOWN_DESTINATION = "Unknown destination";
+
 // ---------------------------------------------------------------------------
 // Log-missing banner predicate. The warning strip shows when the resolved
 // Game.log can't be found, so a user with a non-standard install (or a mis-set
@@ -125,7 +134,7 @@ export function dropoffGroups(
     if (!isActive(m)) continue;
     for (const l of m.legs) {
       if (l.kind !== "dropoff") continue;
-      const loc = l.location ?? "Unknown destination";
+      const loc = l.location ?? UNKNOWN_DESTINATION;
       let g = groups.get(loc);
       if (!g) {
         g = {
@@ -176,6 +185,7 @@ export function dropoffGroups(
     const pctDelivered = scuTotal
       ? Math.round((g.scuDelivered / scuTotal) * 100)
       : 0;
+    const needsLocation = g.location === UNKNOWN_DESTINATION;
     const allDone = todo.length === 0;
     return {
       location: g.location,
@@ -189,12 +199,19 @@ export function dropoffGroups(
       // humanized terminal id frequently won't match a dropoff display name —
       // that's fine; we simply don't highlight rather than false-positive.
       isCurrentLocation: isConfidentLocationMatch(currentLocation, g.location),
+      needsLocation,
     };
   });
 
   out.sort(
     (a, b) =>
-      Number(a.allDone) - Number(b.allDone) || b.scuRemaining - a.scuRemaining,
+      // Cleared stops sink to the bottom; otherwise the "needs a destination"
+      // action bucket floats to the very top (its SCU is usually suppressed to
+      // 0, so it would otherwise sink — but it's the most actionable group),
+      // then the rest by remaining SCU desc.
+      Number(a.allDone) - Number(b.allDone) ||
+      Number(b.needsLocation) - Number(a.needsLocation) ||
+      b.scuRemaining - a.scuRemaining,
   );
   return out;
 }

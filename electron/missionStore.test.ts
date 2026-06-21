@@ -82,6 +82,22 @@ const ended = (
   ts,
 });
 
+/** missionAccepted carrying a title-derived route (FIX 3 fallback). */
+const acceptedWithRoute = (
+  missionId: string,
+  title: string,
+  titlePickup: string | null,
+  titleDropoff: string | null,
+  ts = 1000,
+): DomainEvent => ({
+  type: "missionAccepted",
+  missionId,
+  title,
+  titlePickup,
+  titleDropoff,
+  ts,
+});
+
 const award = (amount: number, ts: number): DomainEvent => ({
   type: "payoutAwarded",
   amount,
@@ -545,6 +561,208 @@ describe("by-dropoff aggregation", () => {
       [...g.todo, ...g.delivered].flatMap((c) => c.legRefs),
     );
     expect(refsAll.some((r) => r.missionId === "m3")).toBe(false);
+  });
+});
+
+// =============================================================================
+// FIX 3: title-derived location autofill (New Objective suppressed)
+// =============================================================================
+
+describe("title-route location autofill (objectiveDeclared suppressed)", () => {
+  it("fills pickup+dropoff from the title for an A->B mission with no declared location", () => {
+    // A->B mission: title carries Seraphim Station > Everus Harbor. A marker
+    // seeds commodity (and the single pickup + single dropoff legs) but NO
+    // objectiveDeclared arrives (game suppressed it).
+    store.applyEvent(
+      acceptedWithRoute(
+        "m1",
+        "DIRECT Large Haul | Seraphim Station > Everus Harbor",
+        "Seraphim Station",
+        "Everus Harbor",
+      ),
+    );
+    store.applyEvent(
+      marker(
+        "m1",
+        "pickup_p_0",
+        "pickup",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+
+    const m = store.getMission("m1")!;
+    const pickup = m.legs.find((l) => l.kind === "pickup")!;
+    const dropoff = m.legs.find((l) => l.kind === "dropoff")!;
+    expect(pickup.location).toBe("Seraphim Station");
+    expect(dropoff.location).toBe("Everus Harbor");
+
+    // By-dropoff groups the suppressed leg under the title's dropoff, NOT Unknown.
+    const groups = store.dropoffGroups(null);
+    const everus = groups.find((g) => g.location === "Everus Harbor");
+    expect(everus).toBeDefined();
+    expect(
+      everus!.todo.some((c) => c.legRefs.some((r) => r.missionId === "m1")),
+    ).toBe(true);
+
+    // SCU is genuinely unavailable when suppressed -> untouched (0), still manual.
+    expect(dropoff.scuTotal).toBe(0);
+  });
+
+  it("MERGES a title-derived dropoff with a declared dropoff of the same location into ONE group", () => {
+    // Regression guard for the dirty-name bug: parseTitleRoute now strips
+    // contract-modifier tokens / trailing colon, so a title-derived dropoff is a
+    // CLEAN name. It must key-match an authoritative objectiveDeclared location
+    // of the same name and form a SINGLE By-Dropoff group — not split into two
+    // (e.g. "Everus Harbor [BP]* :" vs "Everus Harbor").
+
+    // Mission A: New Objective suppressed -> dropoff filled from the (clean) title.
+    store.applyEvent(
+      acceptedWithRoute(
+        "mA",
+        "DIRECT Large Haul | Seraphim Station > Everus Harbor",
+        "Seraphim Station",
+        "Everus Harbor", // already cleaned by parseTitleRoute upstream
+      ),
+    );
+    store.applyEvent(
+      marker(
+        "mA",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+
+    // Mission B: a normal mission with an authoritative declared dropoff there.
+    store.applyEvent(accepted("mB", "Haul B", 1000));
+    store.applyEvent(
+      declared("mB", "d0", "Pressurized Ice", 12, "Everus Harbor"),
+    );
+
+    const groups = store.dropoffGroups(null);
+    const everusGroups = groups.filter((g) => g.location === "Everus Harbor");
+    // The whole point: exactly ONE group for Everus Harbor, fed by BOTH missions.
+    expect(everusGroups).toHaveLength(1);
+    const refs = [
+      ...everusGroups[0].todo,
+      ...everusGroups[0].delivered,
+    ].flatMap((c) => c.legRefs.map((r) => r.missionId));
+    expect(refs).toContain("mA");
+    expect(refs).toContain("mB");
+  });
+
+  it("declared location wins: a later objectiveDeclared overrides the title-derived one", () => {
+    store.applyEvent(
+      acceptedWithRoute(
+        "m1",
+        "DIRECT Large Haul | Seraphim Station > Everus Harbor",
+        "Seraphim Station",
+        "Everus Harbor",
+      ),
+    );
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    // Title-derived dropoff in place...
+    expect(store.getMission("m1")!.legs[0].location).toBe("Everus Harbor");
+    // ...now the authoritative New Objective arrives with a real location.
+    store.applyEvent(
+      declared("m1", "dropoff_p_0", "Waste", 29, "Port Tressler"),
+    );
+    const dropoff = store
+      .getMission("m1")!
+      .legs.find((l) => l.kind === "dropoff")!;
+    expect(dropoff.location).toBe("Port Tressler"); // declared wins
+    expect(dropoff.scuTotal).toBe(29);
+  });
+
+  it("declared-first is NOT overwritten by a later marker (title fallback never clobbers declared)", () => {
+    store.applyEvent(
+      acceptedWithRoute(
+        "m1",
+        "DIRECT Large Haul | Seraphim Station > Everus Harbor",
+        "Seraphim Station",
+        "Everus Harbor",
+      ),
+    );
+    // Declared arrives FIRST with the real (different) location.
+    store.applyEvent(
+      declared("m1", "dropoff_p_0", "Waste", 29, "Port Tressler"),
+    );
+    // Marker for the same leg fires later (would carry the title fallback).
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    const dropoff = store
+      .getMission("m1")!
+      .legs.find((l) => l.kind === "dropoff")!;
+    expect(dropoff.location).toBe("Port Tressler");
+  });
+
+  it("does NOT guess the dropoff for a multi-dropoff mission", () => {
+    // Two dropoff legs -> not a clean A->B; the title's single dropoff must NOT
+    // be smeared across both. (Pickup is still single, but be conservative.)
+    store.applyEvent(
+      acceptedWithRoute(
+        "m1",
+        "BULK Multi Haul | Seraphim Station > Everus Harbor",
+        "Seraphim Station",
+        "Everus Harbor",
+      ),
+    );
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_SingleToMulti3_Processed_Mixed_PressIce_Stanton1_SupplyGrade",
+      ),
+    );
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_1",
+        "dropoff",
+        "HaulCargo_SingleToMulti3_Processed_Mixed_PressIce_Stanton1_SupplyGrade",
+      ),
+    );
+    const dropoffs = store
+      .getMission("m1")!
+      .legs.filter((l) => l.kind === "dropoff");
+    expect(dropoffs).toHaveLength(2);
+    for (const d of dropoffs) expect(d.location).toBeNull();
+  });
+
+  it("no-op when the title carries no route (legs stay null)", () => {
+    store.applyEvent(accepted("m1", "Senior Rank - Medium Cargo Haul", 1000));
+    store.applyEvent(
+      marker(
+        "m1",
+        "dropoff_p_0",
+        "dropoff",
+        "HaulCargo_AToB_Waste_Waste_Stanton1_SupplyGrade",
+      ),
+    );
+    const dropoff = store.getMission("m1")!.legs[0];
+    expect(dropoff.location).toBeNull();
   });
 });
 

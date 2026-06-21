@@ -11,8 +11,19 @@ import type { LegKind, Position } from "./types";
 export type CompletionType = "complete" | "abandon";
 
 export type DomainEvent =
-  // "Contract Accepted: <title>"  (SHUDEvent_OnNotification) — always present
-  | { type: "missionAccepted"; missionId: string; title: string; ts: number }
+  // "Contract Accepted: <title>"  (SHUDEvent_OnNotification) — always present.
+  // titlePickup/titleDropoff are an OPTIONAL, backward-compatible route parsed
+  // from the title's last `|`-segment (FIX 3). They are a FALLBACK used only when
+  // the authoritative New Objective line (objectiveDeclared) is suppressed; the
+  // declared location always wins. Null/absent when the title carries no route.
+  | {
+      type: "missionAccepted";
+      missionId: string;
+      title: string;
+      titlePickup?: string | null;
+      titleDropoff?: string | null;
+      ts: number;
+    }
 
   // CLocalMissionPhaseMarker::CreateMarker — always present. Carries giver,
   // contract template (encodes commodity/variant/grade), objectiveId, position.

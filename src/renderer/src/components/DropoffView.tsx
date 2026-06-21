@@ -1,6 +1,6 @@
 // DropoffView — design README §3. The "UNLOAD MANIFEST" header + 3-col grid of
 // DropoffGroupCards. Aggregation is computed in selectors.dropoffGroups.
-import type { DropoffGroup } from "@shared/types";
+import type { DropoffGroup, Mission, ReferenceData } from "@shared/types";
 import { fmt } from "../lib/selectors";
 import { DropoffGroupCard } from "./DropoffGroupCard";
 
@@ -10,14 +10,26 @@ export function DropoffView({
   activeStops,
   gap,
   showDelivered,
+  missionsById,
+  reference,
   onCheckOff,
+  onEditLeg,
+  onOpenMission,
 }: {
   groups: DropoffGroup[];
   grandTotal: number;
   activeStops: number;
   gap: number;
   showDelivered: boolean;
+  missionsById: Map<string, Mission>;
+  reference: ReferenceData;
   onCheckOff: (location: string, commodity: string) => void;
+  onEditLeg: (
+    missionId: string,
+    legId: string,
+    patch: { commodity?: string; scuTotal?: number; location?: string | null },
+  ) => void;
+  onOpenMission: (missionId: string) => void;
 }): React.JSX.Element {
   return (
     <>
@@ -71,7 +83,11 @@ export function DropoffView({
             key={g.location}
             group={g}
             showDelivered={showDelivered}
+            missionsById={missionsById}
+            reference={reference}
             onCheckOff={onCheckOff}
+            onEditLeg={onEditLeg}
+            onOpenMission={onOpenMission}
           />
         ))}
       </div>

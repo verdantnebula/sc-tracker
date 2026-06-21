@@ -186,6 +186,11 @@ const DEFAULT_PAYOUT_WINDOW_MS = 2000;
 // Giver strings are discovered from logs; match defensively/case-insensitively.
 // ---------------------------------------------------------------------------
 
+/** True for a null / undefined / empty leg location string. */
+function isEmpty(s: string | null | undefined): boolean {
+  return s === null || s === undefined || s === "";
+}
+
 function isHaulingGiver(giver: string): boolean {
   const g = giver.toLowerCase();
   return (
@@ -291,6 +296,8 @@ interface MissionRow {
   notes: string;
   created_seq: number | null;
   session: string;
+  title_pickup: string | null;
+  title_dropoff: string | null;
 }
 
 interface LegRow {
@@ -504,10 +511,21 @@ class SqliteMissionStore implements MissionStore {
         .prepare(
           `UPDATE missions
              SET title = CASE WHEN title = '' THEN @title ELSE title END,
-                 accepted_at = COALESCE(accepted_at, @ts)
+                 accepted_at = COALESCE(accepted_at, @ts),
+                 title_pickup = COALESCE(title_pickup, @tp),
+                 title_dropoff = COALESCE(title_dropoff, @td)
            WHERE id = @id`,
         )
-        .run({ id: e.missionId, title: e.title, ts: e.ts });
+        .run({
+          id: e.missionId,
+          title: e.title,
+          ts: e.ts,
+          tp: e.titlePickup ?? null,
+          td: e.titleDropoff ?? null,
+        });
+      // Markers may have arrived first; now that we know the route, fill any
+      // still-empty leg locations (fallback only; declared values are kept).
+      this.applyTitleRouteFallback(e.missionId);
       return;
     }
     this.ensureMission(e.missionId, {
@@ -516,6 +534,93 @@ class SqliteMissionStore implements MissionStore {
       source: "log",
       accepted_at: e.ts,
     });
+    // Persist the title route on the fresh row so the fallback survives event
+    // ordering + restarts. FALLBACK only — declared location always wins.
+    this.db
+      .prepare(
+        `UPDATE missions SET title_pickup = @tp, title_dropoff = @td WHERE id = @id`,
+      )
+      .run({
+        id: e.missionId,
+        tp: e.titlePickup ?? null,
+        td: e.titleDropoff ?? null,
+      });
+    this.applyTitleRouteFallback(e.missionId);
+  }
+
+  /**
+   * FIX 3: fill leg locations from the mission's title-derived route when the
+   * authoritative New Objective line was suppressed. Mirrors the commodity-from-
+   * template fallback (onMarker / upsertLeg `commodityFillOnly`):
+   *   - The title encodes a single A->B route ("<pickup> > <dropoff>"), so it can
+   *     only describe a clean A_TO_B mission. The mission's VARIANT (parsed from the
+   *     contract template on the marker) is the authoritative shape signal and is
+   *     the gate: only A_TO_B is filled. Multi-leg variants (SINGLE_TO_MULTI /
+   *     MULTI_TO_SINGLE) are skipped so the title's single dropoff is never smeared
+   *     across enumerated legs — and that holds even MID-STREAM, after only the
+   *     first of several dropoff markers has arrived (when a bare single-leg count
+   *     would misfire and fill the first leg before the rest are seen).
+   *   - Within an A_TO_B mission each side is filled INDEPENDENTLY, only when that
+   *     side is present as a single leg: title_pickup -> the lone pickup leg,
+   *     title_dropoff -> the lone dropoff leg. A side whose marker hasn't arrived
+   *     yet is skipped now and filled on a later marker. This is what lets a
+   *     dropoff-only marker stream (no pickup leg yet) still get its title dropoff.
+   *   - Fills a leg's location ONLY when it is currently empty/null; a non-empty
+   *     (declared) location is never overwritten — declared always wins.
+   *   - Never touches SCU (genuinely unavailable when suppressed).
+   * Idempotent + safe to call repeatedly (on accept and on each marker).
+   */
+  private applyTitleRouteFallback(missionId: string): void {
+    const m = this.rawMission(missionId);
+    if (!m) return;
+    if (!m.title_pickup && !m.title_dropoff) return; // no route parsed
+    // The title only describes a single A->B route. Gate on the authoritative
+    // variant so a multi-dropoff mission is never filled — including mid-stream,
+    // before its later dropoff markers have arrived.
+    if (m.variant !== "A_TO_B") return;
+
+    const legs = this.db
+      .prepare(
+        `SELECT objective_id, kind, location FROM legs WHERE mission_id = @m`,
+      )
+      .all({ m: missionId }) as Array<{
+      objective_id: string;
+      kind: string;
+      location: string | null;
+    }>;
+    const pickups = legs.filter((l) => l.kind === "pickup");
+    const dropoffs = legs.filter((l) => l.kind === "dropoff");
+
+    const fill = this.db.prepare(
+      `UPDATE legs SET location = @loc
+         WHERE mission_id = @m AND objective_id = @o
+           AND (location IS NULL OR location = '')`,
+    );
+    // Each direction is filled independently: a clean single leg of that kind
+    // maps unambiguously to the title's single endpoint. Multi-leg (or not-yet-
+    // seen) sides are left alone.
+    if (
+      m.title_pickup &&
+      pickups.length === 1 &&
+      isEmpty(pickups[0].location)
+    ) {
+      fill.run({
+        loc: m.title_pickup,
+        m: missionId,
+        o: pickups[0].objective_id,
+      });
+    }
+    if (
+      m.title_dropoff &&
+      dropoffs.length === 1 &&
+      isEmpty(dropoffs[0].location)
+    ) {
+      fill.run({
+        loc: m.title_dropoff,
+        m: missionId,
+        o: dropoffs[0].objective_id,
+      });
+    }
   }
 
   private onMarker(e: Extract<DomainEvent, { type: "missionMarker" }>): void {
@@ -558,6 +663,9 @@ class SqliteMissionStore implements MissionStore {
       commodityFillOnly: true,
       pos: e.position,
     });
+    // FIX 3: now that this leg exists, fill its location from the title route if
+    // accepted arrived first (fallback only; an already-declared location wins).
+    this.applyTitleRouteFallback(e.missionId);
   }
 
   private onObjectiveDeclared(
@@ -1166,10 +1274,17 @@ class SqliteMissionStore implements MissionStore {
       )
       .all() as LegRow[];
 
-    // Group by location -> commodity.
+    // Group by location -> commodity. `open` tracks legs that are not yet
+    // completed: a token-suppressed leg has unknown SCU (scu_total 0), so its
+    // `remaining` is 0 even though the stop is still outstanding. Bucketing on
+    // remaining alone would mis-file it as "delivered"; `open` keeps an
+    // uncompleted unknown-quantity stop in `todo` where it belongs.
     const byLoc = new Map<
       string,
-      Map<string, { remaining: number; delivered: number; refs: LegRef[] }>
+      Map<
+        string,
+        { remaining: number; delivered: number; open: number; refs: LegRef[] }
+      >
     >();
     for (const r of rows) {
       const loc = r.location as string;
@@ -1177,12 +1292,18 @@ class SqliteMissionStore implements MissionStore {
       if (!byLoc.has(loc)) byLoc.set(loc, new Map());
       const byComm = byLoc.get(loc)!;
       if (!byComm.has(commodity))
-        byComm.set(commodity, { remaining: 0, delivered: 0, refs: [] });
+        byComm.set(commodity, {
+          remaining: 0,
+          delivered: 0,
+          open: 0,
+          refs: [],
+        });
       const cell = byComm.get(commodity)!;
       const delivered = r.completed === 1 ? r.scu_total : r.scu_delivered;
       const remaining = Math.max(0, r.scu_total - delivered);
       cell.remaining += remaining;
       cell.delivered += delivered;
+      if (r.completed !== 1) cell.open += 1;
       cell.refs.push({ missionId: r.mission_id, legId: r.objective_id });
     }
 
@@ -1192,6 +1313,7 @@ class SqliteMissionStore implements MissionStore {
       const delivered: DropoffCommodity[] = [];
       let scuRemaining = 0;
       let scuTotal = 0;
+      let openLegs = 0;
       for (const [commodity, cell] of byComm) {
         const line: DropoffCommodity = {
           commodity,
@@ -1201,7 +1323,10 @@ class SqliteMissionStore implements MissionStore {
         };
         scuRemaining += cell.remaining;
         scuTotal += cell.remaining + cell.delivered;
-        if (cell.remaining > 0) todo.push(line);
+        openLegs += cell.open;
+        // A line is outstanding when it still has SCU to deliver OR carries an
+        // uncompleted leg whose quantity is unknown (suppressed SCU).
+        if (cell.remaining > 0 || cell.open > 0) todo.push(line);
         else delivered.push(line);
       }
       const pctDelivered =
@@ -1217,8 +1342,13 @@ class SqliteMissionStore implements MissionStore {
         scuRemaining,
         scuTotal,
         pctDelivered,
-        allDone: scuRemaining === 0,
+        // Done only when nothing is left to deliver AND no leg is still open.
+        allDone: scuRemaining === 0 && openLegs === 0,
         isCurrentLocation: isConfidentLocationMatch(currentLocation, location),
+        // This store query filters out null-location legs, so it never produces
+        // the synthetic "needs a destination" bucket — always false here. (The
+        // renderer selector builds that bucket from the live mission set.)
+        needsLocation: false,
       });
     }
     // Stable order: stops with work first, then alphabetical.

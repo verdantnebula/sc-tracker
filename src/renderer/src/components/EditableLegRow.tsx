@@ -7,8 +7,8 @@
 // can't clobber them.
 import { useEffect, useState } from "react";
 import type { Leg, ReferenceData } from "@shared/types";
-import { sortDestinations } from "@shared/location";
 import { isLegIncomplete } from "../lib/selectors";
+import { DestinationPicker } from "./DestinationPicker";
 
 export function EditableLegRow({
   leg,
@@ -52,11 +52,6 @@ export function EditableLegRow({
     setLocation(leg.location ?? "");
   }, [leg.missionId, leg.id, leg.commodity, leg.scuTotal, leg.location]);
 
-  // Offer EVERY known destination (the bug fix), not just cargo centers — but
-  // surface cargo centers first so the common drops are easy to reach. Free-text
-  // entry still works for anything not in the list.
-  const terminals = sortDestinations(reference.terminals);
-
   const checkbox = (
     <button
       onClick={onToggle}
@@ -95,7 +90,6 @@ export function EditableLegRow({
   };
 
   const commodityListId = `commodities-${leg.id}`;
-  const terminalListId = `terminals-${leg.id}`;
 
   return (
     <div
@@ -195,25 +189,15 @@ export function EditableLegRow({
           ))}
         </datalist>
 
-        <input
+        <DestinationPicker
           value={location}
-          list={terminalListId}
-          placeholder="Destination…"
-          onChange={(e) => {
-            const v = e.target.value;
+          terminals={reference.terminals}
+          ariaLabel="Destination"
+          onChange={(v) => {
             setLocation(v);
             onEditLeg({ location: v.trim() === "" ? null : v });
           }}
-          style={fieldStyle}
         />
-        <datalist id={terminalListId}>
-          {terminals.map((t) => (
-            <option
-              key={t.name}
-              value={t.displayname || t.nickname || t.name}
-            />
-          ))}
-        </datalist>
 
         <input
           value={scuText}

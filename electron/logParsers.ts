@@ -169,6 +169,99 @@ export function commodityDisplayFromToken(token: string): string {
     .join(" ");
 }
 
+// ---------------------------------------------------------------------------
+// Title-derived route parsing (FIX 3 — location autofill fallback)
+// ---------------------------------------------------------------------------
+
+/**
+ * Route extracted from a Contract Accepted title. Used ONLY as a fallback when
+ * the authoritative New Objective line (objectiveDeclared) is suppressed by the
+ * game's intermittent ObjectiveTokenDef bug. `pickup`/`dropoff` are free-text
+ * human location names (or null when the title doesn't carry them).
+ */
+export interface TitleRoute {
+  pickup: string | null;
+  dropoff: string | null;
+}
+
+/**
+ * Strip the `<EM3>…</EM3>` style markup (including orphan / self-closing tags
+ * like the trailing `<EM4>`) from a raw title and collapse whitespace. Pure.
+ */
+function stripTitleMarkup(raw: string): string {
+  return raw
+    .replace(/<\/?EM\d+\s*\/?>/gi, " ") // <EM3>, </EM3>, <EM4/>, trailing <EM4>
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Clean a single endpoint name extracted from a title route. Real captured
+ * titles carry contract-modifier tokens and a trailing colon on the endpoints,
+ * e.g. `"Everus Harbor [BP]* :"` or `"Port Tressler [BP]* [VAR] :"`. These must
+ * NOT leak into the location string: a dirty name shows a garbled UI label AND
+ * fails to key-match a clean `objectiveDeclared` location, splitting one stop
+ * into two By-Dropoff groups.
+ *
+ * Conservative by design — removes ONLY bracket-token groups (`[...]` with an
+ * optional trailing `*`) and a trailing `:`/whitespace. Legitimate location
+ * characters (letters, digits, spaces, `-`) pass through untouched, so real
+ * names like "Everus Harbor", "Area18", and "HDPC-Cassillo" are preserved. Pure.
+ */
+function cleanRouteName(raw: string): string {
+  return raw
+    .replace(/\s*\[[^\]]*\]\*?/g, "") // ` [BP]*`, `[VAR]`, etc. (token + opt '*')
+    .replace(/\s*:\s*$/, "") // trailing colon + surrounding whitespace
+    .replace(/\s{2,}/g, " ") // collapse any double spaces left behind
+    .trim();
+}
+
+/**
+ * Parse the route out of a Contract Accepted title (FIX 3). The route lives in
+ * the LAST `|`-delimited segment of the (markup-stripped) title:
+ *   - "… | Seraphim Station > Everus Harbor"  -> { pickup, dropoff }
+ *   - "… | from Baijini Point"                -> { pickup, dropoff: null }
+ *   - anything else                            -> { pickup: null, dropoff: null }
+ *
+ * Defensive: trims, collapses whitespace, returns nulls on anything unparseable
+ * or non-string input; never throws. Pure + exported so it's unit-testable.
+ *
+ * This is a FALLBACK only — the declared location (objectiveDeclared) is always
+ * authoritative; see missionStore's title-route location fill.
+ */
+export function parseTitleRoute(title: string): TitleRoute {
+  const empty: TitleRoute = { pickup: null, dropoff: null };
+  if (typeof title !== "string") return empty;
+
+  const cleaned = stripTitleMarkup(title);
+  if (cleaned.length === 0) return empty;
+
+  const segments = cleaned.split("|");
+  const last = segments[segments.length - 1]?.trim() ?? "";
+  if (last.length === 0) return empty;
+
+  // "<pickup> > <dropoff>" — directional A->B route.
+  const gtIdx = last.indexOf(">");
+  if (gtIdx !== -1) {
+    // Clean BOTH endpoints (defensive): tokens/colons can appear on either side.
+    const pickup = cleanRouteName(last.slice(0, gtIdx));
+    const dropoff = cleanRouteName(last.slice(gtIdx + 1));
+    return {
+      pickup: pickup.length > 0 ? pickup : null,
+      dropoff: dropoff.length > 0 ? dropoff : null,
+    };
+  }
+
+  // "from <pickup>" — pickup only (single-to-multi: no single dropoff in title).
+  const fromM = /^from\s+(.+)$/i.exec(last);
+  if (fromM) {
+    const pickup = cleanRouteName(fromM[1]);
+    return { pickup: pickup.length > 0 ? pickup : null, dropoff: null };
+  }
+
+  return empty;
+}
+
 /**
  * Map a contract-template string to { variant, grade, commodityToken }, handling
  * BOTH known giver formats and degrading to UNKNOWN for anything else. Never throws.
@@ -257,7 +350,18 @@ function parseMissionAccepted(
   const title = cleanTitle(m[1]);
   if (title.length === 0) return null;
 
-  return { type: "missionAccepted", missionId, title, ts };
+  // Parse the route from the RAW title segment (markup intact) so the route
+  // helper can use its own markup stripping. Fallback only; declared wins.
+  const { pickup, dropoff } = parseTitleRoute(m[1]);
+
+  return {
+    type: "missionAccepted",
+    missionId,
+    title,
+    titlePickup: pickup,
+    titleDropoff: dropoff,
+    ts,
+  };
 }
 
 /** Strip the `<EM4>...</EM4>` formatting markup and trailing `: ` from a title. */

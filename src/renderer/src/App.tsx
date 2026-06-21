@@ -161,6 +161,13 @@ function CargoApp({
   );
   const grandTotal = useMemo(() => grandTotalRemaining(groups), [groups]);
   const activeStops = useMemo(() => activeStopCount(groups), [groups]);
+  // Live active missions keyed by id, so By-Dropoff can resolve a LegRef back to
+  // its {mission, leg} for inline editing (single source of truth — no leg data
+  // is duplicated into the selector).
+  const activeMissionsById = useMemo(
+    () => new Map(activeMissions.map((m) => [m.id, m])),
+    [activeMissions],
+  );
   const terminalCount = useMemo(
     () => missions.filter(isTerminal).length,
     [missions],
@@ -429,7 +436,11 @@ function CargoApp({
               activeStops={activeStops}
               gap={gap}
               showDelivered={showDelivered}
+              missionsById={activeMissionsById}
+              reference={reference}
               onCheckOff={checkOffLine}
+              onEditLeg={editLeg}
+              onOpenMission={setSelectedId}
             />
           ) : tab === "missions" ? (
             <MissionListView

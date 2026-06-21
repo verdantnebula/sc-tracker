@@ -15,7 +15,7 @@ import Database from "better-sqlite3";
 import type { Database as DB } from "better-sqlite3";
 
 /** Current schema version. Bump + add a migration block when the shape changes. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS missions (
@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS missions (
   completed_at         INTEGER,                       -- epoch ms, nullable
   notes                TEXT NOT NULL DEFAULT '',
   created_seq          INTEGER,                       -- monotonic insert order (newest-first sort)
+  -- FIX 3: route parsed from the Contract Accepted title's last pipe-segment, kept
+  -- so the title-derived location fallback survives event ordering + restarts.
+  -- A FALLBACK ONLY — used to fill a leg location when New Objective is suppressed;
+  -- the declared location always wins. NULL when the title carried no route.
+  title_pickup         TEXT,                          -- nullable
+  title_dropoff        TEXT,                          -- nullable
   -- Origin of the mission's defining events. 'historical' = reconstructed from a
   -- PAST session (logbackups backfill); 'live' = the current session (the live
   -- Game.log read on startup + the ongoing tail). Only live + non-terminal
@@ -209,4 +215,14 @@ function migrate(db: DB): void {
   // already creates them on the next open of an older (cargo-only) DB — no ALTER
   // is required and the cargo tables are untouched (additive migration). This
   // block is intentionally a no-op placeholder documenting the v4 step.
+
+  // v5: add missions.title_pickup / title_dropoff (FIX 3 — title-derived route).
+  // Pre-existing rows have no parsed route; NULL is correct and the fallback is a
+  // no-op for them (they keep whatever leg locations they already had).
+  if (!cols.some((c) => c.name === "title_pickup")) {
+    db.exec(`ALTER TABLE missions ADD COLUMN title_pickup TEXT`);
+  }
+  if (!cols.some((c) => c.name === "title_dropoff")) {
+    db.exec(`ALTER TABLE missions ADD COLUMN title_dropoff TEXT`);
+  }
 }

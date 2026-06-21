@@ -15,6 +15,7 @@ import {
   parseLine,
   parseContractTemplate,
   commodityDisplayFromToken,
+  parseTitleRoute,
 } from "./logParsers";
 
 // ---------------------------------------------------------------------------
@@ -166,6 +167,78 @@ describe("parseLine — objectiveCompleted", () => {
     )!;
     expect(complete).toBeDefined();
     expect(complete.missionId).toBe("65af15d8-7112-485d-9478-b8039f835015");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseTitleRoute — title-derived route fallback (FIX 3, location autofill)
+// ---------------------------------------------------------------------------
+// When the game suppresses the New Objective line, the dropoff location is still
+// present in the Contract Accepted title's last `|`-delimited segment. These are
+// REAL captured titles (markup tags + trailing tag preserved verbatim).
+
+describe("parseTitleRoute", () => {
+  it("parses an A->B (DIRECT) title: <pickup> > <dropoff>, stripping markup", () => {
+    const r = parseTitleRoute(
+      "Experienced | <EM3>DIRECT</EM3> Large Haul | Seraphim Station > Everus Harbor <EM4>",
+    );
+    expect(r).toEqual({ pickup: "Seraphim Station", dropoff: "Everus Harbor" });
+  });
+
+  it("parses a second real A->B title (Baijini Point > Everus Harbor)", () => {
+    const r = parseTitleRoute(
+      "Experienced | <EM3>DIRECT</EM3> Medium Haul | Baijini Point > Everus Harbor <EM4>",
+    );
+    expect(r).toEqual({ pickup: "Baijini Point", dropoff: "Everus Harbor" });
+  });
+
+  it("strips a [BP]* contract-modifier token and trailing ':' from the dropoff (real dirty form)", () => {
+    // Real captured form: the dropoff endpoint carries a boon/penalty token and a
+    // trailing colon. These must NOT leak into the location name, or the stop
+    // splits into a second By-Dropoff group and shows a dirty UI label.
+    const r = parseTitleRoute(
+      "Experienced | <EM3>DIRECT</EM3> Large Haul | Seraphim Station > Everus Harbor [BP]* :",
+    );
+    expect(r).toEqual({ pickup: "Seraphim Station", dropoff: "Everus Harbor" });
+  });
+
+  it("strips [VAR] and multiple bracket tokens from both endpoints", () => {
+    const r = parseTitleRoute(
+      "Experienced | <EM3>DIRECT</EM3> Haul | Baijini Point [VAR] > Port Tressler [BP]* [VAR] :",
+    );
+    expect(r).toEqual({ pickup: "Baijini Point", dropoff: "Port Tressler" });
+  });
+
+  it("preserves legitimate hyphenated / digit location names (no over-stripping)", () => {
+    const r = parseTitleRoute(
+      "Experienced | <EM3>DIRECT</EM3> Haul | Area18 > HDPC-Cassillo",
+    );
+    expect(r).toEqual({ pickup: "Area18", dropoff: "HDPC-Cassillo" });
+  });
+
+  it("parses a clean (no-bracket) A->B title unchanged (no regression)", () => {
+    const r = parseTitleRoute(
+      "Experienced | <EM3>DIRECT</EM3> Haul | Seraphim Station > Everus Harbor",
+    );
+    expect(r).toEqual({ pickup: "Seraphim Station", dropoff: "Everus Harbor" });
+  });
+
+  it("parses a 'from <pickup>' (single-to-multi) title: pickup only, dropoff null", () => {
+    const r = parseTitleRoute(
+      "Experienced | <EM3>BULK</EM3> Multi Haul | from Baijini Point <EM4>",
+    );
+    expect(r).toEqual({ pickup: "Baijini Point", dropoff: null });
+  });
+
+  it("returns nulls for an unparseable title (no route segment)", () => {
+    const r = parseTitleRoute("Senior Rank - Medium Cargo Haul");
+    expect(r).toEqual({ pickup: null, dropoff: null });
+  });
+
+  it("is defensive: empty / non-string -> nulls, never throws", () => {
+    expect(parseTitleRoute("")).toEqual({ pickup: null, dropoff: null });
+    // @ts-expect-error testing defensive non-string guard
+    expect(parseTitleRoute(undefined)).toEqual({ pickup: null, dropoff: null });
   });
 });
 

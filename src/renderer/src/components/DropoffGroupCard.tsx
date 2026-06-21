@@ -1,25 +1,47 @@
 // DropoffGroupCard — design README §3 (HEADLINE). A destination: hero SCU total,
 // combined commodity lines, delivered tray, progress footer. Angular-notch card.
-import type { DropoffGroup } from "@shared/types";
+// The "needs a destination" bucket (group.needsLocation) is relabeled as an
+// action-oriented amber "SET DESTINATION" card with its lines auto-expanded so
+// each leg's inline DestinationPicker is immediately visible.
+import type { DropoffGroup, Mission, ReferenceData } from "@shared/types";
 import { fmt } from "../lib/selectors";
 import { CommodityLine } from "./CommodityLine";
 
 export function DropoffGroupCard({
   group,
   showDelivered,
+  missionsById,
+  reference,
   onCheckOff,
+  onEditLeg,
+  onOpenMission,
 }: {
   group: DropoffGroup;
   showDelivered: boolean;
+  missionsById: Map<string, Mission>;
+  reference: ReferenceData;
   onCheckOff: (location: string, commodity: string) => void;
+  onEditLeg: (
+    missionId: string,
+    legId: string,
+    patch: { commodity?: string; scuTotal?: number; location?: string | null },
+  ) => void;
+  onOpenMission: (missionId: string) => void;
 }): React.JSX.Element {
+  const needsLocation = group.needsLocation;
   const hasDelivered = group.delivered.length > 0;
   return (
     <div
       style={{
         position: "relative",
         background: "var(--card-grad)",
-        border: `1px solid ${group.isCurrentLocation ? "var(--primary)" : "var(--border)"}`,
+        border: `1px solid ${
+          needsLocation
+            ? "var(--secondary)"
+            : group.isCurrentLocation
+              ? "var(--primary)"
+              : "var(--border)"
+        }`,
         padding: 16,
         display: "flex",
         flexDirection: "column",
@@ -49,13 +71,28 @@ export function DropoffGroupCard({
               fontFamily: "var(--font-display)",
               fontWeight: 700,
               fontSize: 15,
-              color: "var(--text-bright)",
+              color: needsLocation ? "var(--secondary)" : "var(--text-bright)",
               lineHeight: 1.15,
             }}
           >
-            {group.location}
+            {needsLocation
+              ? `📍 SET DESTINATION (${group.todo.length})`
+              : group.location}
           </div>
-          {group.isCurrentLocation && (
+          {needsLocation && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-2)",
+                fontFamily: "var(--font-body)",
+                lineHeight: 1.35,
+                maxWidth: 260,
+              }}
+            >
+              These deliveries had no destination in the log — assign one.
+            </div>
+          )}
+          {!needsLocation && group.isCurrentLocation && (
             <div
               style={{
                 fontSize: 10,
@@ -89,43 +126,54 @@ export function DropoffGroupCard({
         )}
       </div>
 
-      {/* Active: hero number + commodity lines */}
+      {/* Active: hero number + commodity lines. The needs-location bucket hides
+          the hero (its SCU is usually suppressed to 0) and shows only the
+          actionable lines. */}
       {!group.allDone && (
         <>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontWeight: 700,
-                fontSize: 42,
-                lineHeight: 0.9,
-                color: "var(--primary)",
-                textShadow: "0 0 18px rgba(52,224,224,0.42)",
-              }}
-            >
-              {fmt(group.scuRemaining)}
-            </span>
-            <span
-              style={{
-                fontSize: 11,
-                letterSpacing: 1,
-                color: "var(--muted)",
-                fontFamily: "var(--font-display)",
-                fontWeight: 600,
-              }}
-            >
-              SCU TO
-              <br />
-              UNLOAD
-            </span>
-          </div>
+          {!needsLocation && (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 700,
+                  fontSize: 42,
+                  lineHeight: 0.9,
+                  color: "var(--primary)",
+                  textShadow: "0 0 18px rgba(52,224,224,0.42)",
+                }}
+              >
+                {fmt(group.scuRemaining)}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  color: "var(--muted)",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                }}
+              >
+                SCU TO
+                <br />
+                UNLOAD
+              </span>
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {group.todo.map((line) => (
               <CommodityLine
-                key={line.commodity}
+                key={line.commodity || "(unknown)"}
                 commodity={line.commodity}
                 scuRemaining={line.scuRemaining}
+                legRefs={line.legRefs}
+                missionsById={missionsById}
+                reference={reference}
+                needsLocation={needsLocation}
+                defaultExpanded={needsLocation}
                 onCheckOff={() => onCheckOff(group.location, line.commodity)}
+                onEditLeg={onEditLeg}
+                onOpenMission={onOpenMission}
               />
             ))}
           </div>

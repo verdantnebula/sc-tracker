@@ -8,6 +8,7 @@ import {
   isMissionIncomplete,
   dropoffGroups,
   shouldShowLogBanner,
+  UNKNOWN_DESTINATION,
 } from "./selectors";
 
 function leg(partial: Partial<Leg>): Leg {
@@ -103,9 +104,12 @@ describe("filled-in leg flows into by-dropoff (renderer selector)", () => {
     const blank = mission([
       leg({ id: "d0", commodity: "", scuTotal: 0, location: null }),
     ]);
-    // Blank dropoff falls under the "Unknown destination" bucket with 0 remaining.
+    // Blank dropoff falls under the needs-location bucket with 0 remaining.
     const before = dropoffGroups([blank], null);
     expect(before.find((g) => g.location === "HDPC-Cassillo")).toBeUndefined();
+    expect(
+      before.find((g) => g.location === UNKNOWN_DESTINATION),
+    ).toBeDefined();
 
     const filled = mission([
       leg({
@@ -121,6 +125,84 @@ describe("filled-in leg flows into by-dropoff (renderer selector)", () => {
     const ice = g.todo.find((c) => c.commodity === "Pressurized Ice")!;
     expect(ice.scuRemaining).toBe(42);
     expect(g.allDone).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The synthetic "needs a destination" bucket: dropoff legs with null location
+// land here, the group is flagged `needsLocation`, it floats to the top of the
+// list (most actionable), and its commodity line carries the legRefs so the UI
+// can resolve each leg for inline editing. Normal grouping is unchanged.
+// ---------------------------------------------------------------------------
+describe("needs-location group (UNKNOWN_DESTINATION / needsLocation)", () => {
+  it("a null-location dropoff lands in the needsLocation group with that flag set", () => {
+    const m = mission([
+      leg({ id: "d0", commodity: "Titanium", scuTotal: 0, location: null }),
+    ]);
+    const groups = dropoffGroups([m], null);
+    const g = groups.find((x) => x.location === UNKNOWN_DESTINATION)!;
+    expect(g).toBeDefined();
+    expect(g.needsLocation).toBe(true);
+    // The leg is preserved as a ref so the UI can resolve + edit it inline.
+    const line = g.todo.find((c) => c.commodity === "Titanium")!;
+    expect(line).toBeDefined();
+    expect(line.legRefs).toEqual([{ missionId: "m1", legId: "d0" }]);
+  });
+
+  it("a known-location group is NOT flagged needsLocation", () => {
+    const m = mission([
+      leg({ id: "d0", commodity: "Ice", scuTotal: 10, location: "A" }),
+    ]);
+    const groups = dropoffGroups([m], null);
+    const g = groups.find((x) => x.location === "A")!;
+    expect(g).toBeDefined();
+    expect(g.needsLocation).toBe(false);
+  });
+
+  it("the needs-location group floats above normal active stops", () => {
+    const m = mission([
+      // A real stop with lots of remaining SCU…
+      leg({ id: "d0", commodity: "Ice", scuTotal: 500, location: "A" }),
+      // …and a suppressed leg with 0 remaining that must still surface first.
+      leg({ id: "d1", commodity: "Gold", scuTotal: 0, location: null }),
+    ]);
+    const groups = dropoffGroups([m], null);
+    expect(groups[0].location).toBe(UNKNOWN_DESTINATION);
+    expect(groups[0].needsLocation).toBe(true);
+  });
+
+  it("aggregates null-location legs across missions into one bucket with all refs", () => {
+    const a = {
+      ...mission([
+        leg({
+          id: "x",
+          missionId: "mA",
+          commodity: "Ore",
+          scuTotal: 0,
+          location: null,
+        }),
+      ]),
+      id: "mA",
+    };
+    const b = {
+      ...mission([
+        leg({
+          id: "y",
+          missionId: "mB",
+          commodity: "Ore",
+          scuTotal: 0,
+          location: null,
+        }),
+      ]),
+      id: "mB",
+    };
+    const groups = dropoffGroups([a, b], null);
+    const g = groups.find((x) => x.location === UNKNOWN_DESTINATION)!;
+    const line = g.todo.find((c) => c.commodity === "Ore")!;
+    expect(line.legRefs).toEqual([
+      { missionId: "mA", legId: "x" },
+      { missionId: "mB", legId: "y" },
+    ]);
   });
 });
 

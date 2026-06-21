@@ -220,6 +220,13 @@ export interface DropoffGroup {
   allDone: boolean;
   /** True when this is the player's current location (highlight). */
   isCurrentLocation: boolean;
+  /**
+   * True for the synthetic "needs a destination" bucket: dropoff legs whose
+   * location the game log never reported (location == null). Lets the By-Dropoff
+   * UI detect this group structurally (an action-oriented "set destination"
+   * surface) instead of string-matching the placeholder label.
+   */
+  needsLocation: boolean;
 }
 
 /** Per-mission derived figures for the Mission List / detail panel. */
