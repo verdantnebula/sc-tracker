@@ -52,6 +52,7 @@ import {
 } from "./settings";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
+import { installConsoleLogger, buildAppInfo, writeAppInfo } from "./logger";
 
 // ---------------------------------------------------------------------------
 // Process-wide singletons, created on app-ready (need app.getPath('userData')).
@@ -504,7 +505,20 @@ function registerIpc(): void {
 // ---------------------------------------------------------------------------
 
 async function boot(): Promise<void> {
-  const dbPath = join(app.getPath("userData"), "sc-cargo-tracker.db");
+  const userDataDir = app.getPath("userData");
+
+  // Stand up file logging BEFORE anything else so the store open, the watcher's
+  // "[main] watching Game.log…" line, the corruption-recovery/quarantine warnings,
+  // and the uncaughtException/unhandledRejection handlers are all captured to
+  // <userData>/logs/main.log. Fully guarded — an unwritable log dir degrades to
+  // console-only and never blocks boot. Console output is preserved.
+  installConsoleLogger(join(userDataDir, "logs"));
+
+  // Drop a tiny environment snapshot so the diagnostics collector can report the
+  // app/runtime versions even when the app isn't running at collect time.
+  writeAppInfo(userDataDir, buildAppInfo(app.getVersion()));
+
+  const dbPath = join(userDataDir, "sc-cargo-tracker.db");
 
   // Store + UEX share the same sqlite FILE (WAL mode allows it). createDb is
   // `CREATE TABLE IF NOT EXISTS`, so both opening it is idempotent and safe.

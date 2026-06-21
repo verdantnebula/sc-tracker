@@ -169,6 +169,40 @@ npm run package:exe    # rebuild native for Electron, build, package a Windows x
 
   The shipped application makes **no** runtime network calls and contains **no** token.
 
+## Troubleshooting / Collecting diagnostics
+
+If something misbehaves and you want to report it, run the bundled diagnostics
+collector and attach the file it produces. You don't need Node or this repo — just
+the script.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\collect-diagnostics.ps1
+```
+
+It writes a single human-readable report to your **Desktop**, named
+`sc-tracker-diagnostics-<timestamp>.txt`, containing:
+
+- your OS / build / architecture, PowerShell version, and the current date/time;
+- the app/runtime versions from `app-info.json` (written each time the app starts);
+- your `settings.json` (the configured LIVE folder), pretty-printed;
+- **status** of `Game.log` (configured path *and* the default install path) and a
+  count of `logbackups\*.log` — *file size and timestamps only*;
+- the database file status, its WAL/SHM sidecars, and any corruption-quarantine
+  history (`*.corrupt-*` files);
+- the tail (~400 lines) of the app's own log, `logs\main.log`;
+- a listing of the app's data folder.
+
+Two privacy guarantees, both enforced by the script:
+
+- **Your Windows username is redacted to `<USER>`** in every path and value.
+- **`Game.log` contents are never collected** — only the file's status. The log can
+  contain gameplay / player data, so it's deliberately excluded.
+
+The app keeps its own log at `%APPDATA%\sc-cargo-tracker\logs\main.log` (rotating,
+capped at ~1.5 MB with one `main.log.1` backup). The report still shows
+sanitized paths, so **review the file before sharing** and double-check nothing
+sensitive slipped through.
+
 ## Tech Stack
 
 Electron + Vite + React + TypeScript + better-sqlite3 (with chokidar for log tailing).
