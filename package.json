@@ -1,6 +1,6 @@
 {
   "name": "sc-cargo-tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop companion for Star Citizen cargo hauling — log-driven mission tracking and by-dropoff unload aggregation.",
   "private": true,
   "author": "verdantnebula",
@@ -26,7 +26,7 @@
     "fetch:reference": "node scripts/fetch-reference.mjs",
     "fetch:salvage-reference": "python scripts/fetch-salvage-reference.py",
     "package:exe": "npm run rebuild:electron && electron-vite build && npx --yes @electron/packager . --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"config\\.local\\.json\"",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "npm run package:exe"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",
@@ -39,7 +39,6 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.3.1",
-    "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
