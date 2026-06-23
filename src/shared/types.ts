@@ -57,6 +57,17 @@ export type MissionSource = "log" | "manual";
  */
 export type AppMode = "cargo" | "salvage";
 
+/**
+ * State of the always-on-top "next stop" overlay window (Phase D). Reported to
+ * the main window so its TopBar pin button reflects whether the overlay is open
+ * — including when the overlay closes itself via its own unpin control. `enabled`
+ * is the single source of truth (mirrors AppSettings.overlayEnabled).
+ */
+export interface OverlayState {
+  /** True when the overlay window is currently open/pinned. */
+  enabled: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Core records
 // ---------------------------------------------------------------------------

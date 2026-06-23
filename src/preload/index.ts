@@ -20,6 +20,7 @@ import type {
   PickLogFolderResult,
   ExportReportResult,
   AppMode,
+  OverlayState,
   SalvageRun,
   SalvageRunInput,
   SalvageRunPatch,
@@ -78,6 +79,12 @@ const api: ApiBridge = {
     ipcRenderer.invoke(IPC.SETTINGS_GET_SHIP) as Promise<string | null>,
   setSelectedShip: (slug: string | null) =>
     ipcRenderer.invoke(IPC.SETTINGS_SET_SHIP, slug) as Promise<string | null>,
+
+  // --- overlay window (Phase D) ---
+  toggleOverlay: () =>
+    ipcRenderer.invoke(IPC.OVERLAY_TOGGLE) as Promise<OverlayState>,
+  getOverlayState: () =>
+    ipcRenderer.invoke(IPC.OVERLAY_GET_STATE) as Promise<OverlayState>,
 
   // --- diagnostics / issue report ("Collect Logs") ---
   exportDiagnostics: (input: { description: string }) =>
@@ -141,6 +148,8 @@ const api: ApiBridge = {
     subscribe<string | null>(IPC.CURRENT_LOCATION_CHANGED, cb),
   onSalvageRunsChanged: (cb) =>
     subscribe<SalvageRun[]>(IPC.SALVAGE_RUNS_CHANGED, cb),
+  onOverlayStateChanged: (cb) =>
+    subscribe<OverlayState>(IPC.OVERLAY_STATE_CHANGED, cb),
 };
 
 contextBridge.exposeInMainWorld("api", api);

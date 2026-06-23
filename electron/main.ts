@@ -15,7 +15,7 @@
 // typed window.api preload bridge; all fs/network stays in this process.
 // ============================================================================
 
-import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, shell, screen } from "electron";
 import { join } from "node:path";
 import { userInfo } from "node:os";
 import { IPC } from "@shared/ipc";
@@ -28,6 +28,7 @@ import type {
   LogPathInfo,
   PickLogFolderResult,
   AppMode,
+  OverlayState,
   SalvageRun,
   SalvageRunInput,
   SalvageRunPatch,
@@ -62,8 +63,11 @@ import {
   resolveGameLogPath,
   folderHasGameLog,
   gameLogPathForFolder,
+  clampOverlayBounds,
   DEFAULT_SETTINGS,
   type AppSettings,
+  type OverlayBounds,
+  type DisplayArea,
 } from "./settings";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
@@ -79,6 +83,13 @@ let store: MissionStore | null = null;
 let uex: UexClient | null = null;
 let watcher: LogWatcher | null = null;
 let mainWindow: BrowserWindow | null = null;
+// The single always-on-top "next stop" overlay window (Phase D). null when not
+// open. Toggled from the main app; its open state + last bounds persist in
+// settings so it can be restored on the next launch.
+let overlayWindow: BrowserWindow | null = null;
+// Debounce timer for persisting overlay bounds on move/resize (a drag fires many
+// 'move' events; we only want to write the final rectangle).
+let overlayBoundsSaveTimer: NodeJS.Timeout | null = null;
 
 // Salvage tracker singletons (separate domain; own store + bundled reference).
 let salvage: SalvageStore | null = null;
@@ -425,6 +436,10 @@ function createWindow(): void {
   win.once("ready-to-show", () => win.show());
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
+    // The overlay is a secondary window; when the MAIN window closes the app is
+    // shutting down, so tear the overlay down too. Otherwise it would keep the
+    // process alive (window-all-closed never fires) with no way to reach it.
+    destroyOverlay();
   });
 
   const devUrl = process.env["ELECTRON_RENDERER_URL"];
@@ -433,6 +448,157 @@ function createWindow(): void {
   } else {
     void win.loadFile(join(__dirname, "../renderer/index.html"));
   }
+}
+
+// ---------------------------------------------------------------------------
+// Overlay window (Phase D) — frameless, always-on-top, transparent "next stop"
+// card that floats over the game. Single instance; reuses the SAME preload as the
+// main window (so its renderer gets the identical typed window.api). Closing it
+// never touches the main window; it closes with the app.
+//
+// CAVEAT: true exclusive-fullscreen games can paint over an always-on-top window.
+// We recommend Borderless/Windowed in SC (noted in the release notes + UI).
+// ---------------------------------------------------------------------------
+
+/** Current connected displays as plain work-area rects for clampOverlayBounds. */
+function displayAreas(): DisplayArea[] {
+  try {
+    return screen.getAllDisplays().map((d) => ({
+      x: d.workArea.x,
+      y: d.workArea.y,
+      width: d.workArea.width,
+      height: d.workArea.height,
+    }));
+  } catch {
+    // screen is unavailable before app 'ready' or in a headless context; the
+    // clamp helper treats an empty list as "use the saved/default rect as-is".
+    return [];
+  }
+}
+
+/** The overlay's open/closed state for IPC + the main window's pin button. */
+function overlayState(): OverlayState {
+  return { enabled: overlayWindow !== null && !overlayWindow.isDestroyed() };
+}
+
+/** Push the overlay state to every renderer so the TopBar pin stays in sync. */
+function broadcastOverlayState(): void {
+  broadcast(IPC.OVERLAY_STATE_CHANGED, overlayState());
+}
+
+/** Persist the overlay's current bounds (debounced). Guarded — never throws. */
+function scheduleOverlayBoundsSave(): void {
+  if (overlayBoundsSaveTimer) clearTimeout(overlayBoundsSaveTimer);
+  overlayBoundsSaveTimer = setTimeout(() => {
+    overlayBoundsSaveTimer = null;
+    try {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      const b = overlayWindow.getBounds();
+      const bounds: OverlayBounds = {
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: b.height,
+      };
+      settings = saveSettings({ overlayBounds: bounds });
+    } catch (err) {
+      console.error("[main] overlay bounds save failed:", err);
+    }
+  }, 400);
+}
+
+/**
+ * Create + show the overlay window. Restores the last bounds (clamped to a
+ * currently-visible display so a saved off-screen rect can't strand it), wires
+ * move/resize persistence, and reports state changes. No-op if already open.
+ */
+function createOverlay(): void {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.show();
+    overlayWindow.focus();
+    return;
+  }
+
+  const bounds = clampOverlayBounds(settings.overlayBounds, displayAreas());
+
+  const win = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: 240,
+    minHeight: 150,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: true,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    show: false,
+    title: "SC Cargo Tracker — Next Stop",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  overlayWindow = win;
+  // Float above normal always-on-top windows; this is the strongest level we can
+  // request short of beating an exclusive-fullscreen game (documented caveat).
+  win.setAlwaysOnTop(true, "screen-saver");
+  // Keep the overlay visible across virtual desktops / fullscreen spaces.
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  win.once("ready-to-show", () => win.show());
+  win.on("move", scheduleOverlayBoundsSave);
+  win.on("resize", scheduleOverlayBoundsSave);
+  win.on("closed", () => {
+    if (overlayWindow === win) overlayWindow = null;
+    // The 'closed' here is the app shutting the window (toggle/quit). State is
+    // broadcast by the caller that initiated the close so we don't double-fire.
+  });
+
+  const devUrl = process.env["ELECTRON_RENDERER_URL"];
+  if (devUrl) {
+    void win.loadURL(`${devUrl}/overlay.html`);
+  } else {
+    void win.loadFile(join(__dirname, "../renderer/overlay.html"));
+  }
+}
+
+/** Close the overlay window if open (used by toggle + before-quit). */
+function destroyOverlay(): void {
+  if (overlayBoundsSaveTimer) {
+    clearTimeout(overlayBoundsSaveTimer);
+    overlayBoundsSaveTimer = null;
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
+  }
+  overlayWindow = null;
+}
+
+/**
+ * Toggle the overlay open/closed, persist the new `overlayEnabled` choice, and
+ * broadcast the resulting state to the main window's pin button. Returns the
+ * resulting state for the invoking renderer.
+ */
+function toggleOverlay(): OverlayState {
+  const open = overlayWindow !== null && !overlayWindow.isDestroyed();
+  if (open) {
+    destroyOverlay();
+    settings = saveSettings({ overlayEnabled: false });
+  } else {
+    createOverlay();
+    settings = saveSettings({ overlayEnabled: true });
+  }
+  const state = overlayState();
+  broadcastOverlayState();
+  return state;
 }
 
 // ---------------------------------------------------------------------------
@@ -624,6 +790,15 @@ function registerIpc(): void {
       return settings.selectedShipSlug;
     },
   );
+
+  // --- Overlay window (Phase D) -------------------------------------------
+  // Toggle the always-on-top "next stop" overlay open/closed (persists the
+  // choice so it restores on the next launch) and report its current state. The
+  // overlay is a SECOND window over the same backend — no store/watcher changes.
+
+  ipcMain.handle(IPC.OVERLAY_TOGGLE, (): OverlayState => toggleOverlay());
+
+  ipcMain.handle(IPC.OVERLAY_GET_STATE, (): OverlayState => overlayState());
 
   // --- Diagnostics / issue report ("Collect Logs") ------------------------
   // Build a timestamped, REDACTED report folder + zip on the Desktop from the
@@ -836,6 +1011,13 @@ async function boot(): Promise<void> {
   registerIpc();
   createWindow();
 
+  // Restore the overlay if the user left it pinned last session. Created AFTER
+  // the main window so it floats above it; its bounds are clamped to a visible
+  // display inside createOverlay (a saved off-screen rect can't strand it).
+  if (settings.overlayEnabled) {
+    createOverlay();
+  }
+
   // The bundled snapshot is always present, so reference data is immediately
   // available. Surface uexActive to the renderer status strip synchronously.
   uexActive = uex.isActive();
@@ -891,6 +1073,7 @@ if (!gotTheLock) {
   });
 
   app.on("before-quit", () => {
+    destroyOverlay();
     void watcher?.stop();
     uex?.close();
     store?.close();

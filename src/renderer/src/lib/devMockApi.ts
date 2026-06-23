@@ -375,6 +375,9 @@ function createMockApi(): ApiBridge {
   let mode: AppMode = "cargo";
   // In-memory selected ship slug for the Phase A ship picker / capacity bar.
   let selectedShipSlug: string | null = null;
+  // In-memory overlay open state for standalone-dev of the TopBar pin button.
+  let overlayEnabled = false;
+  const overlayListeners = new Set<(s: { enabled: boolean }) => void>();
   // In-memory salvage runs for standalone-dev of the salvage views.
   let salvageRuns: SalvageRun[] = [];
   const salvageListeners = new Set<(r: SalvageRun[]) => void>();
@@ -544,6 +547,14 @@ function createMockApi(): ApiBridge {
       return selectedShipSlug;
     },
 
+    // --- overlay window (dev stub — no second window in a plain browser tab) ---
+    toggleOverlay: async () => {
+      overlayEnabled = !overlayEnabled;
+      overlayListeners.forEach((cb) => cb({ enabled: overlayEnabled }));
+      return { enabled: overlayEnabled };
+    },
+    getOverlayState: async () => ({ enabled: overlayEnabled }),
+
     // --- diagnostics / issue report (dev stub — no fs in a browser tab) ---
     exportDiagnostics: async (input: {
       description: string;
@@ -675,6 +686,10 @@ function createMockApi(): ApiBridge {
     onSalvageRunsChanged: (cb) => {
       salvageListeners.add(cb);
       return () => salvageListeners.delete(cb);
+    },
+    onOverlayStateChanged: (cb) => {
+      overlayListeners.add(cb);
+      return () => overlayListeners.delete(cb);
     },
   };
 }

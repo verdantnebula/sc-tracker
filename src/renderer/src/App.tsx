@@ -111,6 +111,10 @@ function CargoApp({
   const [backfill, setBackfill] = useState<BackfillProgress | null>(null);
   // Transient inline message (e.g. picked a folder with no Game.log).
   const [toast, setToast] = useState<string | null>(null);
+  // Whether the always-on-top "next stop" overlay window is open (Phase D).
+  // Read on mount and kept in sync via onOverlayStateChanged so the pin button
+  // reflects the overlay closing itself via its own unpin control.
+  const [overlayEnabled, setOverlayEnabled] = useState(false);
 
   // --- local UI state ---
   const [tab, setTab] = useState<TabKey>("dropoff");
@@ -136,8 +140,10 @@ function CargoApp({
     void api.getReferenceData().then(setReference);
     void api.getCurrentLocation().then(setCurrentLocation);
     void api.getSelectedShip().then(setSelectedShipSlug);
+    void api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
 
     const unsubs = [
+      api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
       // A change to the mission set affects both the full list AND the active
       // subset — re-pull both so the Mission List/by-dropoff stay in sync.
       api.onMissionsChanged(() => refresh()),
@@ -340,6 +346,12 @@ function CargoApp({
     void window.api.setSelectedShip(slug);
   };
 
+  // Toggle the always-on-top overlay window (Phase D). Main returns + broadcasts
+  // the resulting state; we set it optimistically and the broadcast confirms.
+  const toggleOverlay = (): void => {
+    void window.api.toggleOverlay().then((s) => setOverlayEnabled(s.enabled));
+  };
+
   const clearActive = (): void => {
     const n = activeMissions.length;
     const ok = window.confirm(
@@ -403,6 +415,8 @@ function CargoApp({
         onPickLogFolder={pickLogFolder}
         onCollectLogs={() => setShowCollectLogs(true)}
         onToggleMode={onToggleMode}
+        overlayEnabled={overlayEnabled}
+        onToggleOverlay={toggleOverlay}
       />
 
       {/* Log-not-found warning strip — full width, directly under the TopBar and

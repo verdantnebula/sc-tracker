@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SC Cargo Tracker — Overlay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700;800&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* The overlay window is transparent (BrowserWindow transparent:true). Keep
+         the page background fully transparent so only the card paints; the card
+         itself supplies a semi-opaque dark surface for legibility over the game. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        /* !important: override global.css's `body { background: var(--bg) }` so
+           the window stays see-through and only the card paints over the game. */
+        background: transparent !important;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/overlay/main.tsx"></script>
+  </body>
+</html>

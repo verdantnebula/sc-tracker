@@ -19,6 +19,8 @@ export function TopBar({
   onPickLogFolder,
   onCollectLogs,
   onToggleMode,
+  overlayEnabled,
+  onToggleOverlay,
 }: {
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
@@ -38,6 +40,10 @@ export function TopBar({
   onCollectLogs: () => void;
   /** Switch to salvage mode (the top-left Cargo<->Salvage switcher). */
   onToggleMode: () => void;
+  /** Whether the always-on-top "next stop" overlay window is currently open. */
+  overlayEnabled: boolean;
+  /** Toggle the overlay window open/closed (Phase D). */
+  onToggleOverlay: () => void;
 }): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   return (
@@ -100,6 +106,38 @@ export function TopBar({
       <div style={{ flex: 1 }} />
 
       <LogStatusIndicator status={logStatus} onLocate={onPickLogFolder} />
+
+      {/* Overlay pin toggle (Phase D) — opens/closes the always-on-top
+          "next stop" overlay window that floats over the game. Cargo mode only
+          (this whole TopBar is the cargo header). Highlights when pinned. */}
+      <button
+        className="sc-ghost-btn"
+        onClick={onToggleOverlay}
+        aria-label="Toggle next-stop overlay"
+        aria-pressed={overlayEnabled}
+        title={
+          overlayEnabled
+            ? "Hide the always-on-top next-stop overlay"
+            : "Show an always-on-top next-stop overlay over the game"
+        }
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 34,
+          height: 34,
+          background: overlayEnabled ? "rgba(52,224,224,0.10)" : "transparent",
+          border: `1px solid ${
+            overlayEnabled ? "var(--primary)" : "var(--border-strong)"
+          }`,
+          color: overlayEnabled ? "var(--primary)" : "var(--text-2)",
+          fontSize: 15,
+          lineHeight: 1,
+          cursor: "pointer",
+        }}
+      >
+        📌
+      </button>
 
       {/* Settings (gear) — choose a custom StarCitizen \LIVE\ folder */}
       <div style={{ position: "relative" }}>

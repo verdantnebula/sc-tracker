@@ -18,6 +18,7 @@ import type {
   PickLogFolderResult,
   ExportReportResult,
   AppMode,
+  OverlayState,
   SalvageRun,
   SalvageRunInput,
   SalvageRunPatch,
@@ -51,6 +52,10 @@ export const IPC = {
   SETTINGS_GET_SHIP: "settings:getShip",
   SETTINGS_SET_SHIP: "settings:setShip",
 
+  // always-on-top "next stop" overlay window (Phase D)
+  OVERLAY_TOGGLE: "overlay:toggle",
+  OVERLAY_GET_STATE: "overlay:getState",
+
   // diagnostics / issue report ("Collect Logs")
   DIAGNOSTICS_EXPORT_REPORT: "diagnostics:exportReport",
   DIAGNOSTICS_OPEN_PATH: "diagnostics:openPath",
@@ -73,6 +78,7 @@ export const IPC = {
   BACKFILL_PROGRESS: "backfill:progress",
   CURRENT_LOCATION_CHANGED: "currentLocation:changed",
   SALVAGE_RUNS_CHANGED: "salvage:runs:changed",
+  OVERLAY_STATE_CHANGED: "overlay:state:changed",
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -119,6 +125,12 @@ export interface IpcRequestMap {
     args: [slug: string | null];
     result: string | null;
   };
+
+  // --- overlay window (Phase D) ---
+  /** Toggle the always-on-top overlay open/closed; returns the resulting state. */
+  [IPC.OVERLAY_TOGGLE]: { args: []; result: OverlayState };
+  /** Read whether the overlay is currently open (for the TopBar pin button). */
+  [IPC.OVERLAY_GET_STATE]: { args: []; result: OverlayState };
 
   // --- diagnostics / issue report ---
   /** Build a redacted issue-report folder + zip on the Desktop from a description. */
@@ -178,6 +190,7 @@ export interface IpcEventMap {
   [IPC.BACKFILL_PROGRESS]: { payload: BackfillProgress };
   [IPC.CURRENT_LOCATION_CHANGED]: { payload: string | null };
   [IPC.SALVAGE_RUNS_CHANGED]: { payload: SalvageRun[] };
+  [IPC.OVERLAY_STATE_CHANGED]: { payload: OverlayState };
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +228,12 @@ export interface ApiBridge {
   getSelectedShip(): Promise<string | null>;
   /** Persist the selected ship slug (null clears it); resolves to the saved slug. */
   setSelectedShip(slug: string | null): Promise<string | null>;
+
+  // --- overlay window (Phase D) ---
+  /** Toggle the always-on-top overlay open/closed; resolves to the new state. */
+  toggleOverlay(): Promise<OverlayState>;
+  /** Read whether the overlay is currently open. */
+  getOverlayState(): Promise<OverlayState>;
 
   // --- diagnostics / issue report ("Collect Logs") ---
   /** Build a redacted issue-report folder + zip on the Desktop. */
@@ -263,4 +282,6 @@ export interface ApiBridge {
   onCurrentLocationChanged(cb: (location: string | null) => void): () => void;
   /** Salvage runs changed (mutation broadcast). */
   onSalvageRunsChanged(cb: (runs: SalvageRun[]) => void): () => void;
+  /** Overlay open/closed state changed (e.g. overlay closed via its own control). */
+  onOverlayStateChanged(cb: (state: OverlayState) => void): () => void;
 }

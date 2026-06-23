@@ -50,6 +50,29 @@ export interface AppSettings {
    * survives a restart. Stored as a slug (not name) for stable identity.
    */
   selectedShipSlug: string | null;
+  /**
+   * Whether the always-on-top "next stop" overlay window (Phase D) was open. On
+   * launch the overlay is recreated IFF this is true, so the user's choice to
+   * keep it pinned survives a restart. The overlay's own close/unpin control
+   * flips this back to false.
+   */
+  overlayEnabled: boolean;
+  /**
+   * Last position + size of the overlay window, persisted (debounced) on move /
+   * resize so it reopens where the user left it. null when never moved -> the
+   * overlay uses its small default and is centered by the OS. Clamped to a
+   * visible display on restore (see clampOverlayBounds) so a saved off-screen
+   * position (monitor unplugged) can't strand the window where it can't be reached.
+   */
+  overlayBounds: OverlayBounds | null;
+}
+
+/** Window rectangle persisted for the overlay (screen coordinates, px). */
+export interface OverlayBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /** The safe default used when no settings file exists or it is unreadable. */
@@ -57,7 +80,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   liveFolder: null,
   mode: "cargo",
   selectedShipSlug: null,
+  overlayEnabled: false,
+  overlayBounds: null,
 };
+
+/** Default overlay size (px) when no bounds are saved — small, glanceable card. */
+export const OVERLAY_DEFAULT_SIZE = { width: 340, height: 230 } as const;
+
+/** Minimum overlay size the clamp enforces (keeps the card usable when resized). */
+export const OVERLAY_MIN_SIZE = { width: 240, height: 150 } as const;
 
 /** Coerce an arbitrary value to a valid AppMode, defaulting to 'cargo'. */
 function normalizeMode(value: unknown): AppMode {
@@ -67,6 +98,46 @@ function normalizeMode(value: unknown): AppMode {
 /** Coerce an arbitrary value to a ship slug or null (empty string -> null). */
 function normalizeShipSlug(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/** Coerce an arbitrary value to a boolean (anything non-true -> false). */
+function normalizeBool(value: unknown): boolean {
+  return value === true;
+}
+
+/**
+ * Coerce arbitrary parsed JSON into OverlayBounds or null. Every field must be a
+ * finite number and width/height must be positive; otherwise the whole value is
+ * dropped to null (a partially-corrupt rect is unusable, so we fall back to the
+ * default size rather than open a window at a nonsense rectangle).
+ */
+function normalizeOverlayBounds(value: unknown): OverlayBounds | null {
+  if (value === null || typeof value !== "object") return null;
+  const r = value as Record<string, unknown>;
+  const x = r.x;
+  const y = r.y;
+  const width = r.width;
+  const height = r.height;
+  if (
+    typeof x !== "number" ||
+    typeof y !== "number" ||
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null;
+  }
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +174,8 @@ export function mergeSettings(
   // Re-normalize base fields that may have been forged in memory (defensive).
   next.mode = normalizeMode(next.mode);
   next.selectedShipSlug = normalizeShipSlug(next.selectedShipSlug);
+  next.overlayEnabled = normalizeBool(next.overlayEnabled);
+  next.overlayBounds = normalizeOverlayBounds(next.overlayBounds);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
     next.liveFolder = typeof v === "string" && v.length > 0 ? v : null;
@@ -112,6 +185,12 @@ export function mergeSettings(
   }
   if ("selectedShipSlug" in patch) {
     next.selectedShipSlug = normalizeShipSlug(patch.selectedShipSlug);
+  }
+  if ("overlayEnabled" in patch) {
+    next.overlayEnabled = normalizeBool(patch.overlayEnabled);
+  }
+  if ("overlayBounds" in patch) {
+    next.overlayBounds = normalizeOverlayBounds(patch.overlayBounds);
   }
   return next;
 }
@@ -133,7 +212,81 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     liveFolder,
     mode: normalizeMode(raw.mode),
     selectedShipSlug: normalizeShipSlug(raw.selectedShipSlug),
+    overlayEnabled: normalizeBool(raw.overlayEnabled),
+    overlayBounds: normalizeOverlayBounds(raw.overlayBounds),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Overlay bounds clamping (Phase D)
+// ---------------------------------------------------------------------------
+
+/** A visible display work area, in screen coordinates (Electron Display.workArea). */
+export interface DisplayArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Clamp a saved overlay rectangle so it is fully visible inside SOME connected
+ * display's work area, returning a usable rect to open the window at.
+ *
+ * Why: a window restored at its last position can end up entirely off-screen if
+ * the user unplugged the monitor it was on (or changed resolution). Electron will
+ * happily create a window no one can reach. We pick the display the saved rect
+ * overlaps most (its center, falling back to the primary/first display), shrink
+ * the size to fit that work area (never below OVERLAY_MIN_SIZE), then nudge the
+ * origin so the whole rect sits inside. Pure + total — `displays` is injectable
+ * so this is unit-testable without Electron's screen module.
+ *
+ * `bounds === null` (never saved) -> a default-size rect centered in the chosen
+ * display, so a first open is sensibly placed too.
+ */
+export function clampOverlayBounds(
+  bounds: OverlayBounds | null,
+  displays: DisplayArea[],
+  defaultSize: { width: number; height: number } = OVERLAY_DEFAULT_SIZE,
+  minSize: { width: number; height: number } = OVERLAY_MIN_SIZE,
+): OverlayBounds {
+  // No displays reported (shouldn't happen) -> return the requested/default rect
+  // unchanged rather than throwing; the OS will place it.
+  if (displays.length === 0) {
+    if (bounds) return bounds;
+    return { x: 0, y: 0, width: defaultSize.width, height: defaultSize.height };
+  }
+
+  // Choose the target display: the one whose work area contains the saved rect's
+  // center, else the first display (treated as primary).
+  const pick = (): DisplayArea => {
+    if (bounds) {
+      const cx = bounds.x + bounds.width / 2;
+      const cy = bounds.y + bounds.height / 2;
+      const hit = displays.find(
+        (d) =>
+          cx >= d.x && cx < d.x + d.width && cy >= d.y && cy < d.y + d.height,
+      );
+      if (hit) return hit;
+    }
+    return displays[0];
+  };
+  const d = pick();
+
+  // Size: requested (or default), clamped to [minSize, workArea].
+  const reqW = bounds?.width ?? defaultSize.width;
+  const reqH = bounds?.height ?? defaultSize.height;
+  const width = Math.max(minSize.width, Math.min(reqW, d.width));
+  const height = Math.max(minSize.height, Math.min(reqH, d.height));
+
+  // Origin: requested (or centered when never saved), then nudged so the whole
+  // rect sits inside the work area.
+  let x = bounds ? bounds.x : d.x + Math.round((d.width - width) / 2);
+  let y = bounds ? bounds.y : d.y + Math.round((d.height - height) / 2);
+  x = Math.min(Math.max(x, d.x), d.x + d.width - width);
+  y = Math.min(Math.max(y, d.y), d.y + d.height - height);
+
+  return { x: Math.round(x), y: Math.round(y), width, height };
 }
 
 /**
