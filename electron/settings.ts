@@ -43,17 +43,30 @@ export interface AppSettings {
    * survives a restart.
    */
   mode: AppMode;
+  /**
+   * Slug of the user's selected cargo ship (Phase A ship picker), matched against
+   * a ShipReference.slug in the bundled reference snapshot. null when unset ->
+   * the capacity bar shows the "pick a ship" prompt. Persisted so the chosen ship
+   * survives a restart. Stored as a slug (not name) for stable identity.
+   */
+  selectedShipSlug: string | null;
 }
 
 /** The safe default used when no settings file exists or it is unreadable. */
 export const DEFAULT_SETTINGS: AppSettings = {
   liveFolder: null,
   mode: "cargo",
+  selectedShipSlug: null,
 };
 
 /** Coerce an arbitrary value to a valid AppMode, defaulting to 'cargo'. */
 function normalizeMode(value: unknown): AppMode {
   return value === "salvage" ? "salvage" : "cargo";
+}
+
+/** Coerce an arbitrary value to a ship slug or null (empty string -> null). */
+function normalizeShipSlug(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,14 +100,18 @@ export function mergeSettings(
   patch: Partial<AppSettings>,
 ): AppSettings {
   const next: AppSettings = { ...DEFAULT_SETTINGS, ...base };
-  // Re-normalize a base mode that may have been forged in memory (defensive).
+  // Re-normalize base fields that may have been forged in memory (defensive).
   next.mode = normalizeMode(next.mode);
+  next.selectedShipSlug = normalizeShipSlug(next.selectedShipSlug);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
     next.liveFolder = typeof v === "string" && v.length > 0 ? v : null;
   }
   if ("mode" in patch) {
     next.mode = normalizeMode(patch.mode);
+  }
+  if ("selectedShipSlug" in patch) {
+    next.selectedShipSlug = normalizeShipSlug(patch.selectedShipSlug);
   }
   return next;
 }
@@ -112,7 +129,11 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     typeof raw.liveFolder === "string" && raw.liveFolder.length > 0
       ? raw.liveFolder
       : null;
-  return { liveFolder, mode: normalizeMode(raw.mode) };
+  return {
+    liveFolder,
+    mode: normalizeMode(raw.mode),
+    selectedShipSlug: normalizeShipSlug(raw.selectedShipSlug),
+  };
 }
 
 /**

@@ -18,6 +18,7 @@ import type {
 } from "@shared/types";
 
 import { TopBar } from "./components/TopBar";
+import { CapacityBar } from "./components/CapacityBar";
 import { SalvageShell } from "./components/SalvageShell";
 import { applyTheme } from "./lib/theme";
 import { LogMissingBanner } from "./components/LogMissingBanner";
@@ -42,7 +43,11 @@ import {
   shouldShowLogBanner,
 } from "./lib/selectors";
 
-const EMPTY_REFERENCE: ReferenceData = { commodities: [], terminals: [] };
+const EMPTY_REFERENCE: ReferenceData = {
+  commodities: [],
+  terminals: [],
+  ships: [],
+};
 
 // ============================================================================
 // App — the top-level shell. Owns the app MODE (cargo | salvage), applies the
@@ -101,6 +106,8 @@ function CargoApp({
   const [logPathInfo, setLogPathInfo] = useState<LogPathInfo | null>(null);
   const [reference, setReference] = useState<ReferenceData>(EMPTY_REFERENCE);
   const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  // Selected ship slug (Phase A). Read on boot; persisted on every change.
+  const [selectedShipSlug, setSelectedShipSlug] = useState<string | null>(null);
   const [backfill, setBackfill] = useState<BackfillProgress | null>(null);
   // Transient inline message (e.g. picked a folder with no Game.log).
   const [toast, setToast] = useState<string | null>(null);
@@ -128,6 +135,7 @@ function CargoApp({
     void api.getLogPathInfo().then(setLogPathInfo);
     void api.getReferenceData().then(setReference);
     void api.getCurrentLocation().then(setCurrentLocation);
+    void api.getSelectedShip().then(setSelectedShipSlug);
 
     const unsubs = [
       // A change to the mission set affects both the full list AND the active
@@ -164,6 +172,12 @@ function CargoApp({
   );
   const grandTotal = useMemo(() => grandTotalRemaining(groups), [groups]);
   const activeStops = useMemo(() => activeStopCount(groups), [groups]);
+  // Resolve the persisted ship slug to a ShipReference from the bundled snapshot.
+  // null when unset or the slug no longer matches a ship (e.g. after a patch).
+  const selectedShip = useMemo(
+    () => reference.ships.find((s) => s.slug === selectedShipSlug) ?? null,
+    [reference.ships, selectedShipSlug],
+  );
   // ROUTE tab badge = number of distinct stops (union of pickup + dropoff
   // locations) across active hauls. Same active set as the By-Dropoff view.
   const routeStops = useMemo(
@@ -300,6 +314,13 @@ function CargoApp({
     setShowForm(false);
   };
 
+  // Persist a ship selection (Phase A). Optimistic local update + persist; the
+  // resolved slug from main is authoritative but identical. null clears it.
+  const selectShip = (slug: string | null): void => {
+    setSelectedShipSlug(slug);
+    void window.api.setSelectedShip(slug);
+  };
+
   const clearActive = (): void => {
     const n = activeMissions.length;
     const ok = window.confirm(
@@ -354,6 +375,9 @@ function CargoApp({
         logStatus={logStatus}
         logPathInfo={logPathInfo}
         currentLocation={currentLocation}
+        ships={reference.ships}
+        selectedShipSlug={selectedShipSlug}
+        onSelectShip={selectShip}
         onResync={() => void window.api.startBackfill()}
         onManualAdd={() => setShowForm(true)}
         onReset={resetAll}
@@ -417,6 +441,13 @@ function CargoApp({
           onClick={() => setScanlines((v) => !v)}
         />
       </div>
+
+      {/* Hold-capacity bar (Phase A) — under the tab toolbar, visible on the
+          By-Dropoff and ROUTE tabs only. Compares total SCU still to deliver
+          against the selected ship's hold. Muted prompt when no ship is set. */}
+      {hasMissions && (tab === "dropoff" || tab === "route") && (
+        <CapacityBar totalRemaining={grandTotal} ship={selectedShip} />
+      )}
 
       {/* main content */}
       <main

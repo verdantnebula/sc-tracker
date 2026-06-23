@@ -298,6 +298,20 @@ const DEV_REFERENCE: ReferenceData = {
     isCargoCenter: true,
     maxContainerSize: 32,
   })),
+  ships: [
+    { name: "Dev Hull E", scu: 12000 },
+    { name: "Dev Hull C", scu: 4608 },
+    { name: "Dev Caterpillar", scu: 576 },
+    { name: "Dev Freelancer MAX", scu: 120 },
+    { name: "Dev Cutlass Black", scu: 46 },
+  ].map((s) => ({
+    name: s.name,
+    nameFull: `Dev ${s.name}`,
+    company: "Dev Shipworks",
+    slug: s.name.toLowerCase().replace(/\s+/g, "-"),
+    scu: s.scu,
+    gameVersion: "dev",
+  })),
 };
 
 const DEV_CURRENT_LOCATION = "Dev Current Stop";
@@ -354,6 +368,8 @@ function createMockApi(): ApiBridge {
   let missions = seedMissions();
   // In-memory mode so the Cargo<->Salvage switcher works in standalone dev.
   let mode: AppMode = "cargo";
+  // In-memory selected ship slug for the Phase A ship picker / capacity bar.
+  let selectedShipSlug: string | null = null;
   // In-memory salvage runs for standalone-dev of the salvage views.
   let salvageRuns: SalvageRun[] = [];
   const salvageListeners = new Set<(r: SalvageRun[]) => void>();
@@ -513,6 +529,12 @@ function createMockApi(): ApiBridge {
     setMode: async (next: AppMode): Promise<AppMode> => {
       mode = next === "salvage" ? "salvage" : "cargo";
       return mode;
+    },
+    getSelectedShip: async (): Promise<string | null> => selectedShipSlug,
+    setSelectedShip: async (slug: string | null): Promise<string | null> => {
+      selectedShipSlug =
+        typeof slug === "string" && slug.length > 0 ? slug : null;
+      return selectedShipSlug;
     },
 
     // --- diagnostics / issue report (dev stub — no fs in a browser tab) ---

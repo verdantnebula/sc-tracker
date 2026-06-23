@@ -1,14 +1,18 @@
 // TopBar — design README §1. App identity + location chip + LogStatusIndicator
 // + Re-sync (backfill) + Settings (LIVE folder) + Manual Add. 58px fixed row.
 import { useState } from "react";
-import type { LogStatus, LogPathInfo } from "@shared/types";
+import type { LogStatus, LogPathInfo, ShipReference } from "@shared/types";
 import { LogStatusIndicator } from "./LogStatusIndicator";
 import { ModeSwitcher } from "./ModeSwitcher";
+import { ShipPicker } from "./ShipPicker";
 
 export function TopBar({
   logStatus,
   logPathInfo,
   currentLocation,
+  ships,
+  selectedShipSlug,
+  onSelectShip,
   onResync,
   onManualAdd,
   onReset,
@@ -19,6 +23,12 @@ export function TopBar({
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
   currentLocation: string | null;
+  /** Cargo ships for the picker (scu > 0), sorted scu-desc. */
+  ships: ShipReference[];
+  /** Currently selected ship slug, or null. */
+  selectedShipSlug: string | null;
+  /** Persist a ship selection (resolved slug, or null to clear). */
+  onSelectShip: (slug: string | null) => void;
   onResync: () => void;
   onManualAdd: () => void;
   onReset: () => void;
@@ -79,6 +89,13 @@ export function TopBar({
           {currentLocation ?? "—"}
         </span>
       </div>
+
+      {/* Ship picker — Cargo mode only, AFTER the LOCATION chip (Phase A) */}
+      <ShipPicker
+        ships={ships}
+        selectedSlug={selectedShipSlug}
+        onSelect={onSelectShip}
+      />
 
       <div style={{ flex: 1 }} />
 

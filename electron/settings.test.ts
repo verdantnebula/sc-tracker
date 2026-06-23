@@ -64,7 +64,11 @@ describe("loadSettings / saveSettings", () => {
   it("writes valid, pretty-printed JSON", () => {
     saveSettings({ liveFolder: "E:/SC/LIVE" }, file);
     const onDisk = JSON.parse(readFileSync(file, "utf-8"));
-    expect(onDisk).toEqual({ liveFolder: "E:/SC/LIVE", mode: "cargo" });
+    expect(onDisk).toEqual({
+      liveFolder: "E:/SC/LIVE",
+      mode: "cargo",
+      selectedShipSlug: null,
+    });
   });
 
   it("merges onto existing on-disk settings (a partial write can't drop keys)", () => {
@@ -180,7 +184,11 @@ describe("corrupt / malformed settings fallback", () => {
 // ---------------------------------------------------------------------------
 
 describe("mergeSettings", () => {
-  const base: AppSettings = { liveFolder: "A:/old", mode: "cargo" };
+  const base: AppSettings = {
+    liveFolder: "A:/old",
+    mode: "cargo",
+    selectedShipSlug: null,
+  };
 
   it("collapses an empty-string liveFolder to null", () => {
     expect(mergeSettings(base, { liveFolder: "" }).liveFolder).toBeNull();
@@ -194,7 +202,58 @@ describe("mergeSettings", () => {
     const merged = mergeSettings(base, {
       bogus: "x",
     } as unknown as Partial<AppSettings>);
-    expect(merged).toEqual({ liveFolder: "A:/old", mode: "cargo" });
+    expect(merged).toEqual({
+      liveFolder: "A:/old",
+      mode: "cargo",
+      selectedShipSlug: null,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// selectedShipSlug (Phase A ship picker) persistence
+// ---------------------------------------------------------------------------
+
+describe("selected ship persistence", () => {
+  it("defaults to null when the file does not exist", () => {
+    expect(loadSettings(file).selectedShipSlug).toBeNull();
+    expect(DEFAULT_SETTINGS.selectedShipSlug).toBeNull();
+  });
+
+  it("round-trips a saved ship slug", () => {
+    const saved = saveSettings({ selectedShipSlug: "hull-c" }, file);
+    expect(saved.selectedShipSlug).toBe("hull-c");
+    // Re-read from disk to prove it persisted across a (simulated) restart.
+    expect(loadSettings(file).selectedShipSlug).toBe("hull-c");
+  });
+
+  it("can clear a previously-set ship by saving null", () => {
+    saveSettings({ selectedShipSlug: "caterpillar" }, file);
+    const cleared = saveSettings({ selectedShipSlug: null }, file);
+    expect(cleared.selectedShipSlug).toBeNull();
+    expect(loadSettings(file).selectedShipSlug).toBeNull();
+  });
+
+  it("collapses an empty-string slug to null", () => {
+    const merged = mergeSettings(DEFAULT_SETTINGS, { selectedShipSlug: "" });
+    expect(merged.selectedShipSlug).toBeNull();
+  });
+
+  it("drops a non-string slug from a corrupt file", () => {
+    writeFileSync(file, JSON.stringify({ selectedShipSlug: 42 }), "utf-8");
+    expect(loadSettings(file).selectedShipSlug).toBeNull();
+  });
+
+  it("preserves mode + liveFolder when only the ship changes", () => {
+    saveSettings({ liveFolder: "D:/SC/LIVE", mode: "salvage" }, file);
+    const merged = saveSettings({ selectedShipSlug: "hull-e" }, file);
+    expect(merged.liveFolder).toBe("D:/SC/LIVE");
+    expect(merged.mode).toBe("salvage");
+    expect(merged.selectedShipSlug).toBe("hull-e");
+    // ...and changing the ship again must not reset mode/liveFolder.
+    const merged2 = saveSettings({ selectedShipSlug: "hull-c" }, file);
+    expect(merged2.mode).toBe("salvage");
+    expect(merged2.liveFolder).toBe("D:/SC/LIVE");
   });
 });
 
@@ -239,14 +298,21 @@ describe("resolveGameLogPath", () => {
     const expected = gameLogPathForFolder(folder);
     const exists = (p: string) => p === expected;
     expect(
-      resolveGameLogPath({ liveFolder: folder, mode: "cargo" }, exists),
+      resolveGameLogPath(
+        { liveFolder: folder, mode: "cargo", selectedShipSlug: null },
+        exists,
+      ),
     ).toBe(expected);
   });
 
   it("falls back to default when the configured folder's Game.log is missing", () => {
     expect(
       resolveGameLogPath(
-        { liveFolder: "D:/Games/SC/LIVE", mode: "cargo" },
+        {
+          liveFolder: "D:/Games/SC/LIVE",
+          mode: "cargo",
+          selectedShipSlug: null,
+        },
         () => false,
       ),
     ).toBe(FALLBACK);
@@ -256,7 +322,10 @@ describe("resolveGameLogPath", () => {
     // exists() returns true for everything; with no folder set it must STILL
     // return the default (the unset branch never consults the predicate).
     expect(
-      resolveGameLogPath({ liveFolder: null, mode: "cargo" }, () => true),
+      resolveGameLogPath(
+        { liveFolder: null, mode: "cargo", selectedShipSlug: null },
+        () => true,
+      ),
     ).toBe(FALLBACK);
   });
 
@@ -264,7 +333,7 @@ describe("resolveGameLogPath", () => {
     const custom = "Z:/custom/Game.log";
     expect(
       resolveGameLogPath(
-        { liveFolder: null, mode: "cargo" },
+        { liveFolder: null, mode: "cargo", selectedShipSlug: null },
         () => true,
         custom,
       ),

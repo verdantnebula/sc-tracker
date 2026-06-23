@@ -74,6 +74,10 @@ const api: ApiBridge = {
   getMode: () => ipcRenderer.invoke(IPC.SETTINGS_GET_MODE) as Promise<AppMode>,
   setMode: (mode: AppMode) =>
     ipcRenderer.invoke(IPC.SETTINGS_SET_MODE, mode) as Promise<AppMode>,
+  getSelectedShip: () =>
+    ipcRenderer.invoke(IPC.SETTINGS_GET_SHIP) as Promise<string | null>,
+  setSelectedShip: (slug: string | null) =>
+    ipcRenderer.invoke(IPC.SETTINGS_SET_SHIP, slug) as Promise<string | null>,
 
   // --- diagnostics / issue report ("Collect Logs") ---
   exportDiagnostics: (input: { description: string }) =>

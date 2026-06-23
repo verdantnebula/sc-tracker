@@ -25,6 +25,7 @@ import type {
   Commodity,
   Terminal,
   TerminalType,
+  ShipReference,
 } from "@shared/types";
 
 // The bundled per-patch snapshot. resolveJsonModule is enabled (tsconfig.node),
@@ -37,6 +38,8 @@ interface ReferenceSnapshot {
   source: string;
   commodities: Commodity[];
   terminals: Terminal[];
+  /** Optional in older snapshots; defaults to [] when absent (back-compat). */
+  ships?: ShipReference[];
 }
 
 const snapshot = refData as ReferenceSnapshot;
@@ -162,6 +165,7 @@ class UexClientImpl implements UexClient {
     this.data = opts.snapshot ?? {
       commodities: snapshot.commodities,
       terminals: snapshot.terminals,
+      ships: snapshot.ships ?? [],
     };
   }
 

@@ -174,9 +174,32 @@ export interface Terminal {
   type?: TerminalType;
 }
 
+/**
+ * A cargo-capable ship from the UEX vehicles dataset. Bundled (no runtime token)
+ * and used by the ship picker + hold-capacity bar (Phase A). Only vehicles with
+ * `scu > 0` are kept — the picker is about cargo capacity, so non-haulers are
+ * excluded at fetch time. `slug` is the stable identity persisted in settings.
+ */
+export interface ShipReference {
+  /** UEX `name`, e.g. "Hull C". */
+  name: string;
+  /** UEX `name_full`, e.g. "MISC Hull C". */
+  nameFull: string;
+  /** UEX `company_name`, e.g. "Musashi Industrial & Starflight Concern". */
+  company: string;
+  /** UEX `slug` — stable id persisted as the selected ship. */
+  slug: string;
+  /** UEX `scu` — cargo grid capacity in SCU (> 0). */
+  scu: number;
+  /** UEX `game_version` the figure was sourced from. */
+  gameVersion: string;
+}
+
 export interface ReferenceData {
   commodities: Commodity[];
   terminals: Terminal[];
+  /** Cargo-capable ships (scu > 0), sorted by scu descending. */
+  ships: ShipReference[];
 }
 
 // ---------------------------------------------------------------------------

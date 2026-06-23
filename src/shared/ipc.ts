@@ -48,6 +48,8 @@ export const IPC = {
   SETTINGS_SET_LOG_PATH: "settings:setLogPath",
   SETTINGS_GET_MODE: "settings:getMode",
   SETTINGS_SET_MODE: "settings:setMode",
+  SETTINGS_GET_SHIP: "settings:getShip",
+  SETTINGS_SET_SHIP: "settings:setShip",
 
   // diagnostics / issue report ("Collect Logs")
   DIAGNOSTICS_EXPORT_REPORT: "diagnostics:exportReport",
@@ -110,6 +112,13 @@ export interface IpcRequestMap {
   [IPC.SETTINGS_GET_MODE]: { args: []; result: AppMode };
   /** Persist a new app mode; returns the saved mode (defaults defensively). */
   [IPC.SETTINGS_SET_MODE]: { args: [mode: AppMode]; result: AppMode };
+  /** Current selected ship slug (Phase A), or null when unset. */
+  [IPC.SETTINGS_GET_SHIP]: { args: []; result: string | null };
+  /** Persist the selected ship slug; returns the saved slug (null when cleared). */
+  [IPC.SETTINGS_SET_SHIP]: {
+    args: [slug: string | null];
+    result: string | null;
+  };
 
   // --- diagnostics / issue report ---
   /** Build a redacted issue-report folder + zip on the Desktop from a description. */
@@ -202,6 +211,10 @@ export interface ApiBridge {
   getMode(): Promise<AppMode>;
   /** Persist the app mode; resolves to the saved mode. */
   setMode(mode: AppMode): Promise<AppMode>;
+  /** Read the persisted selected ship slug (null when unset). */
+  getSelectedShip(): Promise<string | null>;
+  /** Persist the selected ship slug (null clears it); resolves to the saved slug. */
+  setSelectedShip(slug: string | null): Promise<string | null>;
 
   // --- diagnostics / issue report ("Collect Logs") ---
   /** Build a redacted issue-report folder + zip on the Desktop. */

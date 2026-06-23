@@ -23,6 +23,11 @@
 //   /poi             (distribution / logistics depots — S4DC*, S4LD* haul drops)
 // then de-duplicate by name into the shared Terminal shape. is_cargo_center is
 // PRESERVED (for optional sort/group) but NEVER used to exclude a destination.
+//
+// SHIPS (Phase A): we also fetch /vehicles and keep the cargo-capable ones
+// (scu > 0) as ShipReference rows for the ship picker + hold-capacity bar. The
+// read endpoint is token-free, but we call it with the same Bearer header for
+// consistency with the rest of the script. Sorted scu-descending.
 // ============================================================================
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -86,6 +91,28 @@ function mapCommodities(resp) {
   return asArray(resp)
     .map((r) => ({ name: str(r.name), code: str(r.code), kind: str(r.kind) }))
     .filter((c) => c.name.length > 0);
+}
+
+// --- ships (cargo-capable vehicles) -----------------------------------------
+
+/**
+ * Map UEX /vehicles rows to the bundled ShipReference shape. Only vehicles with
+ * a positive cargo grid (scu > 0) are kept — the picker is about HOLD CAPACITY,
+ * so fighters/ground vehicles with no cargo are excluded. Sorted scu-descending
+ * so the biggest haulers (Hull E/D/C, M2/A2/C2…) lead the dropdown.
+ */
+function mapShips(resp) {
+  return asArray(resp)
+    .map((r) => ({
+      name: str(r.name),
+      nameFull: str(r.name_full),
+      company: str(r.company_name),
+      slug: str(r.slug),
+      scu: numOrNull(r.scu) ?? 0,
+      gameVersion: str(r.game_version),
+    }))
+    .filter((s) => s.name.length > 0 && s.slug.length > 0 && s.scu > 0)
+    .sort((a, b) => b.scu - a.scu);
 }
 
 // --- location union ---------------------------------------------------------
@@ -219,10 +246,10 @@ async function fetchResource(path, token) {
 async function main() {
   const token = loadToken();
   console.log(
-    "[fetch:reference] fetching /commodities, /terminals, /space_stations, /outposts, /cities, /poi …",
+    "[fetch:reference] fetching /commodities, /terminals, /space_stations, /outposts, /cities, /poi, /vehicles …",
   );
 
-  const [commRaw, termRaw, stationRaw, outpostRaw, cityRaw, poiRaw] =
+  const [commRaw, termRaw, stationRaw, outpostRaw, cityRaw, poiRaw, vehicleRaw] =
     await Promise.all([
       fetchResource("/commodities", token),
       fetchResource("/terminals", token),
@@ -230,6 +257,7 @@ async function main() {
       fetchResource("/outposts", token),
       fetchResource("/cities", token),
       fetchResource("/poi", token),
+      fetchResource("/vehicles", token),
     ]);
 
   const commodities = mapCommodities(commRaw);
@@ -240,11 +268,18 @@ async function main() {
     terminals: termRaw,
     pois: poiRaw,
   });
+  const ships = mapShips(vehicleRaw);
 
   if (commodities.length === 0 || terminals.length === 0) {
     throw new Error(
       `[fetch:reference] refusing to write empty snapshot ` +
         `(commodities=${commodities.length}, locations=${terminals.length}).`,
+    );
+  }
+  if (ships.length === 0) {
+    throw new Error(
+      `[fetch:reference] /vehicles returned no cargo ships (scu > 0). ` +
+        `Refusing to write a snapshot with an empty ship picker.`,
     );
   }
 
@@ -253,6 +288,7 @@ async function main() {
     source: "uexcorp.space API 2.0",
     commodities,
     terminals,
+    ships,
   };
 
   mkdirSync(dirname(OUT_PATH), { recursive: true });
@@ -267,7 +303,11 @@ async function main() {
     `[fetch:reference] wrote ${OUT_PATH}\n` +
       `  commodities: ${commodities.length}\n` +
       `  locations:   ${terminals.length} (cargo centers: ${cargoCenters})\n` +
-      `  by type:     ${JSON.stringify(byType)}`,
+      `  by type:     ${JSON.stringify(byType)}\n` +
+      `  ships:       ${ships.length} (top: ${ships
+        .slice(0, 3)
+        .map((s) => `${s.name} ${s.scu}SCU`)
+        .join(", ")})`,
   );
 }
 

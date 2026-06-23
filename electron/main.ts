@@ -62,6 +62,7 @@ import {
   resolveGameLogPath,
   folderHasGameLog,
   gameLogPathForFolder,
+  DEFAULT_SETTINGS,
   type AppSettings,
 } from "./settings";
 import { existsSync } from "node:fs";
@@ -86,7 +87,7 @@ let salvageRef: SalvageReferenceLoader | null = null;
 // Per-user settings (custom LIVE folder, etc.), loaded on boot. Held in memory
 // so the IPC handlers can report/resolve the current Game.log path without a disk
 // read each call; saveSettings() still merges onto disk as the source of truth.
-let settings: AppSettings = { liveFolder: null, mode: "cargo" };
+let settings: AppSettings = { ...DEFAULT_SETTINGS };
 
 // Latest UEX cache state, threaded into LogStatus.uexActive.
 let uexActive = false;
@@ -520,7 +521,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.REF_GET, (): ReferenceData => {
-    if (!uex) return { commodities: [], terminals: [] };
+    if (!uex) return { commodities: [], terminals: [], ships: [] };
     return uex.getReferenceData();
   });
 
@@ -604,6 +605,25 @@ function registerIpc(): void {
     settings = saveSettings({ mode });
     return settings.mode;
   });
+
+  // --- Selected ship (Phase A ship picker / hold-capacity bar) -------------
+  // Pure renderer concern (drives the capacity bar); the watcher/store/DB are
+  // ship-agnostic, so there is nothing to restart — just persist so the chosen
+  // ship survives a restart. saveSettings merges onto disk so mode/liveFolder
+  // are never dropped, and normalizes an empty/forged slug to null.
+
+  ipcMain.handle(
+    IPC.SETTINGS_GET_SHIP,
+    (): string | null => settings.selectedShipSlug,
+  );
+
+  ipcMain.handle(
+    IPC.SETTINGS_SET_SHIP,
+    (_e, slug: string | null): string | null => {
+      settings = saveSettings({ selectedShipSlug: slug });
+      return settings.selectedShipSlug;
+    },
+  );
 
   // --- Diagnostics / issue report ("Collect Logs") ------------------------
   // Build a timestamped, REDACTED report folder + zip on the Desktop from the

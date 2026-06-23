@@ -1,5 +1,5 @@
 {
-  "fetchedAt": 1782061801150,
+  "fetchedAt": 1782182983103,
   "source": "uexcorp.space API 2.0",
   "commodities": [
     {
@@ -2564,6 +2564,1120 @@
       "isCargoCenter": false,
       "maxContainerSize": 0,
       "type": "outpost"
+    }
+  ],
+  "ships": [
+    {
+      "name": "Hull E",
+      "nameFull": "MISC Hull E",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "hull-e",
+      "scu": 12000,
+      "gameVersion": "4.4"
+    },
+    {
+      "name": "Hull D",
+      "nameFull": "MISC Hull D",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "hull-d",
+      "scu": 6912,
+      "gameVersion": "4.4"
+    },
+    {
+      "name": "Odin",
+      "nameFull": "Anvil Odin",
+      "company": "Anvil Aerospace",
+      "slug": "odin",
+      "scu": 6000,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "Hull C",
+      "nameFull": "MISC Hull C",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "hull-c",
+      "scu": 4608,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Kraken",
+      "nameFull": "Drake Kraken",
+      "company": "Drake Interplanetary",
+      "slug": "kraken",
+      "scu": 3792,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "Merchantman",
+      "nameFull": "Banu Merchantman",
+      "company": "Banu Souli",
+      "slug": "merchantman",
+      "scu": 2880,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Ironclad",
+      "nameFull": "Drake Ironclad",
+      "company": "Drake Interplanetary",
+      "slug": "ironclad",
+      "scu": 2200,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Ironclad Assault",
+      "nameFull": "Drake Ironclad Assault",
+      "company": "Drake Interplanetary",
+      "slug": "ironclad-assault",
+      "scu": 1440,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "Idris-P",
+      "nameFull": "Aegis Idris-P",
+      "company": "Aegis Dynamics",
+      "slug": "idris-p",
+      "scu": 1374,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Idris-M",
+      "nameFull": "Aegis Idris-M",
+      "company": "Aegis Dynamics",
+      "slug": "idris-m",
+      "scu": 1326,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Pioneer",
+      "nameFull": "C.O. Pioneer",
+      "company": "Consolidated Outland",
+      "slug": "pioneer",
+      "scu": 1000,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Kraken Privateer",
+      "nameFull": "Drake Kraken Privateer",
+      "company": "Drake Interplanetary",
+      "slug": "kraken-privateer",
+      "scu": 768,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "C2 Hercules Starlifter",
+      "nameFull": "Crusader C2 Hercules Starlifter",
+      "company": "Crusader Industries",
+      "slug": "c2-hercules-starlifter",
+      "scu": 696,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Railen",
+      "nameFull": "Gatac Railen",
+      "company": "Gatac Manufacture",
+      "slug": "railen",
+      "scu": 640,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Arrastra",
+      "nameFull": "RSI Arrastra",
+      "company": "Roberts Space Industries",
+      "slug": "arrastra",
+      "scu": 576,
+      "gameVersion": "3.24.1"
+    },
+    {
+      "name": "Caterpillar",
+      "nameFull": "Drake Caterpillar",
+      "company": "Drake Interplanetary",
+      "slug": "drak-caterpillar",
+      "scu": 576,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Caterpillar Best In Show Edition",
+      "nameFull": "Drake Caterpillar Best In Show Edition",
+      "company": "Drake Interplanetary",
+      "slug": "caterpillar-best-in-show-edition",
+      "scu": 576,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Caterpillar Pirate Edition",
+      "nameFull": "Drake Caterpillar Pirate Edition",
+      "company": "Drake Interplanetary",
+      "slug": "drak-caterpillar-pirate-edition",
+      "scu": 576,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Polaris",
+      "nameFull": "RSI Polaris",
+      "company": "Roberts Space Industries",
+      "slug": "polaris",
+      "scu": 576,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "M2 Hercules Starlifter",
+      "nameFull": "Crusader M2 Hercules Starlifter",
+      "company": "Crusader Industries",
+      "slug": "m2-hercules-starlifter",
+      "scu": 522,
+      "gameVersion": "3.23"
+    },
+    {
+      "name": "Hull B",
+      "nameFull": "MISC Hull B",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "hull-b",
+      "scu": 512,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Endeavor",
+      "nameFull": "MISC Endeavor",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "endeavor",
+      "scu": 500,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Carrack",
+      "nameFull": "Anvil Carrack",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-carrack",
+      "scu": 456,
+      "gameVersion": "4.5"
+    },
+    {
+      "name": "Carrack Expedition",
+      "nameFull": "Anvil Carrack Expedition",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-carrack-expedition",
+      "scu": 456,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Reclaimer",
+      "nameFull": "Aegis Reclaimer",
+      "company": "Aegis Dynamics",
+      "slug": "aegs-reclaimer",
+      "scu": 420,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Liberator",
+      "nameFull": "Anvil Liberator",
+      "company": "Anvil Aerospace",
+      "slug": "liberator",
+      "scu": 400,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "890 Jump",
+      "nameFull": "Origin 890 Jump",
+      "company": "Origin Jumpworks",
+      "slug": "orig-890jump",
+      "scu": 388,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Orion",
+      "nameFull": "RSI Orion",
+      "company": "Roberts Space Industries",
+      "slug": "orion",
+      "scu": 384,
+      "gameVersion": "3.24.1"
+    },
+    {
+      "name": "Genesis Starliner",
+      "nameFull": "Crusader Genesis Starliner",
+      "company": "Crusader Industries",
+      "slug": "genesis-starliner",
+      "scu": 300,
+      "gameVersion": "3.23.1a"
+    },
+    {
+      "name": "Starfarer",
+      "nameFull": "MISC Starfarer",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-starfarer",
+      "scu": 291,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Starfarer Gemini",
+      "nameFull": "MISC Starfarer Gemini",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-starfarer-gemini",
+      "scu": 291,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Hermes",
+      "nameFull": "RSI Hermes",
+      "company": "Roberts Space Industries",
+      "slug": "hermes",
+      "scu": 288,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Odyssey",
+      "nameFull": "MISC Odyssey",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "odyssey",
+      "scu": 252,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Crucible",
+      "nameFull": "Anvil Crucible",
+      "company": "Anvil Aerospace",
+      "slug": "crucible",
+      "scu": 240,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "A2 Hercules Starlifter",
+      "nameFull": "Crusader A2 Hercules Starlifter",
+      "company": "Crusader Industries",
+      "slug": "a2-hercules-starlifter",
+      "scu": 234,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Starlancer MAX",
+      "nameFull": "MISC Starlancer MAX",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-starlancer-max",
+      "scu": 224,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "MOTH",
+      "nameFull": "Argo MOTH",
+      "company": "Argo Astronautics",
+      "slug": "moth",
+      "scu": 224,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "RAFT",
+      "nameFull": "Argo RAFT",
+      "company": "Argo Astronautics",
+      "slug": "argo-raft",
+      "scu": 192,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Reclaimer Best In Show Edition",
+      "nameFull": "Aegis Reclaimer Best In Show Edition",
+      "company": "Aegis Dynamics",
+      "slug": "reclaimer-best-in-show-edition",
+      "scu": 180,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Asgard",
+      "nameFull": "Anvil Asgard",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-asgard",
+      "scu": 180,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Constellation Taurus",
+      "nameFull": "RSI Constellation Taurus",
+      "company": "Roberts Space Industries",
+      "slug": "rsi-constellation-taurus",
+      "scu": 174,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Expanse",
+      "nameFull": "MISC Expanse",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "expanse",
+      "scu": 128,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Zeus Mk II CL",
+      "nameFull": "RSI Zeus Mk II CL",
+      "company": "Roberts Space Industries",
+      "slug": "rsi-zeus-cl",
+      "scu": 128,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Freelancer MAX",
+      "nameFull": "MISC Freelancer MAX",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-freelancer-max",
+      "scu": 120,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Mercury Star Runner",
+      "nameFull": "Crusader Mercury Star Runner",
+      "company": "Crusader Industries",
+      "slug": "mercury-star-runner",
+      "scu": 114,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Constellation Andromeda",
+      "nameFull": "RSI Constellation Andromeda",
+      "company": "Roberts Space Industries",
+      "slug": "constellation-andromeda",
+      "scu": 96,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Constellation Aquila",
+      "nameFull": "RSI Constellation Aquila",
+      "company": "Roberts Space Industries",
+      "slug": "rsi-constellation-aquila",
+      "scu": 96,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "MOLE Carbon Edition",
+      "nameFull": "Argo MOLE Carbon Edition",
+      "company": "Argo Astronautics",
+      "slug": "mole-carbon-edition",
+      "scu": 96,
+      "gameVersion": "3.23.1a"
+    },
+    {
+      "name": "MOLE Talus Edition",
+      "nameFull": "Argo MOLE Talus Edition",
+      "company": "Argo Astronautics",
+      "slug": "mole-talus-edition",
+      "scu": 96,
+      "gameVersion": "3.23.1a"
+    },
+    {
+      "name": "Perseus",
+      "nameFull": "RSI Perseus",
+      "company": "Roberts Space Industries",
+      "slug": "perseus",
+      "scu": 96,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Starlancer TAC",
+      "nameFull": "MISC Starlancer TAC",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "starlancer-tac",
+      "scu": 96,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Tyilui",
+      "nameFull": "Gatac Tyilui",
+      "company": "Gatac Manufacture",
+      "slug": "tyilui",
+      "scu": 96,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Valkyrie",
+      "nameFull": "Anvil Valkyrie",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-valkyrie",
+      "scu": 90,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Constellation Phoenix",
+      "nameFull": "RSI Constellation Phoenix",
+      "company": "Roberts Space Industries",
+      "slug": "rsi-constellation-phoenix",
+      "scu": 80,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Constellation Phoenix Emerald",
+      "nameFull": "RSI Constellation Phoenix Emerald",
+      "company": "Roberts Space Industries",
+      "slug": "rsi-constellation-phoenix-emerald",
+      "scu": 80,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Retaliator",
+      "nameFull": "Aegis Retaliator",
+      "company": "Aegis Dynamics",
+      "slug": "retaliator",
+      "scu": 74,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Retaliator Bomber",
+      "nameFull": "Aegis Retaliator Bomber",
+      "company": "Aegis Dynamics",
+      "slug": "retaliator-bomber",
+      "scu": 74,
+      "gameVersion": "3.23.1a"
+    },
+    {
+      "name": "Corsair",
+      "nameFull": "Drake Corsair",
+      "company": "Drake Interplanetary",
+      "slug": "drak-corsair",
+      "scu": 72,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Freelancer",
+      "nameFull": "MISC Freelancer",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-freelancer",
+      "scu": 66,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Galaxy",
+      "nameFull": "RSI Galaxy",
+      "company": "Roberts Space Industries",
+      "slug": "galaxy",
+      "scu": 64,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Hull A",
+      "nameFull": "MISC Hull A",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-hull-a",
+      "scu": 64,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Nautilus",
+      "nameFull": "Aegis Nautilus",
+      "company": "Aegis Dynamics",
+      "slug": "nautilus",
+      "scu": 64,
+      "gameVersion": "3.24.3"
+    },
+    {
+      "name": "Nautilus Solstice Edition",
+      "nameFull": "Aegis Nautilus Solstice Edition",
+      "company": "Aegis Dynamics",
+      "slug": "nautilus-solstice-edition",
+      "scu": 64,
+      "gameVersion": "3.24.3"
+    },
+    {
+      "name": "C1 Spirit",
+      "nameFull": "Crusader C1 Spirit",
+      "company": "Crusader Industries",
+      "slug": "c1-spirit",
+      "scu": 64,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Golem Ox",
+      "nameFull": "Drake Golem Ox",
+      "company": "Drake Interplanetary",
+      "slug": "golem-ox",
+      "scu": 64,
+      "gameVersion": "4.5"
+    },
+    {
+      "name": "Tiburon",
+      "nameFull": "Aegis Tiburon",
+      "company": "Aegis Dynamics",
+      "slug": "tiburon",
+      "scu": 64,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "Cutlass Black",
+      "nameFull": "Drake Cutlass Black",
+      "company": "Drake Interplanetary",
+      "slug": "drak-cutlass-black",
+      "scu": 46,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Cutlass Black Best In Show Edition",
+      "nameFull": "Drake Cutlass Black Best In Show Edition",
+      "company": "Drake Interplanetary",
+      "slug": "cutlass-black-best-in-show-edition",
+      "scu": 46,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "600i Explorer",
+      "nameFull": "Origin 600i Explorer",
+      "company": "Origin Jumpworks",
+      "slug": "orig-600i-explorer",
+      "scu": 44,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "400i",
+      "nameFull": "Origin 400i",
+      "company": "Origin Jumpworks",
+      "slug": "orig-400i",
+      "scu": 42,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "600i Executive Edition",
+      "nameFull": "Origin 600i Executive Edition",
+      "company": "Origin Jumpworks",
+      "slug": "600i-executive-edition",
+      "scu": 40,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Hammerhead",
+      "nameFull": "Aegis Hammerhead",
+      "company": "Aegis Dynamics",
+      "slug": "aegs-hammerhead",
+      "scu": 40,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Hammerhead Best In Show Edition",
+      "nameFull": "Aegis Hammerhead Best In Show Edition",
+      "company": "Aegis Dynamics",
+      "slug": "hammerhead-best-in-show-edition",
+      "scu": 40,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Retaliator Cargo Module - Bow",
+      "nameFull": "Aegis Retaliator Cargo Module - Bow",
+      "company": "Aegis Dynamics",
+      "slug": "retaliator-cargo-module---bow",
+      "scu": 38,
+      "gameVersion": "3.24.3"
+    },
+    {
+      "name": "Freelancer DUR",
+      "nameFull": "MISC Freelancer DUR",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-freelancer-dur",
+      "scu": 36,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Freelancer MIS",
+      "nameFull": "MISC Freelancer MIS",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-freelancer-mis",
+      "scu": 36,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Retaliator Cargo Module - Stern",
+      "nameFull": "Aegis Retaliator Cargo Module - Stern",
+      "company": "Aegis Dynamics",
+      "slug": "retaliator-cargo-module---stern",
+      "scu": 36,
+      "gameVersion": "3.24.3"
+    },
+    {
+      "name": "Apollo Medivac",
+      "nameFull": "RSI Apollo Medivac",
+      "company": "Roberts Space Industries",
+      "slug": "apollo-medivac",
+      "scu": 32,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Apollo Triage",
+      "nameFull": "RSI Apollo Triage",
+      "company": "Roberts Space Industries",
+      "slug": "apollo-triage",
+      "scu": 32,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "MOLE",
+      "nameFull": "Argo MOLE",
+      "company": "Argo Astronautics",
+      "slug": "argo-mole",
+      "scu": 32,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Zeus Mk II ES",
+      "nameFull": "RSI Zeus Mk II ES",
+      "company": "Roberts Space Industries",
+      "slug": "rsi-zeus-es",
+      "scu": 32,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Golem",
+      "nameFull": "Drake Golem",
+      "company": "Drake Interplanetary",
+      "slug": "golem",
+      "scu": 32,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "Prowler Utility",
+      "nameFull": "Esperia Prowler Utility",
+      "company": "Esperia Incorporation",
+      "slug": "prowler-utility",
+      "scu": 32,
+      "gameVersion": "4.2"
+    },
+    {
+      "name": "Shiv",
+      "nameFull": "Grey's Market Shiv",
+      "company": "Grey&apos;s Market",
+      "slug": "shiv",
+      "scu": 32,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "Valkyrie Liberator Edition",
+      "nameFull": "Anvil Valkyrie Liberator Edition",
+      "company": "Anvil Aerospace",
+      "slug": "valkyrie-liberator-edition",
+      "scu": 30,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Nomad",
+      "nameFull": "C.O. Nomad",
+      "company": "Consolidated Outland",
+      "slug": "cnou-nomad",
+      "scu": 24,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "600i Touring",
+      "nameFull": "Origin 600i Touring",
+      "company": "Origin Jumpworks",
+      "slug": "orig-600i-touring",
+      "scu": 20,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Zeus Mk II MR",
+      "nameFull": "RSI Zeus Mk II MR",
+      "company": "Roberts Space Industries",
+      "slug": "zeus-mk-ii-mr",
+      "scu": 16,
+      "gameVersion": "3.24.2"
+    },
+    {
+      "name": "MPUV Tractor",
+      "nameFull": "Argo MPUV Tractor",
+      "company": "Argo Astronautics",
+      "slug": "mpuv-tractor",
+      "scu": 16,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Fortune",
+      "nameFull": "MISC Fortune",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-fortune",
+      "scu": 16,
+      "gameVersion": "4.0.1"
+    },
+    {
+      "name": "315p",
+      "nameFull": "Origin 315p",
+      "company": "Origin Jumpworks",
+      "slug": "orig-315p",
+      "scu": 12,
+      "gameVersion": "3.24.2"
+    },
+    {
+      "name": "Cutlass Blue",
+      "nameFull": "Drake Cutlass Blue",
+      "company": "Drake Interplanetary",
+      "slug": "drak-cutlass-blue",
+      "scu": 12,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Cutlass Red",
+      "nameFull": "Drake Cutlass Red",
+      "company": "Drake Interplanetary",
+      "slug": "drak-cutlass-red",
+      "scu": 12,
+      "gameVersion": "3.23.1a"
+    },
+    {
+      "name": "SRV",
+      "nameFull": "Argo SRV",
+      "company": "Argo Astronautics",
+      "slug": "argo-srv",
+      "scu": 12,
+      "gameVersion": "3.23"
+    },
+    {
+      "name": "Vulcan",
+      "nameFull": "Aegis Vulcan",
+      "company": "Aegis Dynamics",
+      "slug": "vulcan",
+      "scu": 12,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Vulture",
+      "nameFull": "Drake Vulture",
+      "company": "Drake Interplanetary",
+      "slug": "vulture",
+      "scu": 12,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "Clipper",
+      "nameFull": "Drake Clipper",
+      "company": "Drake Interplanetary",
+      "slug": "clipper",
+      "scu": 12,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "300i",
+      "nameFull": "Origin 300i",
+      "company": "Origin Jumpworks",
+      "slug": "orig-300i",
+      "scu": 8,
+      "gameVersion": "0.8.0"
+    },
+    {
+      "name": "Avenger Titan",
+      "nameFull": "Aegis Avenger Titan",
+      "company": "Aegis Dynamics",
+      "slug": "aegs-avenger-titan",
+      "scu": 8,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Avenger Titan Renegade",
+      "nameFull": "Aegis Avenger Titan Renegade",
+      "company": "Aegis Dynamics",
+      "slug": "aegs-avenger-titan-renegade",
+      "scu": 8,
+      "gameVersion": "3.24.3"
+    },
+    {
+      "name": "Intrepid",
+      "nameFull": "Crusader Intrepid",
+      "company": "Crusader Industries",
+      "slug": "crus-intrepid",
+      "scu": 8,
+      "gameVersion": "4.7.1"
+    },
+    {
+      "name": "135c",
+      "nameFull": "Origin 135c",
+      "company": "Origin Jumpworks",
+      "slug": "orig-135c",
+      "scu": 6,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Aurora Mk I CL",
+      "nameFull": "RSI Aurora Mk I CL",
+      "company": "Roberts Space Industries",
+      "slug": "aurora-mk-i-cl",
+      "scu": 6,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "Reliant Kore",
+      "nameFull": "MISC Reliant Kore",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-reliant",
+      "scu": 6,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Syulen",
+      "nameFull": "Gatac Syulen",
+      "company": "Gatac Manufacture",
+      "slug": "gama-syulen",
+      "scu": 6,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Salvation",
+      "nameFull": "RSI Salvation",
+      "company": "Roberts Space Industries",
+      "slug": "salvation",
+      "scu": 6,
+      "gameVersion": "4.4"
+    },
+    {
+      "name": "Aurora Mk I SE",
+      "nameFull": "RSI Aurora Mk I SE",
+      "company": "Roberts Space Industries",
+      "slug": "aurora-mk-i-se",
+      "scu": 6,
+      "gameVersion": "4.8.2"
+    },
+    {
+      "name": "325a",
+      "nameFull": "Origin 325a",
+      "company": "Origin Jumpworks",
+      "slug": "orig-325a",
+      "scu": 4,
+      "gameVersion": "0.9.1.3"
+    },
+    {
+      "name": "350r",
+      "nameFull": "Origin 350r",
+      "company": "Origin Jumpworks",
+      "slug": "orig-350r",
+      "scu": 4,
+      "gameVersion": "3.23"
+    },
+    {
+      "name": "C8 Pisces",
+      "nameFull": "Anvil C8 Pisces",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-c8-pisces",
+      "scu": 4,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "C8X Pisces Expedition",
+      "nameFull": "Anvil C8X Pisces Expedition",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-c8x-pisces-expedition",
+      "scu": 4,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Cutter",
+      "nameFull": "Drake Cutter",
+      "company": "Drake Interplanetary",
+      "slug": "drak-cutter",
+      "scu": 4,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "Mustang Alpha",
+      "nameFull": "C.O. Mustang Alpha",
+      "company": "Consolidated Outland",
+      "slug": "cnou-mustang-alpha",
+      "scu": 4,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Mustang Alpha Vindicator",
+      "nameFull": "C.O. Mustang Alpha Vindicator",
+      "company": "Consolidated Outland",
+      "slug": "mustang-alpha-vindicator",
+      "scu": 4,
+      "gameVersion": "3.24.2"
+    },
+    {
+      "name": "CSV-SM",
+      "nameFull": "Argo CSV-SM",
+      "company": "Argo Astronautics",
+      "slug": "csv-sm",
+      "scu": 4,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "CSV-FM",
+      "nameFull": "Argo CSV-FM",
+      "company": "Argo Astronautics",
+      "slug": "csv-fm",
+      "scu": 4,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Paladin",
+      "nameFull": "Anvil Paladin",
+      "company": "Anvil Aerospace",
+      "slug": "paladin",
+      "scu": 4,
+      "gameVersion": "4.3.2"
+    },
+    {
+      "name": "Aurora Mk I ES",
+      "nameFull": "RSI Aurora Mk I ES",
+      "company": "Roberts Space Industries",
+      "slug": "aurora-mk-i-es",
+      "scu": 3,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "Aurora Mk I LN",
+      "nameFull": "RSI Aurora Mk I LN",
+      "company": "Roberts Space Industries",
+      "slug": "aurora-mk-i-ln",
+      "scu": 3,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "Aurora Mk I LX",
+      "nameFull": "RSI Aurora Mk I LX",
+      "company": "Roberts Space Industries",
+      "slug": "aurora-mk-i-lx",
+      "scu": 3,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "Aurora Mk I MR",
+      "nameFull": "RSI Aurora Mk I MR",
+      "company": "Roberts Space Industries",
+      "slug": "aurora-mk-i-mr",
+      "scu": 3,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "100i",
+      "nameFull": "Origin 100i",
+      "company": "Origin Jumpworks",
+      "slug": "orig-100i",
+      "scu": 2,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "125a",
+      "nameFull": "Origin 125a",
+      "company": "Origin Jumpworks",
+      "slug": "orig-125a",
+      "scu": 2,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "Cutter Scout",
+      "nameFull": "Drake Cutter Scout",
+      "company": "Drake Interplanetary",
+      "slug": "drak-cutter-scout",
+      "scu": 2,
+      "gameVersion": "4.0.1"
+    },
+    {
+      "name": "Cutter Rambler",
+      "nameFull": "Drake Cutter Rambler",
+      "company": "Drake Interplanetary",
+      "slug": "drak-cutter-rambler",
+      "scu": 2,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "F7C Hornet Mk II",
+      "nameFull": "Anvil F7C Hornet Mk II",
+      "company": "Anvil Aerospace",
+      "slug": "anvl-hornet-f7c-mk2",
+      "scu": 2,
+      "gameVersion": "3.24.2a"
+    },
+    {
+      "name": "G12",
+      "nameFull": "Origin G12",
+      "company": "Origin Jumpworks",
+      "slug": "g12",
+      "scu": 2,
+      "gameVersion": "3.22.0b"
+    },
+    {
+      "name": "MPUV Cargo",
+      "nameFull": "Argo MPUV Cargo",
+      "company": "Argo Astronautics",
+      "slug": "mpuv-cargo",
+      "scu": 2,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "MULE",
+      "nameFull": "Drake MULE",
+      "company": "Drake Interplanetary",
+      "slug": "mule",
+      "scu": 2,
+      "gameVersion": "3.24.3"
+    },
+    {
+      "name": "Redeemer",
+      "nameFull": "Aegis Redeemer",
+      "company": "Aegis Dynamics",
+      "slug": "aegs-redeemer",
+      "scu": 2,
+      "gameVersion": "4.0"
+    },
+    {
+      "name": "M80",
+      "nameFull": "Origin M80",
+      "company": "Origin Jumpworks",
+      "slug": "m80",
+      "scu": 2,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "Cyclone",
+      "nameFull": "Tumbril Cyclone",
+      "company": "Tumbril Land Systems",
+      "slug": "tmbl-cyclone",
+      "scu": 1,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "Reliant Tana",
+      "nameFull": "MISC Reliant Tana",
+      "company": "Musashi Industrial and Starflight Concern",
+      "slug": "misc-reliant-tana",
+      "scu": 1,
+      "gameVersion": "4.1.1"
+    },
+    {
+      "name": "UTV",
+      "nameFull": "Greycat UTV",
+      "company": "Greycat Industrial",
+      "slug": "utv",
+      "scu": 1,
+      "gameVersion": "4.8.0"
+    },
+    {
+      "name": "ATLS GEO",
+      "nameFull": "Argo ATLS GEO",
+      "company": "Argo Astronautics",
+      "slug": "atls-geo",
+      "scu": 0.8,
+      "gameVersion": "4.7"
+    },
+    {
+      "name": "ATLS IKTI",
+      "nameFull": "Argo ATLS IKTI",
+      "company": "Argo Astronautics",
+      "slug": "atls-ikti",
+      "scu": 0.8,
+      "gameVersion": "4.5"
+    },
+    {
+      "name": "ATLS IKTI Rad",
+      "nameFull": "Argo ATLS IKTI Rad",
+      "company": "Argo Astronautics",
+      "slug": "atls-ikti-rad",
+      "scu": 0.8,
+      "gameVersion": "4.5"
+    },
+    {
+      "name": "ATLS IKTI GEO",
+      "nameFull": "Argo ATLS IKTI GEO",
+      "company": "Argo Astronautics",
+      "slug": "atls-ikti-geo",
+      "scu": 0.8,
+      "gameVersion": "4.5"
+    },
+    {
+      "name": "ATLS IKTI GEO Rad",
+      "nameFull": "Argo ATLS IKTI GEO Rad",
+      "company": "Argo Astronautics",
+      "slug": "atls-ikti-geo-rad",
+      "scu": 0.8,
+      "gameVersion": "4.5"
     }
   ]
 }

@@ -155,6 +155,7 @@ describe("uexClient (bundled snapshot)", () => {
     const ref = client.getReferenceData();
     expect(ref.commodities).toEqual(refData.commodities);
     expect(ref.terminals).toEqual(refData.terminals);
+    expect(ref.ships).toEqual(refData.ships);
   });
 
   it("commodities have the correct {name, code, kind} shape", () => {
@@ -186,6 +187,28 @@ describe("uexClient (bundled snapshot)", () => {
     expect(ref.terminals.some((t) => !t.isCargoCenter)).toBe(true);
   });
 
+  it("serves cargo ships (scu > 0), sorted scu-descending, with real shapes", () => {
+    const ref = createUexClient().getReferenceData();
+    expect(ref.ships.length).toBeGreaterThan(0);
+    for (const s of ref.ships) {
+      expect(typeof s.name).toBe("string");
+      expect(s.name.length).toBeGreaterThan(0);
+      expect(typeof s.nameFull).toBe("string");
+      expect(typeof s.company).toBe("string");
+      expect(typeof s.slug).toBe("string");
+      expect(s.slug.length).toBeGreaterThan(0);
+      expect(typeof s.scu).toBe("number");
+      expect(s.scu).toBeGreaterThan(0);
+      expect(typeof s.gameVersion).toBe("string");
+    }
+    // Sorted by scu descending.
+    for (let i = 1; i < ref.ships.length; i++) {
+      expect(ref.ships[i - 1].scu).toBeGreaterThanOrEqual(ref.ships[i].scu);
+    }
+    // A known big hauler present (sanity that the data is real, not stub).
+    expect(ref.ships.some((s) => s.name === "Hull E")).toBe(true);
+  });
+
   it("offers the real haul destinations users were missing (the bug fix)", () => {
     const ref = createUexClient().getReferenceData();
     const has = (needle: string) =>
@@ -209,6 +232,16 @@ describe("uexClient (bundled snapshot)", () => {
     const custom = {
       commodities: [{ name: "Quantanium", code: "QUAN", kind: "Mineral" }],
       terminals: [],
+      ships: [
+        {
+          name: "Hull C",
+          nameFull: "MISC Hull C",
+          company: "MISC",
+          slug: "hull-c",
+          scu: 4608,
+          gameVersion: "4.8",
+        },
+      ],
     };
     const ref = createUexClient({ snapshot: custom }).getReferenceData();
     expect(ref).toEqual(custom);
