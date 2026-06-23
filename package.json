@@ -1,6 +1,6 @@
 {
   "name": "sc-cargo-tracker",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Desktop companion for Star Citizen cargo hauling — log-driven mission tracking and by-dropoff unload aggregation.",
   "private": true,
   "author": "verdantnebula",
