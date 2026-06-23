@@ -108,6 +108,26 @@ describe("fuzzyMatch — noisy input", () => {
     const r = fuzzyMatch("Agricultural Supplie", COMMODITIES);
     expect(r.value).toBe("Agricultural Supplies");
   });
+
+  it("matches a station name against a Lagrange-PREFIXED reference entry", () => {
+    // The OCR parser strips the " at … Lagrange point" qualifier and feeds the
+    // bare station name, but the reference entries carry a Lagrange PREFIX
+    // (e.g. "L1 <name> Station"). The containment boost bridges that gap so the
+    // bare name still resolves to the prefixed reference entry. (Generic
+    // synthetic names mirroring the real "Green Glade"/"Melodic Fields" shape.)
+    const PREFIXED = [
+      "L1 Green Glade Station",
+      "L4 Melodic Fields Station",
+      "Everus Harbor",
+    ];
+    const a = fuzzyMatch("Green Glade Station", PREFIXED);
+    expect(a.value).toBe("L1 Green Glade Station");
+    expect(a.score).toBeGreaterThan(0.6);
+
+    const b = fuzzyMatch("Melodic Fields Station", PREFIXED);
+    expect(b.value).toBe("L4 Melodic Fields Station");
+    expect(b.score).toBeGreaterThan(0.6);
+  });
 });
 
 // ---------------------------------------------------------------------------

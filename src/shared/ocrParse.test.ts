@@ -214,6 +214,73 @@ describe("parseContractOcr — garbled / empty input", () => {
 // Multi-objective (single-to-multi haul) + full contract
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// REAL mobiGlas format (the canonical fixture this feature must handle)
+// ----------------------------------------------------------------------------
+// This is the ACTUAL raw text tesseract produced from a captured contract screen
+// (game data only — no personal info). It exercises the format the parser MUST
+// handle: fractional SCU ("0/46"), the aUEC glyph OCR'd as a stray "a", a pickup
+// line with NO "SCU of", destinations carrying an " at … Lagrange point"
+// qualifier, a stray trailing "j" speckle, and — critically — destination/
+// commodity names WRAPPED across lines ("Melodic Fields" + "Station").
+// ---------------------------------------------------------------------------
+
+describe("parseContractOcr — real mobiGlas contract format", () => {
+  const REAL_OCR = [
+    "Reward a 290,500",
+    "Contract Deadline N/A",
+    "Contracted B, Covalex Independent Contractors",
+    "PRIMARY OBJECTIVES",
+    "Deliver 0/46 SCU of Quantum Fuel to Green Glade Station j",
+    "at Hurstons L1 Lagrange point.",
+    "Collect Quantum Fuel from Everus Harbor.",
+    "Deliver 0/94 SCU of Hydrogen Fuel to Melodic Fields",
+    "Station at Hurstons L4 Lagrange point.",
+  ].join("\n");
+
+  it("extracts the reward despite the aUEC glyph reading as a stray 'a'", () => {
+    expect(parseContractOcr(REAL_OCR).reward).toBe(290500);
+  });
+
+  it("extracts both dropoffs (fractional SCU total, wrapped/qualified dest)", () => {
+    const out = parseContractOcr(REAL_OCR);
+    const dropoffs = out.objectives.filter((o) => o.kind === "dropoff");
+    expect(dropoffs).toHaveLength(2);
+
+    // SCU = the DENOMINATOR (contract total), not the delivered numerator.
+    // Lagrange qualifier dropped; wrapped "Melodic Fields" + "Station" rejoined;
+    // stray trailing "j" stripped from "Green Glade Station".
+    expect(dropoffs[0]).toEqual({
+      kind: "dropoff",
+      scu: 46,
+      commodity: "Quantum Fuel",
+      location: "Green Glade Station",
+    });
+    expect(dropoffs[1]).toEqual({
+      kind: "dropoff",
+      scu: 94,
+      commodity: "Hydrogen Fuel",
+      location: "Melodic Fields Station",
+    });
+  });
+
+  it("extracts the pickup line that has NO 'SCU of' wording", () => {
+    const out = parseContractOcr(REAL_OCR);
+    const pickups = out.objectives.filter((o) => o.kind === "pickup");
+    expect(pickups).toHaveLength(1);
+    expect(pickups[0]).toEqual({
+      kind: "pickup",
+      scu: null,
+      commodity: "Quantum Fuel",
+      location: "Everus Harbor",
+    });
+  });
+
+  it("recovers exactly 3 objectives total from the real screen", () => {
+    expect(parseContractOcr(REAL_OCR).objectives).toHaveLength(3);
+  });
+});
+
 describe("parseContractOcr — multi-objective contract", () => {
   it("parses several objectives and the reward from one screen", () => {
     const text = [

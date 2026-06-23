@@ -90,57 +90,171 @@ export function cleanOcrSpan(raw: string): string {
 // ---------------------------------------------------------------------------
 // Objective extraction
 // ---------------------------------------------------------------------------
+//
+// The REAL mobiGlas contract screen wraps objectives across MULTIPLE lines —
+// mid-sentence AND mid-name — e.g. a destination "Melodic Fields Station" is
+// split as "Melodic Fields" / "Station" on two lines, and a "… at Hurstons L4
+// Lagrange point" qualifier trails on its own line. Anchoring patterns to a
+// single line therefore drops or truncates objectives.
+//
+// STRATEGY: normalize the whole block to ONE continuous line first (newlines ->
+// spaces, runs of whitespace collapsed) so wrapped names rejoin, then split the
+// stream into objective spans on the verb keywords (Deliver / Collect / Pick up
+// / Acquire) — the next keyword (or end of text) bounds the previous span. Each
+// span is parsed independently, so OCR noise in one objective can't bleed into
+// the next.
+//
+// The two real shapes we must handle (plus the older synthetic shapes the unit
+// tests already exercise):
+//   dropoff:  "Deliver <delivered>/<total> SCU of <COMMODITY> to <DEST> [at … Lagrange point]."
+//   dropoff:  "Deliver <N> SCU of <COMMODITY> to <DEST>"                   (no fraction)
+//   pickup:   "Collect <COMMODITY> from <LOCATION>."                       (no "SCU of")
+//   pickup:   "Collect <N> SCU of <COMMODITY> from <LOCATION>"             (synthetic)
+//
+// For the SCU amount we take the DENOMINATOR of a "<delivered>/<total>" fraction
+// (the contract total), falling back to a plain number when there's no slash.
 
-// "Deliver <N> SCU of <commodity> to <location>"  (dropoff)
-// "Collect <N> SCU of <commodity> from <location>" (pickup)
-// Tolerances baked in:
-//   - leading verb may be OCR'd with case noise; we match case-insensitively.
-//   - "SCU" may read as "scu"/"5CU"/"SCU." — we accept a fuzzy unit token.
-//   - the number span is captured loosely then run through parseOcrNumber.
-//   - "of" / "to" / "from" connective words may have stray casing.
-// The commodity span is non-greedy up to the connective; the location span runs
-// to end-of-line. Each is post-cleaned with cleanOcrSpan.
-// The amount span (group 1) MUST start with a digit or a strong digit-confusion
-// char ([0-9OoQlI|]) — never with S/B — so the leading "S"/"5" of the "SCU" unit
-// can't be mis-read as the amount. The whole amount span is OPTIONAL, so a line
-// whose number was unreadable (e.g. "Deliver -- SCU of …") still matches with a
-// null amount instead of dropping the objective entirely. The unit token is
-// "[5S]?cu" so it absorbs an OCR'd "5CU"/"SCU".
-// Continuation chars after the first are LAZY (`*?`) and the unit is separated
-// by mandatory whitespace, so the amount can't greedily swallow the leading
-// "S" of "SCU". Thousands separators inside the number ("12,5OO") still match
-// because they precede the whitespace+unit.
-const AMOUNT = "([0-9OoQlI|][0-9OoQlI|SsB.,]*?)?";
-const DELIVER_RE = new RegExp(
-  `\\bdeliver\\b[^0-9a-z]*${AMOUNT}\\s*[5S]?cu\\b\\s*of\\s+(.+?)\\s+to\\s+(.+?)\\s*$`,
-  "gim",
+/** The verb that opens an objective, with OCR/case tolerance. */
+const VERB_RE = /\b(deliver|collect|pick\s*up|acquire)\b/gi;
+
+// Amount token: an optional "<num>/<num>" fraction OR a plain number, followed by
+// the (possibly OCR-garbled) "SCU of" unit+connective. The amount chars allow
+// the usual digit-confusion letters; we de-confuse via parseOcrNumber after.
+// Group 1 = numerator (when a fraction), group 2 = the number we keep (the
+// denominator of a fraction, or the lone number otherwise).
+//
+// Two layers of optionality:
+//   - the NUMBER inside the preamble is optional, so "Deliver -- SCU of …" (an
+//     unreadable amount) still anchors on "SCU of" and yields a null scu;
+//   - the WHOLE "<amount> SCU of" preamble is optional and falls back to a bare
+//     "of", so a "Collect <commodity> from …" (the real pickup wording, no unit)
+//     still matches with a null amount.
+const NUM = "[0-9OoQlI|][0-9OoQlI|SsB.,]*";
+// number?  SCU  of   (number optional; SCU + of required in this branch)
+const SCU_WITH_UNIT = `(?:(${NUM})\\s*/\\s*)?(${NUM})?\\s*[5S]?cu\\b\\s*of\\s+`;
+const SCU_PREAMBLE = `(?:${SCU_WITH_UNIT}|of\\s+)`;
+
+// dropoff: <preamble?> <commodity> to <dest>
+const DELIVER_BODY_RE = new RegExp(
+  `^\\s*deliver\\b[^0-9a-z]*${SCU_PREAMBLE}(.+?)\\s+to\\s+(.+?)\\s*$`,
+  "i",
 );
-const COLLECT_RE = new RegExp(
-  `\\b(?:collect|pick\\s*up|acquire)\\b[^0-9a-z]*${AMOUNT}\\s*[5S]?cu\\b\\s*of\\s+(.+?)\\s+from\\s+(.+?)\\s*$`,
-  "gim",
+// pickup WITH the "<n> SCU of" preamble (synthetic tests): Collect <n> SCU of <c> from <l>
+const COLLECT_SCU_RE = new RegExp(
+  `^\\s*(?:collect|pick\\s*up|acquire)\\b[^0-9a-z]*(?:(${NUM})\\s*/\\s*)?(${NUM})\\s*[5S]?cu\\b\\s*of\\s+(.+?)\\s+from\\s+(.+?)\\s*$`,
+  "i",
 );
+// pickup WITHOUT the unit (the real wording): Collect <commodity> from <location>
+const COLLECT_PLAIN_RE = new RegExp(
+  `^\\s*(?:collect|pick\\s*up|acquire)\\b[^0-9a-z]*(.+?)\\s+from\\s+(.+?)\\s*$`,
+  "i",
+);
+
+// Trailing non-objective section labels that may bleed into a destination span
+// once the screen is flattened to one line (the objective span runs until the
+// next objective VERB, so a final objective's dest can absorb the reward/box-size
+// block that follows it). Cutting here bounds the destination to the place name.
+const TRAILING_SECTION_RE =
+  /\s+(?:max\s*box\s*size|box\s*size|container\s*size|reward|payout|contract\s*deadline|contracted|primary\s*objectives|deadline)\b.*$/i;
 
 /**
- * Pull every objective line out of the OCR text. Runs both the deliver and
- * collect patterns line-by-line (the `m` flag anchors `$` per line). Objectives
- * with an empty commodity AND empty location after cleaning are dropped (pure
- * noise). Order of appearance is preserved.
+ * Trim a destination/location span read after "to"/"from":
+ *   - drop an " at … Lagrange point" qualifier (the fuzzy matcher keys off the
+ *     station name, not the Lagrange suffix),
+ *   - cut a trailing non-objective section label (Reward, Max Box Size, …) that
+ *     bled in after line-flattening,
+ *   - cut at a trailing period (the screen ends the sentence there),
+ *   - strip a lone trailing stray OCR token (e.g. the spurious "j" after
+ *     "Green Glade Station").
+ * cleanOcrSpan handles the residual edge punctuation/whitespace.
+ */
+function trimDestination(raw: string): string {
+  let s = raw;
+  // Cut an " at … Lagrange point" qualifier (case-insensitive).
+  s = s.replace(/\s+at\s+.*?lagrange\s+point.*$/i, "");
+  // Cut a trailing non-objective section that flattened in after the place name.
+  s = s.replace(TRAILING_SECTION_RE, "");
+  // Cut at the first sentence-ending period (the screen ends a sentence there).
+  const dot = s.indexOf(".");
+  if (dot >= 0) s = s.slice(0, dot);
+  s = cleanOcrSpan(s);
+  // Strip a lone trailing stray single-letter token (OCR speckle), e.g. "… j".
+  s = s.replace(/\s+[a-z]$/i, "");
+  return cleanOcrSpan(s);
+}
+
+/**
+ * Pick the kept SCU amount from a fraction's denominator (group `total`) or a
+ * lone number. parseOcrNumber de-confuses OCR letter/digit swaps and strips
+ * separators; returns null when nothing digit-like survives.
+ */
+function pickScu(total: string | undefined): number | null {
+  return parseOcrNumber(total ?? "");
+}
+
+/**
+ * Parse a single objective span (already verb-led, single-line) into an
+ * OcrObjective, or null if it doesn't match any known shape.
+ */
+function parseObjectiveSpan(span: string): OcrObjective | null {
+  // Dropoff first ("Deliver … to …").
+  const d = DELIVER_BODY_RE.exec(span);
+  if (d) {
+    const commodity = cleanOcrSpan(d[3] ?? "");
+    const location = trimDestination(d[4] ?? "");
+    if (commodity.length === 0 && location.length === 0) return null;
+    return { kind: "dropoff", scu: pickScu(d[2]), commodity, location };
+  }
+  // Pickup with explicit "<n> SCU of" (synthetic form).
+  const cs = COLLECT_SCU_RE.exec(span);
+  if (cs) {
+    const commodity = cleanOcrSpan(cs[3] ?? "");
+    const location = trimDestination(cs[4] ?? "");
+    if (commodity.length === 0 && location.length === 0) return null;
+    return { kind: "pickup", scu: pickScu(cs[2]), commodity, location };
+  }
+  // Pickup without the unit (the real "Collect <commodity> from <location>").
+  const cp = COLLECT_PLAIN_RE.exec(span);
+  if (cp) {
+    const commodity = cleanOcrSpan(cp[1] ?? "");
+    const location = trimDestination(cp[2] ?? "");
+    if (commodity.length === 0 && location.length === 0) return null;
+    return { kind: "pickup", scu: null, commodity, location };
+  }
+  return null;
+}
+
+/**
+ * Pull every objective out of the OCR text. Normalizes the whole block to one
+ * continuous line (rejoining names/sentences wrapped across lines), then splits
+ * it into verb-led spans (the next verb keyword bounds the previous span) and
+ * parses each span independently. Objectives with empty commodity AND location
+ * after cleaning are dropped (pure noise). Order of appearance is preserved.
  */
 function extractObjectives(text: string): OcrObjective[] {
+  // Normalize first: collapse newlines + multiple spaces into single spaces so a
+  // destination/commodity wrapped across lines rejoins ("Melodic Fields" +
+  // "Station" -> "Melodic Fields Station").
+  const flat = text.replace(/\s+/g, " ").trim();
+
+  // Find every objective-verb start; the span runs to the next verb (or EOT).
+  VERB_RE.lastIndex = 0;
+  const starts: number[] = [];
+  let vm: RegExpExecArray | null;
+  while ((vm = VERB_RE.exec(flat)) !== null) {
+    starts.push(vm.index);
+    // Guard against a zero-width match looping forever.
+    if (vm.index === VERB_RE.lastIndex) VERB_RE.lastIndex++;
+  }
+
   const out: OcrObjective[] = [];
-  const push = (kind: OcrObjective["kind"], re: RegExp): void => {
-    re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      const scu = parseOcrNumber(m[1] ?? "");
-      const commodity = cleanOcrSpan(m[2] ?? "");
-      const location = cleanOcrSpan(m[3] ?? "");
-      if (commodity.length === 0 && location.length === 0) continue;
-      out.push({ kind, scu, commodity, location });
-    }
-  };
-  push("dropoff", DELIVER_RE);
-  push("pickup", COLLECT_RE);
+  for (let i = 0; i < starts.length; i++) {
+    const begin = starts[i];
+    const end = i + 1 < starts.length ? starts[i + 1] : flat.length;
+    const span = flat.slice(begin, end).trim();
+    const obj = parseObjectiveSpan(span);
+    if (obj) out.push(obj);
+  }
   return out;
 }
 
@@ -153,8 +267,14 @@ function extractObjectives(text: string): OcrObjective[] {
 // being dropped/garbled) and read the number immediately before it. We also
 // accept a "Reward"/"Payout" label preceding a number when the unit is missing.
 const REWARD_UNIT_RE = /([0-9OoQlI|SsB.,\s]{2,})\s*a?[\s.]*uec\b/gim;
+// Label fallback. On the real screen the aUEC glyph OCRs as junk so there's no
+// unit to anchor on — e.g. "Reward a 290,500" reads a stray "a" where the
+// currency symbol was. We therefore tolerate a SHORT run of stray non-digit
+// gap chars (whitespace, punctuation, 1-2 stray letters) between the label and
+// the number, instead of just an optional colon/period. The gap is bounded
+// ([^0-9\n]{0,6}) so it can't leap across unrelated text to a distant number.
 const REWARD_LABEL_RE =
-  /\b(?:reward|payout|pay)\b\s*[:.\-]?\s*([0-9OoQlI|SsB.,]{2,})/gim;
+  /\b(?:reward|payout|pay)\b[^0-9\n]{0,6}?([0-9OoQlI|SsB.,]{2,})/gim;
 
 /**
  * Find the contract reward. Prefers the strongest signal: a number directly
