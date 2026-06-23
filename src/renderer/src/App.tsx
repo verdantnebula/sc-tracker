@@ -522,6 +522,7 @@ function CargoApp({
               currentLocation={currentLocation}
               gap={gap}
               dropoffs={groups}
+              shipCapacity={selectedShip?.scu ?? null}
               onCheckOffPickup={checkOffPickup}
               onCheckOffDropoff={checkOffLine}
             />

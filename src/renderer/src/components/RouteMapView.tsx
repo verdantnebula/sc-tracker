@@ -44,8 +44,11 @@ export function mapNodeHeight(isSink: boolean, incomingCount: number): number {
 
 export function RouteMapView({
   edges,
+  visitOrder,
 }: {
   edges: RouteEdge[];
+  /** Optional location -> 1-based visit number; when set, nodes are badged. */
+  visitOrder?: Map<string, number>;
 }): React.JSX.Element {
   const { nodes, height } = useMemo(() => buildLayout(edges), [edges]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -98,7 +101,7 @@ export function RouteMapView({
 
         {/* Nodes (drop-off cards carry their incoming-cargo lines). */}
         {nodes.map((n) => (
-          <NodeBox key={n.id} node={n} />
+          <NodeBox key={n.id} node={n} visit={visitOrder?.get(n.id)} />
         ))}
       </svg>
 
@@ -199,7 +202,14 @@ function buildLayout(edges: RouteEdge[]): { nodes: MapNode[]; height: number } {
   return { nodes, height };
 }
 
-function NodeBox({ node }: { node: MapNode }): React.JSX.Element {
+function NodeBox({
+  node,
+  visit,
+}: {
+  node: MapNode;
+  /** 1-based visit number when route optimization is on; undefined otherwise. */
+  visit?: number;
+}): React.JSX.Element {
   const roleParts: React.JSX.Element[] = [];
   if (node.isSource)
     roleParts.push(
@@ -243,9 +253,33 @@ function NodeBox({ node }: { node: MapNode }): React.JSX.Element {
         height={node.h}
         rx={6}
         fill="var(--window)"
-        stroke="var(--border-strong)"
+        stroke={visit != null ? "var(--primary)" : "var(--border-strong)"}
         strokeWidth={1}
       />
+      {/* Visit-order badge (top-left), shown only when optimization is on. */}
+      {visit != null && (
+        <g>
+          <circle
+            cx={node.x + 14}
+            cy={node.y + 14}
+            r={9}
+            fill="var(--window)"
+            stroke="var(--primary)"
+            strokeWidth={1.4}
+          />
+          <text
+            x={node.x + 14}
+            y={node.y + 18}
+            textAnchor="middle"
+            fontFamily="var(--font-mono)"
+            fontSize={10}
+            fontWeight={700}
+            fill="var(--primary)"
+          >
+            {visit}
+          </text>
+        </g>
+      )}
       <text
         x={node.x + NODE_W / 2}
         y={node.y + 20}
