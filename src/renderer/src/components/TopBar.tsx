@@ -72,7 +72,10 @@ export function TopBar({
       {/* Top-left Cargo<->Salvage switcher (replaces the static diamond+wordmark) */}
       <ModeSwitcher mode="cargo" onToggle={onToggleMode} />
 
-      {/* Location chip */}
+      {/* Location chip — must stay one line. flexShrink:0 keeps it sizing to
+          content (the SHIP picker after it must not squeeze it), and the value
+          span uses nowrap + ellipsis so a long location id (e.g. RR-MIC-LEO)
+          never wraps onto multiple lines inside the chip. */}
       <div
         style={{
           display: "flex",
@@ -81,6 +84,7 @@ export function TopBar({
           padding: "6px 12px",
           border: "1px solid rgba(86,180,200,0.22)",
           background: "rgba(52,224,224,0.06)",
+          flexShrink: 0,
         }}
       >
         <span
@@ -90,6 +94,7 @@ export function TopBar({
             fontSize: 10,
             color: "var(--muted)",
             letterSpacing: 1.5,
+            flex: "none",
           }}
         >
           LOCATION
@@ -99,6 +104,9 @@ export function TopBar({
             fontFamily: "var(--font-mono)",
             fontSize: 13,
             color: "var(--primary)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {currentLocation ?? "—"}

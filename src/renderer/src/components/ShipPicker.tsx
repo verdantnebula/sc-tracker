@@ -80,7 +80,7 @@ export function ShipPicker({
         padding: "6px 12px",
         border: "1px solid var(--border-strong)",
         background: "rgba(52,224,224,0.06)",
-        minWidth: 0,
+        flexShrink: 0,
       }}
     >
       <span
