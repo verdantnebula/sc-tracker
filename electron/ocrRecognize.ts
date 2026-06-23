@@ -39,6 +39,28 @@ export interface OcrRecognizeResult {
   confidence: number;
 }
 
+/**
+ * Tesseract page-segmentation modes we use. The user crops to just the objective
+ * lines + reward, so the input is a tight text region:
+ *   - PSM 6  : "Assume a single uniform block of text" — the default for a crop
+ *              of the objectives list; treats it as flowing lines (best general
+ *              choice for the "Deliver … SCU …" block).
+ *   - PSM 11 : "Sparse text — find as much text as possible in no particular
+ *              order" — a fallback when the crop is loosely laid out / the block
+ *              assumption hurts. Exposed so the renderer can retry.
+ * (Values are tesseract's own PSM enum numbers, passed as strings to setParameters.)
+ */
+export type OcrPsm = "6" | "11";
+
+/**
+ * Character whitelist for the contract crop. The objectives/reward use only
+ * letters, digits, spaces, and a small punctuation set ("/" for fractions like
+ * "1/2", commas/periods in numbers, "-" and ":" in labels). Restricting the
+ * alphabet stops tesseract inventing glyphs from the stylized font's flourishes.
+ */
+export const OCR_CHAR_WHITELIST =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /,.-:";
+
 /** The minimal slice of Electron `app` this module needs (so it's unit-testable). */
 export interface AppPathInfo {
   /** True in the packaged app (assets are inside app.asar / unpacked beside it). */
@@ -81,13 +103,21 @@ export function ocrAssetDir(info: AppPathInfo): string {
  * every asset resolved from the local disk directory `assetDir`. Always
  * terminates the worker (even on error) so a failed run can't leak it.
  *
- * @param imageDataUrl a `data:image/png;base64,…` frame from desktopCapturer.
+ * The image is expected to be a PREPROCESSED crop (the renderer upscales,
+ * grayscales, and binarizes the user's selection before sending it here), so we
+ * tune tesseract for a tight text block: a page-segmentation mode (default PSM 6,
+ * a single uniform block) and a character whitelist that stops the stylized font
+ * producing junk glyphs.
+ *
+ * @param imageDataUrl a `data:image/png;base64,…` preprocessed crop.
  * @param assetDir     directory holding eng.traineddata.gz + the core/worker
  *                     assets (from {@link ocrAssetDir}).
+ * @param psm          page-segmentation mode (default "6" = single uniform block).
  */
 export async function recognize(
   imageDataUrl: string,
   assetDir: string,
+  psm: OcrPsm = "6",
 ): Promise<OcrRecognizeResult> {
   if (typeof imageDataUrl !== "string" || imageDataUrl.length === 0) {
     throw new Error("No image to recognize.");
@@ -109,6 +139,15 @@ export async function recognize(
   });
 
   try {
+    // Tune for a cropped text block. tessedit_pageseg_mode picks the segmentation
+    // strategy; the whitelist constrains the alphabet to what a contract uses.
+    // PSM enum values ARE the strings "6"/"11", so map straight onto the enum.
+    const pageSegMode =
+      psm === "11" ? Tesseract.PSM.SPARSE_TEXT : Tesseract.PSM.SINGLE_BLOCK;
+    await worker.setParameters({
+      tessedit_pageseg_mode: pageSegMode,
+      tessedit_char_whitelist: OCR_CHAR_WHITELIST,
+    });
     const { data } = await worker.recognize(imageDataUrl);
     const rawText = data.text ?? "";
     const confidence =

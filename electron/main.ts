@@ -889,7 +889,11 @@ function registerIpc(): void {
   // instead of throwing into the renderer. The image is consumed in-memory only.
   ipcMain.handle(
     IPC.OCR_RECOGNIZE,
-    async (_e, imageDataUrl: string): Promise<OcrRecognizeResult> => {
+    async (
+      _e,
+      imageDataUrl: string,
+      psm?: "6" | "11",
+    ): Promise<OcrRecognizeResult> => {
       if (!settings.ocrEnabled) {
         return {
           outcome: "error",
@@ -905,6 +909,7 @@ function registerIpc(): void {
         const { rawText, confidence } = await recognizeOcr(
           imageDataUrl,
           assetDir,
+          psm === "11" ? "11" : "6",
         );
         return { outcome: "ok", rawText, confidence };
       } catch (err) {

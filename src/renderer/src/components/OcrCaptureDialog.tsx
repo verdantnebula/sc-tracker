@@ -3,10 +3,20 @@
 // ----------------------------------------------------------------------------
 // Opt-in fallback for when the game suppressed the New Objective log line. Flow:
 //
-//   capture (main desktopCapturer) -> OCR (tesseract.js, renderer)
+//   capture FULL screen at native res (main desktopCapturer)
+//     -> CROP: user drags a box around the objectives + reward on a scaled
+//        preview, confirms "Read selection"
+//     -> PREPROCESS the crop in a <canvas>: upscale ~3x, grayscale, threshold +
+//        invert (dark text on light, which tesseract prefers)
+//     -> OCR the processed crop (tesseract.js, MAIN process; PSM 6 + whitelist)
 //     -> parse (pure parseContractOcr) -> fuzzy-match commodity/location
 //     -> REVIEW: user confirms/corrects every field + picks the target mission
 //     -> APPLY via window.api.updateMission (the existing, audited path)
+//
+// WHY MANUAL CROP + PREPROCESS: OCR'ing the full busy frame returned gibberish —
+// the small stylized mobiGlas text was lost in the scene. Cropping to just the
+// contract text and feeding tesseract a large, high-contrast binarized image is
+// the difference between noise and a usable read.
 //
 // HARD RULES (defensive by construction):
 //   - NEVER auto-applies. Apply is a deliberate button after review.
@@ -20,9 +30,17 @@
 // a top-level entry; the target mission can be preselected by the caller.
 // ============================================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Mission, ReferenceData, MissionPatch } from "@shared/types";
 import { fuzzyMatch } from "@shared/ocrMatch";
+import {
+  mapSelectionToSource,
+  luminance,
+  thresholdInvert,
+  OCR_PREPROCESS_DEFAULTS,
+  type Rect,
+} from "@shared/ocrPreprocess";
+import { pickDefaultTarget } from "../lib/selectors";
 import { recognizeContract } from "../lib/ocrRunner";
 
 /** A reviewable objective row: the OCR'd + fuzzy-matched values, all editable. */
@@ -39,6 +57,14 @@ interface ReviewObjective {
 type Phase =
   | { kind: "idle" }
   | { kind: "capturing" }
+  /** Screenshot in hand; user drags a selection box over the scaled preview. */
+  | {
+      kind: "cropping";
+      dataUrl: string;
+      /** True source pixel dimensions of the captured frame. */
+      sourceWidth: number;
+      sourceHeight: number;
+    }
   | { kind: "recognizing" }
   | { kind: "review"; confidence: number; rawText: string }
   | { kind: "applied" }
@@ -61,8 +87,10 @@ export function OcrCaptureDialog({
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [objectives, setObjectives] = useState<ReviewObjective[]>([]);
   const [reward, setReward] = useState<number | null>(null);
-  const [targetId, setTargetId] = useState<string | null>(
-    initialMissionId ?? missions[0]?.id ?? null,
+  // Auto-select the mission that needs OCR (most-recent "details missing"),
+  // unless the caller preselected one. The user can still change it.
+  const [targetId, setTargetId] = useState<string | null>(() =>
+    pickDefaultTarget(missions, initialMissionId),
   );
   const [showRaw, setShowRaw] = useState(false);
 
@@ -77,13 +105,25 @@ export function OcrCaptureDialog({
     [reference.terminals],
   );
 
+  // The full-resolution screenshot, held in memory only (an offscreen <img> used
+  // as the canvas crop source). Cleared on unmount; never persisted.
+  const sourceImgRef = useRef<HTMLImageElement | null>(null);
+
   // Kick off capture immediately on mount — the user already opted in by opening
   // the dialog. (No auto-apply; this only READS the screen.)
   useEffect(() => {
     void runCapture();
+    return () => {
+      sourceImgRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * STEP 1: grab the full screen at native resolution and move to the crop step.
+   * We decode the PNG into an offscreen <img> so the crop canvas has a pixel
+   * source, and read its true dimensions for the selection -> source mapping.
+   */
   async function runCapture(): Promise<void> {
     setPhase({ kind: "capturing" });
     try {
@@ -95,8 +135,60 @@ export function OcrCaptureDialog({
         });
         return;
       }
-      setPhase({ kind: "recognizing" });
-      const result = await recognizeContract(cap.dataUrl);
+      const img = await loadImage(cap.dataUrl);
+      sourceImgRef.current = img;
+      setPhase({
+        kind: "cropping",
+        dataUrl: cap.dataUrl,
+        sourceWidth: img.naturalWidth,
+        sourceHeight: img.naturalHeight,
+      });
+    } catch (err) {
+      setPhase({
+        kind: "error",
+        message:
+          "Screen capture failed. " +
+          String(err instanceof Error ? err.message : err),
+      });
+    }
+  }
+
+  /**
+   * STEP 2-4: given the user's selection (in displayed/CSS-pixel space) and the
+   * displayed image size, map it to source pixels, crop + preprocess via canvas
+   * (upscale, grayscale, threshold+invert), then OCR the processed crop and run
+   * the pure parser + fuzzy matcher. PSM defaults to "6" (uniform block).
+   */
+  async function recognizeSelection(
+    selection: Rect,
+    displayWidth: number,
+    displayHeight: number,
+    psm: "6" | "11" = "6",
+  ): Promise<void> {
+    const img = sourceImgRef.current;
+    if (!img) {
+      setPhase({ kind: "error", message: "No captured image to read." });
+      return;
+    }
+    const srcRect = mapSelectionToSource(
+      selection,
+      displayWidth,
+      displayHeight,
+      img.naturalWidth,
+      img.naturalHeight,
+    );
+    if (srcRect.width <= 0 || srcRect.height <= 0) {
+      setPhase({
+        kind: "error",
+        message: "Selection was empty. Drag a box around the objectives.",
+      });
+      return;
+    }
+
+    setPhase({ kind: "recognizing" });
+    try {
+      const processed = preprocessCrop(img, srcRect);
+      const result = await recognizeContract(processed, psm);
 
       // Fuzzy-match each OCR'd objective against the bundled reference. The raw
       // span is the fallback when no candidate clears the threshold, so the user
@@ -206,7 +298,9 @@ export function OcrCaptureDialog({
           left: "50%",
           transform: "translate(-50%, -50%)",
           zIndex: 51,
-          width: 600,
+          // Wider during the crop step so the screenshot preview is large enough
+          // to drag an accurate selection box.
+          width: phase.kind === "cropping" ? 900 : 600,
           maxWidth: "calc(100vw - 48px)",
           maxHeight: "calc(100vh - 64px)",
           overflowY: "auto",
@@ -259,8 +353,10 @@ export function OcrCaptureDialog({
           }}
         >
           Reads your mobiGlas contract screen to recover details the game didn’t
-          write to the log. OCR can misread the stylized font — check every
-          field below before applying. Nothing is changed until you press Apply.
+          write to the log. Drag a box around the “Deliver … SCU …” objectives
+          and the aUEC reward, then read the selection. OCR can misread the
+          stylized font — check every field before applying. Nothing is changed
+          until you press Apply.
         </p>
 
         {(phase.kind === "capturing" || phase.kind === "recognizing") && (
@@ -275,8 +371,19 @@ export function OcrCaptureDialog({
           >
             {phase.kind === "capturing"
               ? "Capturing the screen…"
-              : "Reading the contract (OCR)…"}
+              : "Preprocessing + reading the selection (OCR)…"}
           </div>
+        )}
+
+        {phase.kind === "cropping" && (
+          <CropStep
+            dataUrl={phase.dataUrl}
+            sourceWidth={phase.sourceWidth}
+            sourceHeight={phase.sourceHeight}
+            onConfirm={(sel, dispW, dispH) =>
+              void recognizeSelection(sel, dispW, dispH)
+            }
+          />
         )}
 
         {phase.kind === "error" && (
@@ -352,6 +459,230 @@ export function OcrCaptureDialog({
       </div>
     </>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Image helpers — capture decode + canvas crop/preprocess (renderer-only)
+// ---------------------------------------------------------------------------
+
+/** Decode a PNG data URL into an <img> (resolves once it has real dimensions). */
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not decode the screenshot."));
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Crop `srcRect` (in source pixels) from `img` and preprocess it for OCR:
+ *   1. draw the crop upscaled ~3x (small glyphs -> large, readable),
+ *   2. grayscale via perceptual luminance,
+ *   3. threshold + invert -> dark text on light (what tesseract reads best).
+ * Returns a PNG data URL. The only non-pure step (canvas getImageData) lives
+ * here; the per-pixel math is the pure {@link luminance}/{@link thresholdInvert}.
+ *
+ * Defensive: throws a readable error if a 2D context can't be obtained, which the
+ * caller turns into an on-screen message (the app never crashes).
+ */
+function preprocessCrop(img: HTMLImageElement, srcRect: Rect): string {
+  const { scale, threshold } = OCR_PREPROCESS_DEFAULTS;
+  const outW = Math.max(1, Math.round(srcRect.width * scale));
+  const outH = Math.max(1, Math.round(srcRect.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas 2D context unavailable for preprocessing.");
+
+  // Draw the cropped source region scaled up to the full canvas.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(
+    img,
+    srcRect.x,
+    srcRect.y,
+    srcRect.width,
+    srcRect.height,
+    0,
+    0,
+    outW,
+    outH,
+  );
+
+  // Grayscale + threshold + invert, in place.
+  const image = ctx.getImageData(0, 0, outW, outH);
+  const px = image.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const lum = luminance(px[i], px[i + 1], px[i + 2]);
+    const v = thresholdInvert(lum, threshold);
+    px[i] = v;
+    px[i + 1] = v;
+    px[i + 2] = v;
+    px[i + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+
+  return canvas.toDataURL("image/png");
+}
+
+// ---------------------------------------------------------------------------
+// Crop step — scaled screenshot preview + drag-to-select rectangle overlay
+// ---------------------------------------------------------------------------
+
+function CropStep({
+  dataUrl,
+  sourceWidth,
+  sourceHeight,
+  onConfirm,
+}: {
+  dataUrl: string;
+  sourceWidth: number;
+  sourceHeight: number;
+  /** Called with the selection (CSS px) + the displayed image size (CSS px). */
+  onConfirm: (sel: Rect, displayWidth: number, displayHeight: number) => void;
+}): React.JSX.Element {
+  const imgWrapRef = useRef<HTMLDivElement | null>(null);
+  // Selection rect in DISPLAYED (CSS-pixel) coordinates relative to the image.
+  const [sel, setSel] = useState<Rect | null>(null);
+  const dragging = useRef<{ startX: number; startY: number } | null>(null);
+
+  // The displayed image scales to fit a max width; height follows aspect ratio.
+  // We read the actual rendered size at confirm time from the element rect, so
+  // the selection -> source mapping uses the true on-screen dimensions.
+  function localPoint(e: React.MouseEvent): { x: number; y: number } {
+    const el = imgWrapRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    return {
+      x: clampNum(e.clientX - r.left, 0, r.width),
+      y: clampNum(e.clientY - r.top, 0, r.height),
+    };
+  }
+
+  function onMouseDown(e: React.MouseEvent): void {
+    e.preventDefault();
+    const p = localPoint(e);
+    dragging.current = { startX: p.x, startY: p.y };
+    setSel({ x: p.x, y: p.y, width: 0, height: 0 });
+  }
+  function onMouseMove(e: React.MouseEvent): void {
+    if (!dragging.current) return;
+    const p = localPoint(e);
+    const { startX, startY } = dragging.current;
+    setSel({
+      x: Math.min(startX, p.x),
+      y: Math.min(startY, p.y),
+      width: Math.abs(p.x - startX),
+      height: Math.abs(p.y - startY),
+    });
+  }
+  function endDrag(): void {
+    dragging.current = null;
+  }
+
+  const hasSelection = sel !== null && sel.width > 4 && sel.height > 4;
+
+  function confirm(): void {
+    const el = imgWrapRef.current;
+    if (!el || !sel) return;
+    const r = el.getBoundingClientRect();
+    onConfirm(sel, r.width, r.height);
+  }
+
+  return (
+    <div style={{ margin: "4px 0 2px" }}>
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 11,
+          letterSpacing: 0.5,
+          color: "var(--text-2)",
+          marginBottom: 8,
+        }}
+      >
+        Drag a box around the objectives + reward, then “Read selection”.
+        Captured at {sourceWidth}×{sourceHeight}px.
+      </div>
+      <div
+        ref={imgWrapRef}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        style={{
+          position: "relative",
+          display: "block",
+          width: "100%",
+          maxHeight: "55vh",
+          overflow: "hidden",
+          border: "1px solid var(--border-strong)",
+          cursor: "crosshair",
+          userSelect: "none",
+          lineHeight: 0,
+        }}
+      >
+        <img
+          src={dataUrl}
+          alt="Captured screen — drag to select the contract region"
+          draggable={false}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "auto",
+            pointerEvents: "none",
+          }}
+        />
+        {sel && (sel.width > 0 || sel.height > 0) && (
+          <div
+            style={{
+              position: "absolute",
+              left: sel.x,
+              top: sel.y,
+              width: sel.width,
+              height: sel.height,
+              border: "2px solid var(--primary)",
+              background: "rgba(0, 200, 220, 0.12)",
+              pointerEvents: "none",
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+            }}
+          />
+        )}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+          marginTop: 12,
+        }}
+      >
+        <button
+          className="sc-ghost-btn"
+          onClick={() => setSel(null)}
+          disabled={!hasSelection}
+          style={ghostBtn(hasSelection)}
+        >
+          Clear selection
+        </button>
+        <button
+          className="sc-primary-btn"
+          onClick={confirm}
+          disabled={!hasSelection}
+          style={primaryBtn(hasSelection)}
+        >
+          READ SELECTION
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Clamp `n` into [lo, hi] (local mouse-coordinate helper). */
+function clampNum(n: number, lo: number, hi: number): number {
+  return n < lo ? lo : n > hi ? hi : n;
 }
 
 // ---------------------------------------------------------------------------

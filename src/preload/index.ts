@@ -92,10 +92,11 @@ const api: ApiBridge = {
     ) as Promise<boolean>,
   captureScreenForOcr: () =>
     ipcRenderer.invoke(IPC.OCR_CAPTURE_SCREEN) as Promise<OcrCaptureResult>,
-  recognizeOcr: (imageDataUrl: string) =>
+  recognizeOcr: (imageDataUrl: string, psm?: "6" | "11") =>
     ipcRenderer.invoke(
       IPC.OCR_RECOGNIZE,
       imageDataUrl,
+      psm,
     ) as Promise<OcrRecognizeResult>,
 
   // --- overlay window (Phase D) ---

@@ -144,9 +144,13 @@ export interface IpcRequestMap {
   };
   /** Capture the primary display as a PNG data URL for OCR (Phase F). */
   [IPC.OCR_CAPTURE_SCREEN]: { args: []; result: OcrCaptureResult };
-  /** Run tesseract.js OCR (in main) over a captured PNG data URL (Phase F). */
+  /**
+   * Run tesseract.js OCR (in main) over a PREPROCESSED crop PNG data URL
+   * (Phase F). Optional `psm` selects the page-segmentation mode ("6" uniform
+   * block, default; "11" sparse) so the renderer can retry a loose layout.
+   */
   [IPC.OCR_RECOGNIZE]: {
-    args: [imageDataUrl: string];
+    args: [imageDataUrl: string, psm?: "6" | "11"];
     result: OcrRecognizeResult;
   };
 
@@ -260,8 +264,14 @@ export interface ApiBridge {
   setOcrEnabled(enabled: boolean): Promise<boolean>;
   /** Capture the primary display as a PNG data URL for the OCR pipeline. */
   captureScreenForOcr(): Promise<OcrCaptureResult>;
-  /** Run OCR (in main) over a captured PNG data URL; resolves text + confidence. */
-  recognizeOcr(imageDataUrl: string): Promise<OcrRecognizeResult>;
+  /**
+   * Run OCR (in main) over a PREPROCESSED crop PNG data URL; resolves text +
+   * confidence. Optional `psm` selects the page-segmentation mode (default "6").
+   */
+  recognizeOcr(
+    imageDataUrl: string,
+    psm?: "6" | "11",
+  ): Promise<OcrRecognizeResult>;
 
   // --- overlay window (Phase D) ---
   /** Toggle the always-on-top overlay open/closed; resolves to the new state. */

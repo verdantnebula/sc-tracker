@@ -26,20 +26,24 @@ export interface OcrRunResult {
 }
 
 /**
- * Run OCR on a PNG/JPEG data URL (from the main-process screen capture) and
- * parse the recognized text into contract fields. Delegates recognition to the
- * main process (window.api.recognizeOcr); the parse runs here.
+ * Run OCR on a PREPROCESSED crop PNG data URL (the dialog upscales + binarizes
+ * the user's selection before calling this) and parse the recognized text into
+ * contract fields. Delegates recognition to the main process
+ * (window.api.recognizeOcr); the parse runs here.
  *
- * @param imageDataUrl a `data:image/png;base64,…` frame.
+ * @param imageDataUrl a `data:image/png;base64,…` preprocessed crop.
+ * @param psm          optional page-segmentation mode ("6" uniform block default,
+ *                     "11" sparse) forwarded to the main-process tesseract pass.
  */
 export async function recognizeContract(
   imageDataUrl: string,
+  psm?: "6" | "11",
 ): Promise<OcrRunResult> {
   if (typeof imageDataUrl !== "string" || imageDataUrl.length === 0) {
     throw new Error("No image to recognize.");
   }
 
-  const result = await window.api.recognizeOcr(imageDataUrl);
+  const result = await window.api.recognizeOcr(imageDataUrl, psm);
   if (result.outcome !== "ok") {
     throw new Error(result.error ?? "OCR failed.");
   }
