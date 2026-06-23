@@ -32,6 +32,7 @@ import { ManualEntryForm } from "./components/ManualEntryForm";
 import { BackfillOverlay } from "./components/BackfillOverlay";
 import { EmptyState } from "./components/EmptyState";
 import { CollectLogsDialog } from "./components/CollectLogsDialog";
+import { OcrCaptureDialog } from "./components/OcrCaptureDialog";
 
 import {
   dropoffGroups,
@@ -115,12 +116,20 @@ function CargoApp({
   // Read on mount and kept in sync via onOverlayStateChanged so the pin button
   // reflects the overlay closing itself via its own unpin control.
   const [overlayEnabled, setOverlayEnabled] = useState(false);
+  // EXPERIMENTAL OCR contract capture (Phase F). Opt-in; default false. When off
+  // the capture entry point is hidden. Read on mount; toggled from the gear panel.
+  const [ocrEnabled, setOcrEnabled] = useState(false);
 
   // --- local UI state ---
   const [tab, setTab] = useState<TabKey>("dropoff");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showCollectLogs, setShowCollectLogs] = useState(false);
+  // When set, the OCR capture/review dialog is open targeting this mission id
+  // (null = no preselection; the dialog defaults to the first active mission).
+  const [ocrCaptureFor, setOcrCaptureFor] = useState<{
+    missionId: string | null;
+  } | null>(null);
   const [density, setDensity] = useState<"comfortable" | "compact">(
     "comfortable",
   );
@@ -141,6 +150,7 @@ function CargoApp({
     void api.getCurrentLocation().then(setCurrentLocation);
     void api.getSelectedShip().then(setSelectedShipSlug);
     void api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
+    void api.getOcrEnabled().then(setOcrEnabled);
 
     const unsubs = [
       api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
@@ -352,6 +362,16 @@ function CargoApp({
     void window.api.toggleOverlay().then((s) => setOverlayEnabled(s.enabled));
   };
 
+  // Toggle the EXPERIMENTAL OCR contract-capture feature (Phase F). Persists via
+  // settings; when turned off, also close any open capture dialog so the hidden
+  // entry point can't linger. Optimistic + confirmed by the saved value.
+  const toggleOcr = (): void => {
+    const next = !ocrEnabled;
+    setOcrEnabled(next);
+    if (!next) setOcrCaptureFor(null);
+    void window.api.setOcrEnabled(next).then(setOcrEnabled);
+  };
+
   const clearActive = (): void => {
     const n = activeMissions.length;
     const ok = window.confirm(
@@ -417,6 +437,9 @@ function CargoApp({
         onToggleMode={onToggleMode}
         overlayEnabled={overlayEnabled}
         onToggleOverlay={toggleOverlay}
+        ocrEnabled={ocrEnabled}
+        onToggleOcr={toggleOcr}
+        onOcrCapture={() => setOcrCaptureFor({ missionId: null })}
       />
 
       {/* Log-not-found warning strip — full width, directly under the TopBar and
@@ -588,6 +611,18 @@ function CargoApp({
         {/* Collect Logs / Report a Problem dialog */}
         {showCollectLogs && (
           <CollectLogsDialog onClose={() => setShowCollectLogs(false)} />
+        )}
+
+        {/* EXPERIMENTAL OCR contract capture + review dialog (Phase F). Only
+            reachable when ocrEnabled (the entry points are gated), and it never
+            writes to a mission until the user confirms in its review step. */}
+        {ocrEnabled && ocrCaptureFor && (
+          <OcrCaptureDialog
+            missions={activeMissions}
+            reference={reference}
+            initialMissionId={ocrCaptureFor.missionId}
+            onClose={() => setOcrCaptureFor(null)}
+          />
         )}
 
         {/* backfill overlay */}

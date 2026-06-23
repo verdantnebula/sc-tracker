@@ -65,6 +65,16 @@ export interface AppSettings {
    * position (monitor unplugged) can't strand the window where it can't be reached.
    */
   overlayBounds: OverlayBounds | null;
+  /**
+   * EXPERIMENTAL (Phase F): enables the opt-in OCR contract-capture fallback —
+   * a screen-capture + tesseract.js pipeline that reads the mobiGlas contract
+   * screen to recover SCU / commodity / location / reward when the game
+   * suppressed the authoritative New Objective log line. Default false: the
+   * capture entry point is HIDDEN unless the user turns this on, because OCR
+   * accuracy on the stylized font is unproven. Persisted so the choice survives
+   * a restart. NEVER auto-applies anything — the user reviews before any write.
+   */
+  ocrEnabled: boolean;
 }
 
 /** Window rectangle persisted for the overlay (screen coordinates, px). */
@@ -82,6 +92,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   selectedShipSlug: null,
   overlayEnabled: false,
   overlayBounds: null,
+  ocrEnabled: false,
 };
 
 /** Default overlay size (px) when no bounds are saved — small, glanceable card. */
@@ -176,6 +187,7 @@ export function mergeSettings(
   next.selectedShipSlug = normalizeShipSlug(next.selectedShipSlug);
   next.overlayEnabled = normalizeBool(next.overlayEnabled);
   next.overlayBounds = normalizeOverlayBounds(next.overlayBounds);
+  next.ocrEnabled = normalizeBool(next.ocrEnabled);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
     next.liveFolder = typeof v === "string" && v.length > 0 ? v : null;
@@ -191,6 +203,9 @@ export function mergeSettings(
   }
   if ("overlayBounds" in patch) {
     next.overlayBounds = normalizeOverlayBounds(patch.overlayBounds);
+  }
+  if ("ocrEnabled" in patch) {
+    next.ocrEnabled = normalizeBool(patch.ocrEnabled);
   }
   return next;
 }
@@ -214,6 +229,7 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     selectedShipSlug: normalizeShipSlug(raw.selectedShipSlug),
     overlayEnabled: normalizeBool(raw.overlayEnabled),
     overlayBounds: normalizeOverlayBounds(raw.overlayBounds),
+    ocrEnabled: normalizeBool(raw.ocrEnabled),
   };
 }
 

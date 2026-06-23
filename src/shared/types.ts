@@ -365,6 +365,31 @@ export interface BackfillProgress {
 }
 
 // ---------------------------------------------------------------------------
+// EXPERIMENTAL OCR contract capture (Phase F)
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of a primary-display screen grab for the OCR fallback. The main process
+ * captures the screen via Electron's desktopCapturer and returns the frame as a
+ * PNG data URL (`data:image/png;base64,…`) for the renderer to feed to
+ * tesseract.js. Fully defensive: on any failure `outcome` is 'error' with a
+ * message instead of throwing into the renderer (a capture tool must never crash
+ * the app). `width`/`height` are the captured pixel dimensions (diagnostic only).
+ *
+ * PRIVACY: the data URL is held in renderer memory for the OCR pass only — it is
+ * never written to disk and never leaves the machine. No image is persisted.
+ */
+export interface OcrCaptureResult {
+  outcome: "ok" | "error";
+  /** PNG data URL of the captured frame (present when outcome === 'ok'). */
+  dataUrl?: string;
+  width?: number;
+  height?: number;
+  /** Human-readable reason when outcome === 'error'. */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Manual entry payloads (renderer -> main; SPEC §4 secondary capture)
 // ---------------------------------------------------------------------------
 

@@ -17,6 +17,7 @@ import type {
   LogPathInfo,
   PickLogFolderResult,
   ExportReportResult,
+  OcrCaptureResult,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -51,6 +52,12 @@ export const IPC = {
   SETTINGS_SET_MODE: "settings:setMode",
   SETTINGS_GET_SHIP: "settings:getShip",
   SETTINGS_SET_SHIP: "settings:setShip",
+  SETTINGS_GET_OCR_ENABLED: "settings:getOcrEnabled",
+  SETTINGS_SET_OCR_ENABLED: "settings:setOcrEnabled",
+
+  // EXPERIMENTAL OCR contract capture (Phase F) — capture the primary display
+  // as a PNG data URL in main; the renderer runs tesseract.js + the parser.
+  OCR_CAPTURE_SCREEN: "ocr:captureScreen",
 
   // always-on-top "next stop" overlay window (Phase D)
   OVERLAY_TOGGLE: "overlay:toggle",
@@ -125,6 +132,15 @@ export interface IpcRequestMap {
     args: [slug: string | null];
     result: string | null;
   };
+  /** EXPERIMENTAL OCR fallback enabled? (Phase F; default false). */
+  [IPC.SETTINGS_GET_OCR_ENABLED]: { args: []; result: boolean };
+  /** Persist the OCR-enabled flag; returns the saved value. */
+  [IPC.SETTINGS_SET_OCR_ENABLED]: {
+    args: [enabled: boolean];
+    result: boolean;
+  };
+  /** Capture the primary display as a PNG data URL for OCR (Phase F). */
+  [IPC.OCR_CAPTURE_SCREEN]: { args: []; result: OcrCaptureResult };
 
   // --- overlay window (Phase D) ---
   /** Toggle the always-on-top overlay open/closed; returns the resulting state. */
@@ -228,6 +244,14 @@ export interface ApiBridge {
   getSelectedShip(): Promise<string | null>;
   /** Persist the selected ship slug (null clears it); resolves to the saved slug. */
   setSelectedShip(slug: string | null): Promise<string | null>;
+
+  // --- EXPERIMENTAL OCR contract capture (Phase F) ---
+  /** Read whether the experimental OCR fallback is enabled (default false). */
+  getOcrEnabled(): Promise<boolean>;
+  /** Persist the OCR-enabled flag; resolves to the saved value. */
+  setOcrEnabled(enabled: boolean): Promise<boolean>;
+  /** Capture the primary display as a PNG data URL for the OCR pipeline. */
+  captureScreenForOcr(): Promise<OcrCaptureResult>;
 
   // --- overlay window (Phase D) ---
   /** Toggle the always-on-top overlay open/closed; resolves to the new state. */

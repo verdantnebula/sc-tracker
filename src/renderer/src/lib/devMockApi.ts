@@ -377,6 +377,8 @@ function createMockApi(): ApiBridge {
   let selectedShipSlug: string | null = null;
   // In-memory overlay open state for standalone-dev of the TopBar pin button.
   let overlayEnabled = false;
+  // In-memory experimental-OCR flag (Phase F) for standalone-dev of the toggle.
+  let ocrEnabled = false;
   const overlayListeners = new Set<(s: { enabled: boolean }) => void>();
   // In-memory salvage runs for standalone-dev of the salvage views.
   let salvageRuns: SalvageRun[] = [];
@@ -546,6 +548,20 @@ function createMockApi(): ApiBridge {
         typeof slug === "string" && slug.length > 0 ? slug : null;
       return selectedShipSlug;
     },
+
+    // --- EXPERIMENTAL OCR contract capture (dev stub — Phase F) ---
+    // No desktopCapturer in a plain browser tab; the capture call returns an
+    // error result so the dev UI degrades gracefully (the dialog shows the
+    // "couldn't capture" path). The enabled flag is in-memory only.
+    getOcrEnabled: async (): Promise<boolean> => ocrEnabled,
+    setOcrEnabled: async (enabled: boolean): Promise<boolean> => {
+      ocrEnabled = enabled === true;
+      return ocrEnabled;
+    },
+    captureScreenForOcr: async () => ({
+      outcome: "error" as const,
+      error: "Screen capture is unavailable in standalone dev mode.",
+    }),
 
     // --- overlay window (dev stub — no second window in a plain browser tab) ---
     toggleOverlay: async () => {

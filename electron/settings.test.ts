@@ -74,6 +74,7 @@ describe("loadSettings / saveSettings", () => {
       selectedShipSlug: null,
       overlayEnabled: false,
       overlayBounds: null,
+      ocrEnabled: false,
     });
   });
 
@@ -196,6 +197,7 @@ describe("mergeSettings", () => {
     selectedShipSlug: null,
     overlayEnabled: false,
     overlayBounds: null,
+    ocrEnabled: false,
   };
 
   it("collapses an empty-string liveFolder to null", () => {
@@ -216,7 +218,17 @@ describe("mergeSettings", () => {
       selectedShipSlug: null,
       overlayEnabled: false,
       overlayBounds: null,
+      ocrEnabled: false,
     });
+  });
+
+  it("round-trips ocrEnabled and coerces a non-boolean to false (Phase F)", () => {
+    expect(mergeSettings(base, { ocrEnabled: true }).ocrEnabled).toBe(true);
+    expect(
+      mergeSettings(base, {
+        ocrEnabled: "yes",
+      } as unknown as Partial<AppSettings>).ocrEnabled,
+    ).toBe(false);
   });
 });
 
@@ -315,6 +327,7 @@ describe("resolveGameLogPath", () => {
           selectedShipSlug: null,
           overlayEnabled: false,
           overlayBounds: null,
+          ocrEnabled: false,
         },
         exists,
       ),
@@ -330,6 +343,7 @@ describe("resolveGameLogPath", () => {
           selectedShipSlug: null,
           overlayEnabled: false,
           overlayBounds: null,
+          ocrEnabled: false,
         },
         () => false,
       ),
@@ -347,6 +361,7 @@ describe("resolveGameLogPath", () => {
           selectedShipSlug: null,
           overlayEnabled: false,
           overlayBounds: null,
+          ocrEnabled: false,
         },
         () => true,
       ),
@@ -363,6 +378,7 @@ describe("resolveGameLogPath", () => {
           selectedShipSlug: null,
           overlayEnabled: false,
           overlayBounds: null,
+          ocrEnabled: false,
         },
         () => true,
         custom,

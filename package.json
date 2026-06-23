@@ -12,7 +12,8 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && npm run copy:ocr",
+    "copy:ocr": "node scripts/copy-ocr-assets.mjs",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
@@ -25,14 +26,16 @@
     "dev:fresh": "npm run rebuild:electron && electron-vite dev",
     "fetch:reference": "node scripts/fetch-reference.mjs",
     "fetch:salvage-reference": "python scripts/fetch-salvage-reference.py",
-    "package:exe": "npm run rebuild:electron && electron-vite build && npx --yes @electron/packager . --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"config\\.local\\.json\"",
+    "package:exe": "npm run rebuild:electron && electron-vite build && npm run copy:ocr && npx --yes @electron/packager . --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"config\\.local\\.json\"",
     "dist": "npm run package:exe"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "chokidar": "^5.0.0"
+    "chokidar": "^5.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

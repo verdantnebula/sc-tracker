@@ -21,6 +21,9 @@ export function TopBar({
   onToggleMode,
   overlayEnabled,
   onToggleOverlay,
+  ocrEnabled,
+  onToggleOcr,
+  onOcrCapture,
 }: {
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
@@ -44,6 +47,12 @@ export function TopBar({
   overlayEnabled: boolean;
   /** Toggle the overlay window open/closed (Phase D). */
   onToggleOverlay: () => void;
+  /** Whether the EXPERIMENTAL OCR contract-capture feature is enabled (Phase F). */
+  ocrEnabled: boolean;
+  /** Toggle the experimental OCR feature on/off (persists). */
+  onToggleOcr: () => void;
+  /** Open the OCR capture/review dialog (only shown when ocrEnabled). */
+  onOcrCapture: () => void;
 }): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false);
   return (
@@ -169,6 +178,8 @@ export function TopBar({
         {settingsOpen && (
           <LogFolderPanel
             info={logPathInfo}
+            ocrEnabled={ocrEnabled}
+            onToggleOcr={onToggleOcr}
             onChangeFolder={() => {
               setSettingsOpen(false);
               onPickLogFolder();
@@ -219,6 +230,30 @@ export function TopBar({
         ⌫ Reset Data
       </button>
 
+      {/* EXPERIMENTAL OCR capture entry — only present when the feature is
+          enabled in the gear panel. Reads the mobiGlas contract screen to
+          recover suppressed details; opens a review-before-apply dialog. */}
+      {ocrEnabled && (
+        <button
+          className="sc-ghost-btn"
+          onClick={onOcrCapture}
+          title="Experimental: capture the mobiGlas contract screen via OCR"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--primary)",
+            color: "var(--primary)",
+            fontFamily: "var(--font-display)",
+            fontWeight: 600,
+            fontSize: 12,
+            padding: "8px 13px",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ⊡ OCR Capture
+        </button>
+      )}
+
       {/* Manual Add (primary) */}
       <button
         className="sc-primary-btn"
@@ -254,11 +289,15 @@ export function TopBar({
 
 function LogFolderPanel({
   info,
+  ocrEnabled,
+  onToggleOcr,
   onChangeFolder,
   onCollectLogs,
   onClose,
 }: {
   info: LogPathInfo | null;
+  ocrEnabled: boolean;
+  onToggleOcr: () => void;
   onChangeFolder: () => void;
   onCollectLogs: () => void;
   onClose: () => void;
@@ -439,6 +478,68 @@ function LogFolderPanel({
         >
           🛟 COLLECT LOGS…
         </button>
+
+        {/* Divider + EXPERIMENTAL OCR toggle (Phase F) */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            margin: "16px 0 12px",
+          }}
+        />
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: 1.5,
+            color: "var(--muted)",
+            marginBottom: 8,
+          }}
+        >
+          EXPERIMENTAL
+        </div>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            padding: "8px 10px",
+            border: "1px solid var(--border-strong)",
+            background: ocrEnabled ? "rgba(52,224,224,0.06)" : "transparent",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={ocrEnabled}
+            onChange={onToggleOcr}
+            aria-label="Experimental: OCR contract capture"
+            style={{ flex: "none", accentColor: "var(--primary)" }}
+          />
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-bright)",
+            }}
+          >
+            OCR contract capture
+          </span>
+        </label>
+        <p
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 10,
+            lineHeight: 1.5,
+            color: "var(--text-2)",
+            margin: "8px 0 0",
+          }}
+        >
+          Reads the mobiGlas contract screen to recover SCU / commodity /
+          destination / reward when the game doesn’t log them. Accuracy varies —
+          you review and confirm every field before anything is applied.
+        </p>
       </div>
     </>
   );

@@ -15,7 +15,15 @@
 // typed window.api preload bridge; all fs/network stays in this process.
 // ============================================================================
 
-import { app, BrowserWindow, ipcMain, dialog, shell, screen } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  shell,
+  screen,
+  desktopCapturer,
+} from "electron";
 import { join } from "node:path";
 import { userInfo } from "node:os";
 import { IPC } from "@shared/ipc";
@@ -27,6 +35,7 @@ import type {
   MissionPatch,
   LogPathInfo,
   PickLogFolderResult,
+  OcrCaptureResult,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -788,6 +797,85 @@ function registerIpc(): void {
     (_e, slug: string | null): string | null => {
       settings = saveSettings({ selectedShipSlug: slug });
       return settings.selectedShipSlug;
+    },
+  );
+
+  // --- EXPERIMENTAL OCR contract capture (Phase F) ------------------------
+  // The feature is opt-in: persist a boolean flag (default false) that gates the
+  // capture entry point in the UI. The capture handler grabs the primary display
+  // as a PNG data URL via desktopCapturer; the renderer runs tesseract.js + the
+  // pure parser/matcher and presents a review-before-apply dialog. NOTHING here
+  // ever writes to a mission — application happens via the existing MISSION_UPDATE
+  // after the user confirms. The capture handler is fully defensive: any failure
+  // returns an { outcome: 'error' } result rather than throwing into the renderer.
+
+  ipcMain.handle(
+    IPC.SETTINGS_GET_OCR_ENABLED,
+    (): boolean => settings.ocrEnabled,
+  );
+
+  ipcMain.handle(
+    IPC.SETTINGS_SET_OCR_ENABLED,
+    (_e, enabled: boolean): boolean => {
+      settings = saveSettings({ ocrEnabled: enabled === true });
+      return settings.ocrEnabled;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.OCR_CAPTURE_SCREEN,
+    async (): Promise<OcrCaptureResult> => {
+      // Honor the gate even if the renderer somehow asks while disabled.
+      if (!settings.ocrEnabled) {
+        return {
+          outcome: "error",
+          error: "OCR contract capture is disabled in settings.",
+        };
+      }
+      try {
+        // Capture at the primary display's full pixel size so small on-screen
+        // text survives for OCR (the default thumbnail size is tiny). The frame
+        // is held in renderer memory for the OCR pass only — never written to
+        // disk, never sent anywhere.
+        const primary = screen.getPrimaryDisplay();
+        const { width, height } = primary.size;
+        const scale = primary.scaleFactor || 1;
+        const sources = await desktopCapturer.getSources({
+          types: ["screen"],
+          thumbnailSize: {
+            width: Math.round(width * scale),
+            height: Math.round(height * scale),
+          },
+        });
+        // Prefer the source matching the primary display id; fall back to first.
+        const primaryId = String(primary.id);
+        const source =
+          sources.find((s) => s.display_id === primaryId) ?? sources[0];
+        if (!source || source.thumbnail.isEmpty()) {
+          return {
+            outcome: "error",
+            error:
+              "Could not capture the screen. On Windows, ensure the app has " +
+              "screen-capture permission and the game is not in exclusive " +
+              "fullscreen (use borderless/windowed).",
+          };
+        }
+        const size = source.thumbnail.getSize();
+        return {
+          outcome: "ok",
+          dataUrl: source.thumbnail.toDataURL(),
+          width: size.width,
+          height: size.height,
+        };
+      } catch (err) {
+        console.error("[main] OCR screen capture failed:", err);
+        return {
+          outcome: "error",
+          error:
+            "Screen capture failed. " +
+            String(err instanceof Error ? err.message : err),
+        };
+      }
     },
   );
 

@@ -19,6 +19,7 @@ import type {
   LogPathInfo,
   PickLogFolderResult,
   ExportReportResult,
+  OcrCaptureResult,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -79,6 +80,17 @@ const api: ApiBridge = {
     ipcRenderer.invoke(IPC.SETTINGS_GET_SHIP) as Promise<string | null>,
   setSelectedShip: (slug: string | null) =>
     ipcRenderer.invoke(IPC.SETTINGS_SET_SHIP, slug) as Promise<string | null>,
+
+  // --- EXPERIMENTAL OCR contract capture (Phase F) ---
+  getOcrEnabled: () =>
+    ipcRenderer.invoke(IPC.SETTINGS_GET_OCR_ENABLED) as Promise<boolean>,
+  setOcrEnabled: (enabled: boolean) =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_SET_OCR_ENABLED,
+      enabled,
+    ) as Promise<boolean>,
+  captureScreenForOcr: () =>
+    ipcRenderer.invoke(IPC.OCR_CAPTURE_SCREEN) as Promise<OcrCaptureResult>,
 
   // --- overlay window (Phase D) ---
   toggleOverlay: () =>
