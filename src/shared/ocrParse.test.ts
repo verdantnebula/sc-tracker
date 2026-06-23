@@ -281,6 +281,130 @@ describe("parseContractOcr — real mobiGlas contract format", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// REAL mobiGlas format — FULL multi-leg contract (regression)
+// ----------------------------------------------------------------------------
+// The ACTUAL raw tesseract text from a larger captured contract (game data only,
+// no personal info): a SINGLE pickup hub (Everus Harbor) feeding FOUR deliveries.
+// It is the stress case the smaller fixture above only partially covers:
+//   - 4 dropoffs + 4 pickups in interleaved (deliver, collect, …) order,
+//   - destination/commodity names WRAPPED mid-name across lines
+//     ("Melodic Fields" + "Station", "Thundering" + "Express Station"),
+//   - the aUEC glyph OCR'd as a stray "a", fractional SCU ("0/46"),
+//     " at … Lagrange point" qualifiers, a trailing "j" speckle,
+//   - CRITICALLY a REPEATED destination (Green Glade Station appears twice with
+//     different commodity/SCU) and a REPEATED commodity (Hydrogen Fuel delivered
+//     to two different stations) — neither must be deduped/merged: each objective
+//     is its own leg.
+// ---------------------------------------------------------------------------
+
+describe("parseContractOcr — full multi-leg contract (repeated dest/commodity)", () => {
+  const FULL_OCR = [
+    "Reward a 290,500",
+    "Contract Deadline N/A",
+    "Contracted B, Covalex Independent Contractors",
+    "PRIMARY OBJECTIVES",
+    "Deliver 0/46 SCU of Quantum Fuel to Green Glade Station j",
+    "at Hurstons L1 Lagrange point.",
+    "Collect Quantum Fuel from Everus Harbor.",
+    "Deliver 0/94 SCU of Hydrogen Fuel to Melodic Fields",
+    "Station at Hurstons L4 Lagrange point.",
+    "Collect Hydrogen Fuel from Everus Harbor.",
+    "Deliver 0/116 SCU of Ship Ammunition to Thundering",
+    "Express Station at Hurstons L3 Lagrange point.",
+    "Collect Ship Ammunition from Everus Harbor.",
+    "Deliver 0/53 SCU of Hydrogen Fuel to Green Glade Station",
+    "at Hurstons L1 Lagrange point.",
+    "Collect Hydrogen Fuel from Everus Harbor.",
+  ].join("\n");
+
+  it("extracts the reward (aUEC glyph read as a stray 'a')", () => {
+    expect(parseContractOcr(FULL_OCR).reward).toBe(290500);
+  });
+
+  it("extracts all 4 dropoffs in order, with wraps/qualifiers/speckle handled", () => {
+    const out = parseContractOcr(FULL_OCR);
+    const dropoffs = out.objectives.filter((o) => o.kind === "dropoff");
+    expect(dropoffs).toHaveLength(4);
+
+    // SCU is the DENOMINATOR (contract total). Lagrange qualifiers dropped;
+    // wrapped "Melodic Fields"/"Station" and "Thundering"/"Express Station"
+    // rejoined; stray trailing "j" stripped from the first Green Glade dest.
+    expect(dropoffs[0]).toEqual({
+      kind: "dropoff",
+      scu: 46,
+      commodity: "Quantum Fuel",
+      location: "Green Glade Station",
+    });
+    expect(dropoffs[1]).toEqual({
+      kind: "dropoff",
+      scu: 94,
+      commodity: "Hydrogen Fuel",
+      location: "Melodic Fields Station",
+    });
+    expect(dropoffs[2]).toEqual({
+      kind: "dropoff",
+      scu: 116,
+      commodity: "Ship Ammunition",
+      location: "Thundering Express Station",
+    });
+    expect(dropoffs[3]).toEqual({
+      kind: "dropoff",
+      scu: 53,
+      commodity: "Hydrogen Fuel",
+      location: "Green Glade Station",
+    });
+  });
+
+  it("extracts all 4 'Collect … from Everus Harbor' pickups in order", () => {
+    const out = parseContractOcr(FULL_OCR);
+    const pickups = out.objectives.filter((o) => o.kind === "pickup");
+    expect(pickups).toHaveLength(4);
+    expect(pickups.map((p) => p.commodity)).toEqual([
+      "Quantum Fuel",
+      "Hydrogen Fuel",
+      "Ship Ammunition",
+      "Hydrogen Fuel",
+    ]);
+    // Every pickup is from the single hub; no SCU on the real pickup wording.
+    for (const p of pickups) {
+      expect(p.location).toBe("Everus Harbor");
+      expect(p.scu).toBeNull();
+    }
+  });
+
+  it("does NOT dedupe a repeated destination (Green Glade twice = TWO legs)", () => {
+    const out = parseContractOcr(FULL_OCR);
+    const greenGlade = out.objectives.filter(
+      (o) => o.kind === "dropoff" && o.location === "Green Glade Station",
+    );
+    expect(greenGlade).toHaveLength(2);
+    // Same destination, but distinct commodity/SCU — kept as separate legs.
+    expect(greenGlade.map((o) => o.commodity)).toEqual([
+      "Quantum Fuel",
+      "Hydrogen Fuel",
+    ]);
+    expect(greenGlade.map((o) => o.scu)).toEqual([46, 53]);
+  });
+
+  it("does NOT dedupe a repeated commodity (Hydrogen Fuel to two stations)", () => {
+    const out = parseContractOcr(FULL_OCR);
+    const hydrogen = out.objectives.filter(
+      (o) => o.kind === "dropoff" && o.commodity === "Hydrogen Fuel",
+    );
+    expect(hydrogen).toHaveLength(2);
+    expect(hydrogen.map((o) => o.location)).toEqual([
+      "Melodic Fields Station",
+      "Green Glade Station",
+    ]);
+    expect(hydrogen.map((o) => o.scu)).toEqual([94, 53]);
+  });
+
+  it("recovers exactly 8 objectives total (4 dropoffs + 4 pickups)", () => {
+    expect(parseContractOcr(FULL_OCR).objectives).toHaveLength(8);
+  });
+});
+
 describe("parseContractOcr — multi-objective contract", () => {
   it("parses several objectives and the reward from one screen", () => {
     const text = [

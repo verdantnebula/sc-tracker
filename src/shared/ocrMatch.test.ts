@@ -128,6 +128,22 @@ describe("fuzzyMatch — noisy input", () => {
     expect(b.value).toBe("L4 Melodic Fields Station");
     expect(b.score).toBeGreaterThan(0.6);
   });
+
+  it("resolves a three-word station name against a Lagrange-PREFIXED entry", () => {
+    // From the full multi-leg contract: the parser feeds the bare three-word
+    // "Thundering Express Station" (Lagrange qualifier already stripped) and the
+    // reference carries the "HUR-L3" prefix. Containment still bridges the gap.
+    // (Generic synthetic prefix mirroring the real "HUR-L3" reference shape.)
+    const PREFIXED = [
+      "L1 Green Glade Station",
+      "L3 Thundering Express Station",
+      "L4 Melodic Fields Station",
+      "Everus Harbor",
+    ];
+    const r = fuzzyMatch("Thundering Express Station", PREFIXED);
+    expect(r.value).toBe("L3 Thundering Express Station");
+    expect(r.score).toBeGreaterThan(0.6);
+  });
 });
 
 // ---------------------------------------------------------------------------
