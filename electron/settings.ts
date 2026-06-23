@@ -103,7 +103,8 @@ export const OVERLAY_MIN_SIZE = { width: 240, height: 150 } as const;
 
 /** Coerce an arbitrary value to a valid AppMode, defaulting to 'cargo'. */
 function normalizeMode(value: unknown): AppMode {
-  return value === "salvage" ? "salvage" : "cargo";
+  if (value === "salvage" || value === "mining") return value;
+  return "cargo";
 }
 
 /** Coerce an arbitrary value to a ship slug or null (empty string -> null). */

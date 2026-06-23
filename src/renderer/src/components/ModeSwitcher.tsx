@@ -1,17 +1,34 @@
 // ============================================================================
-// ModeSwitcher — the top-left Cargo <-> Salvage toggle (shared by both shells).
+// ModeSwitcher — the top-left Cargo -> Salvage -> Mining cycle (shared by every
+// shell).
 // ----------------------------------------------------------------------------
 // Replaces the static diamond logo + wordmark with a clickable control: it shows
-// the CURRENT mode's identity ("SC CARGO TRACKER" / "SC SALVAGE TRACKER") and a
-// small "⇄ SALVAGE" / "⇄ CARGO" hint for where a click goes. Clicking calls
-// onToggle, which (in App) persists the new mode via window.api and re-renders.
+// the CURRENT mode's identity ("SC CARGO TRACKER" / "SC SALVAGE TRACKER" /
+// "SC MINING TRACKER") and a small "→ NEXT" hint for where a click goes. The
+// app cycles cargo -> salvage -> mining -> cargo. Clicking calls onToggle, which
+// (in App) advances + persists the new mode via window.api and re-renders.
 //
 // It is purely token-driven (var(--primary) etc.), so it inherits whichever
-// theme is active — cyan in cargo, Drake orange in salvage — with no per-mode
-// styling here. Both shells render it so the switcher is always top-left.
+// theme is active — cyan in cargo, Drake orange in salvage, MISC azure in
+// mining — with no per-mode styling here. Every shell renders it so the switcher
+// is always top-left.
 // ============================================================================
 
 import type { AppMode } from "@shared/types";
+
+/** Mode -> wordmark label (the segment before "TRACKER"). */
+const MODE_LABEL: Record<AppMode, string> = {
+  cargo: "CARGO",
+  salvage: "SALVAGE",
+  mining: "MINING",
+};
+
+/** The cycle order, mirrored from App's MODE_CYCLE, for the "next" hint. */
+const NEXT_MODE: Record<AppMode, AppMode> = {
+  cargo: "salvage",
+  salvage: "mining",
+  mining: "cargo",
+};
 
 export function ModeSwitcher({
   mode,
@@ -20,14 +37,14 @@ export function ModeSwitcher({
   mode: AppMode;
   onToggle: () => void;
 }): React.JSX.Element {
-  const isCargo = mode === "cargo";
-  const other = isCargo ? "SALVAGE" : "CARGO";
+  const current = MODE_LABEL[mode];
+  const next = MODE_LABEL[NEXT_MODE[mode]];
   return (
     <button
       className="sc-ghost-btn"
       onClick={onToggle}
-      title={`Switch to ${other} mode`}
-      aria-label={`Switch to ${other} tracker`}
+      title={`Switch to ${next} mode`}
+      aria-label={`Switch to ${next} tracker`}
       style={{
         display: "flex",
         alignItems: "center",
@@ -73,11 +90,11 @@ export function ModeSwitcher({
           letterSpacing: 0.5,
         }}
       >
-        SC {isCargo ? "CARGO" : "SALVAGE"}
+        SC {current}
         <span style={{ color: "var(--primary)" }}>TRACKER</span>
       </span>
 
-      {/* switch hint chip */}
+      {/* switch hint chip — names the next mode in the cycle */}
       <span
         style={{
           fontFamily: "var(--font-display)",
@@ -89,7 +106,7 @@ export function ModeSwitcher({
           border: "1px solid var(--border)",
         }}
       >
-        ⇄ {other}
+        → {next}
       </span>
     </button>
   );

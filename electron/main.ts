@@ -45,6 +45,7 @@ import type {
   StrippedComponentInput,
   StrippedComponentPatch,
   SalvageReferenceData,
+  MiningReferenceData,
 } from "@shared/types";
 import type { DomainEvent } from "@shared/events";
 import {
@@ -58,6 +59,10 @@ import {
   createSalvageReference,
   type SalvageReferenceLoader,
 } from "./salvageReference";
+import {
+  createMiningReference,
+  type MiningReferenceLoader,
+} from "./miningReference";
 import { isCorruptionError } from "./db/recovery";
 import { CurrentLocationTracker } from "./currentLocation";
 import { createUexClient, type UexClient } from "./uexClient";
@@ -105,6 +110,9 @@ let overlayBoundsSaveTimer: NodeJS.Timeout | null = null;
 // Salvage tracker singletons (separate domain; own store + bundled reference).
 let salvage: SalvageStore | null = null;
 let salvageRef: SalvageReferenceLoader | null = null;
+
+// Mining reference singleton (read-only bundled game reference; no store yet).
+let miningRef: MiningReferenceLoader | null = null;
 
 // Per-user settings (custom LIVE folder, etc.), loaded on boot. Held in memory
 // so the IPC handlers can report/resolve the current Game.log path without a disk
@@ -1090,6 +1098,13 @@ function registerIpc(): void {
       };
     return salvageRef.getReferenceData();
   });
+
+  // Mining reference — bundled, read-only (rocks + deposits). Total-safe when
+  // the loader hasn't been created yet (mirrors the salvage handler above).
+  ipcMain.handle(IPC.MINING_REFERENCE, (): MiningReferenceData => {
+    if (!miningRef) return { rocks: [], deposits: [] };
+    return miningRef.getReferenceData();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1135,6 +1150,10 @@ async function boot(): Promise<void> {
   // reference snapshot. Independent of the cargo store/watcher.
   salvage = openSalvageStore({ dbPath });
   salvageRef = createSalvageReference();
+
+  // Mining mode: a bundled, read-only reference (rocks + deposits). No store,
+  // no log correlation yet — purely a lookup surface. Independent of cargo/salvage.
+  miningRef = createMiningReference();
 
   // Load per-user settings (custom LIVE folder) BEFORE resolving the log path.
   // A missing/corrupt file returns safe defaults, so this never blocks boot.

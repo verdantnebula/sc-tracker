@@ -1,12 +1,13 @@
 // ============================================================================
 // theme.ts — app-mode -> CSS theme mapping (renderer)
 // ----------------------------------------------------------------------------
-// The two trackers (cargo / salvage) share one window but swap their entire
-// design-token palette. Rather than re-style every component, we flip a single
-// attribute on the document root — `data-mode` — and let tokens.css redefine
-// the CSS custom properties under `[data-mode="salvage"]`. Cargo keeps the
-// default `:root` tokens (the attribute is still set to "cargo" for symmetry,
-// but no override block targets it, so nothing changes for cargo).
+// The three trackers (cargo / salvage / mining) share one window but swap their
+// entire design-token palette. Rather than re-style every component, we flip a
+// single attribute on the document root — `data-mode` — and let tokens.css
+// redefine the CSS custom properties under `[data-mode="salvage"]` /
+// `[data-mode="mining"]`. Cargo keeps the default `:root` tokens (the attribute
+// is still set to "cargo" for symmetry, but no override block targets it, so
+// nothing changes for cargo).
 //
 // The mapping (`themeForMode`) is a pure function so it is unit-testable with no
 // DOM; `applyTheme` performs the single side effect (setting the attribute) and
@@ -16,17 +17,18 @@
 import type { AppMode } from "@shared/types";
 
 /** The value written to `document.documentElement[data-mode]` for each mode. */
-export type ThemeAttr = "cargo" | "salvage";
+export type ThemeAttr = "cargo" | "salvage" | "mining";
 
 /**
  * Pure mapping from an app mode to the theme attribute value. Defensive: any
- * non-salvage value resolves to "cargo" so a corrupt persisted mode can never
+ * unrecognized value resolves to "cargo" so a corrupt persisted mode can never
  * select a non-existent theme.
  */
 export function themeForMode(
   mode: AppMode | string | null | undefined,
 ): ThemeAttr {
-  return mode === "salvage" ? "salvage" : "cargo";
+  if (mode === "salvage" || mode === "mining") return mode;
+  return "cargo";
 }
 
 /** A minimal element shape that supports the dataset write — for testability. */

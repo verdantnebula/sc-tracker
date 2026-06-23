@@ -64,6 +64,17 @@
     transparent 10px,
     transparent 20px
   );
+
+  /* Rarity scale (Mining mode rock table + scan lookup). Mirrors the in-game
+     rarity ladder: common = blue/teal, uncommon = green, rare = purple,
+     epic = orange, legendary = light/gold. Defined here on :root so the
+     mining components have working defaults under any theme; each mode tunes
+     them for legibility on its own surfaces below. */
+  --rarity-common: #56c4dc;
+  --rarity-uncommon: #54e08a;
+  --rarity-rare: #b98bff;
+  --rarity-epic: #ffb24a;
+  --rarity-legendary: #ffe9a8;
 }
 
 /* ===========================================================================
@@ -125,4 +136,84 @@
     #161009 14px,
     #161009 28px
   );
+
+  /* Rarity scale — warmed to read on Drake charcoals (salvage shows no rock
+     table today, but keep the scale defined so any shared component stays
+     on-brand if it ever surfaces rarity here). */
+  --rarity-common: #c8a98a;
+  --rarity-uncommon: #7ed957;
+  --rarity-rare: #d2a6ff;
+  --rarity-epic: #ffc24a;
+  --rarity-legendary: #ffe9a8;
+}
+
+/* ===========================================================================
+   MINING MODE — MISC (maker of the Prospector) theme.
+   Applied when `document.documentElement[data-mode="mining"]` is set (see
+   src/renderer/src/lib/theme.ts). Overrides ONLY the design tokens; every
+   component reads var(--…) so the whole UI re-skins from this one block.
+
+   The look: MISC's clean, smooth INDUSTRIAL BLUE/WHITE — a deep blue-black
+   bg, cool blue-gray surfaces, a bright AZURE/ROYAL-BLUE primary (clearly
+   bluer/deeper than cargo's mobiGlas cyan #34e0e0), and a warm white/sand
+   secondary. Distinct from both cargo (cyan) and salvage (Drake orange).
+   =========================================================================== */
+:root[data-mode="mining"] {
+  /* Surfaces — deep blue-black + cool blue-gray panels */
+  --bg: #060a12;
+  --window: #0a1019;
+  --surface: #101826;
+  --surface-2: #16212f;
+  --card-grad: linear-gradient(
+    180deg,
+    rgba(22, 34, 50, 0.94),
+    rgba(11, 18, 28, 0.78)
+  );
+
+  /* Accents — MISC azure / royal blue + warm white-sand secondary */
+  --primary: #3d7dff;
+  --primary-hover: #6a9dff;
+  --primary-dim: #2a52a8;
+  --secondary: #f3ead6;
+  --success: #4fd6a8;
+  --danger: #ff6b6b;
+
+  /* Text — cool white on blue */
+  --text: #d8e3f2;
+  --text-bright: #f4f8ff;
+  --text-2: #a7bcd8;
+  --muted: #7388a6;
+  --muted-done: #59708e;
+
+  /* Borders — azure-tinted */
+  --border: rgba(61, 125, 255, 0.18);
+  --border-strong: rgba(61, 125, 255, 0.38);
+
+  /* Status — re-tinted to the cool palette */
+  --status-accepted: #8aa0c0;
+  --status-accepted-bg: rgba(138, 160, 192, 0.13);
+  --status-progress: #f3c969;
+  --status-progress-bg: rgba(243, 201, 105, 0.14);
+  --status-complete: #4fd6a8;
+  --status-complete-bg: rgba(79, 214, 168, 0.14);
+  --status-abandoned: #ff6b6b;
+  --status-abandoned-bg: rgba(255, 107, 107, 0.13);
+
+  /* Hazard stripe — cool azure industrial chevrons */
+  --hazard-stripe: repeating-linear-gradient(
+    45deg,
+    #3d7dff 0,
+    #3d7dff 12px,
+    #0c1422 12px,
+    #0c1422 24px
+  );
+
+  /* Rarity scale — tuned to read on the deep-blue surfaces. Common is a teal
+     that stays distinct from the azure primary; the rest follow the in-game
+     ladder (uncommon green, rare purple, epic orange, legendary light/gold). */
+  --rarity-common: #5fd4e0;
+  --rarity-uncommon: #5fe09a;
+  --rarity-rare: #b98bff;
+  --rarity-epic: #ffaf52;
+  --rarity-legendary: #ffe6a0;
 }

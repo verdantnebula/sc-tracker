@@ -27,6 +27,7 @@ import type {
   StrippedComponentInput,
   StrippedComponentPatch,
   SalvageReferenceData,
+  MiningReferenceData,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,9 @@ export const IPC = {
   SALVAGE_COMPLETE_RUN: "salvage:completeRun",
   SALVAGE_DELETE_RUN: "salvage:deleteRun",
   SALVAGE_REFERENCE: "salvage:reference",
+
+  // mining reference (additive — bundled, read-only game reference data)
+  MINING_REFERENCE: "mining:reference",
 
   // push events (main.send -> renderer.on)
   MISSIONS_CHANGED: "missions:changed",
@@ -205,6 +209,10 @@ export interface IpcRequestMap {
   [IPC.SALVAGE_DELETE_RUN]: { args: [runId: string]; result: void };
   /** The bundled salvage reference snapshot (ships/components/prices/haulers). */
   [IPC.SALVAGE_REFERENCE]: { args: []; result: SalvageReferenceData };
+
+  // --- mining reference ---
+  /** The bundled mining reference snapshot (rocks + deposits). */
+  [IPC.MINING_REFERENCE]: { args: []; result: MiningReferenceData };
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +326,10 @@ export interface ApiBridge {
   deleteSalvageRun(runId: string): Promise<void>;
   /** The bundled salvage reference snapshot. */
   getSalvageReference(): Promise<SalvageReferenceData>;
+
+  // --- mining reference ---
+  /** The bundled mining reference snapshot (rocks + deposits). */
+  getMiningReference(): Promise<MiningReferenceData>;
 
   // subscriptions — each returns an unsubscribe function
   onMissionsChanged(cb: (missions: Mission[]) => void): () => void;

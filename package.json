@@ -26,6 +26,7 @@
     "dev:fresh": "npm run rebuild:electron && electron-vite dev",
     "fetch:reference": "node scripts/fetch-reference.mjs",
     "fetch:salvage-reference": "python scripts/fetch-salvage-reference.py",
+    "fetch:mining-reference": "node scripts/fetch-mining-reference.mjs",
     "package:exe": "npm run rebuild:electron && electron-vite build && npm run copy:ocr && npx --yes @electron/packager . --platform=win32 --arch=x64 --out=release --overwrite --prune=true --ignore=\"config\\.local\\.json\" --asar.unpackDir=\"out/renderer/ocr\"",
     "dist": "npm run package:exe"
   },

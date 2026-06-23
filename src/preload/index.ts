@@ -29,6 +29,7 @@ import type {
   StrippedComponentInput,
   StrippedComponentPatch,
   SalvageReferenceData,
+  MiningReferenceData,
 } from "@shared/types";
 
 /** Subscribe to a push channel; returns an unsubscribe fn. */
@@ -158,6 +159,10 @@ const api: ApiBridge = {
     ipcRenderer.invoke(IPC.SALVAGE_DELETE_RUN, runId) as Promise<void>,
   getSalvageReference: () =>
     ipcRenderer.invoke(IPC.SALVAGE_REFERENCE) as Promise<SalvageReferenceData>,
+
+  // --- mining reference ---
+  getMiningReference: () =>
+    ipcRenderer.invoke(IPC.MINING_REFERENCE) as Promise<MiningReferenceData>,
 
   onMissionsChanged: (cb) => subscribe<Mission[]>(IPC.MISSIONS_CHANGED, cb),
   onLogStatusChanged: (cb) => subscribe<LogStatus>(IPC.LOG_STATUS_CHANGED, cb),

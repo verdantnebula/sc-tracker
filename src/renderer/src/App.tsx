@@ -20,6 +20,7 @@ import type {
 import { TopBar } from "./components/TopBar";
 import { CapacityBar } from "./components/CapacityBar";
 import { SalvageShell } from "./components/SalvageShell";
+import { MiningShell } from "./components/MiningShell";
 import { applyTheme } from "./lib/theme";
 import { LogMissingBanner } from "./components/LogMissingBanner";
 import { TabBar, type TabKey } from "./components/TabBar";
@@ -51,16 +52,27 @@ const EMPTY_REFERENCE: ReferenceData = {
 };
 
 // ============================================================================
-// App — the top-level shell. Owns the app MODE (cargo | salvage), applies the
-// matching theme to <html data-mode>, and routes to the cargo tracker (the
-// existing, unchanged CargoApp) or the salvage shell. Mode is read once on
-// mount from window.api and persisted on every switch, so it survives a restart.
-// Cargo and salvage keep entirely separate component trees — switching mode
-// unmounts one and mounts the other, so neither touches the other's state.
+// App — the top-level shell. Owns the app MODE (cargo | salvage | mining),
+// applies the matching theme to <html data-mode>, and routes to the cargo
+// tracker (the existing, unchanged CargoApp), the salvage shell, or the mining
+// shell. Mode is read once on mount from window.api and persisted on every
+// switch, so it survives a restart. Each mode keeps an entirely separate
+// component tree — switching mode unmounts one and mounts another, so no mode
+// touches another's state.
 // ============================================================================
+
+/** The single-control cycle order for the mode switcher. */
+const MODE_CYCLE: AppMode[] = ["cargo", "salvage", "mining"];
+
+/** Next mode in the cycle (cargo -> salvage -> mining -> cargo). */
+function nextMode(cur: AppMode): AppMode {
+  const i = MODE_CYCLE.indexOf(cur);
+  return MODE_CYCLE[(i + 1) % MODE_CYCLE.length];
+}
+
 export function App(): React.JSX.Element {
   // null while we read the persisted mode on mount — render nothing rather than
-  // flash cargo then snap to salvage (or vice versa) on a one-tick delay.
+  // flash one mode then snap to another on a one-tick delay.
   const [mode, setMode] = useState<AppMode | null>(null);
 
   // Read the persisted mode once, then keep <html data-mode> in sync with it.
@@ -73,7 +85,7 @@ export function App(): React.JSX.Element {
 
   const toggleMode = (): void => {
     setMode((cur) => {
-      const next: AppMode = cur === "salvage" ? "cargo" : "salvage";
+      const next: AppMode = nextMode(cur ?? "cargo");
       applyTheme(next);
       // Persist; the resolved value from main is authoritative but identical.
       void window.api.setMode(next);
@@ -84,6 +96,7 @@ export function App(): React.JSX.Element {
   if (mode === null)
     return <div style={{ height: "100%", background: "var(--bg)" }} />;
   if (mode === "salvage") return <SalvageShell onToggleMode={toggleMode} />;
+  if (mode === "mining") return <MiningShell onToggleMode={toggleMode} />;
   return <CargoApp onToggleMode={toggleMode} />;
 }
 

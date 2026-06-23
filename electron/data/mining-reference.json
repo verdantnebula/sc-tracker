@@ -1,0 +1,886 @@
+{
+  "fetchedAt": 1782258282276,
+  "source": "rock_values.csv + mineable_locations.csv (bundled game reference)",
+  "rocks": [
+    {
+      "name": "Ice",
+      "rarity": "Common",
+      "scanValues": [
+        4300,
+        8600,
+        12900,
+        17200,
+        21500,
+        25800
+      ]
+    },
+    {
+      "name": "Aluminum",
+      "rarity": "Common",
+      "scanValues": [
+        4285,
+        8570,
+        12855,
+        17140,
+        21425,
+        25710
+      ]
+    },
+    {
+      "name": "Iron",
+      "rarity": "Common",
+      "scanValues": [
+        4270,
+        8540,
+        12810,
+        17080,
+        21350,
+        25620
+      ]
+    },
+    {
+      "name": "Silicon",
+      "rarity": "Common",
+      "scanValues": [
+        4255,
+        8510,
+        12765,
+        17020,
+        21275,
+        25530
+      ]
+    },
+    {
+      "name": "Copper",
+      "rarity": "Common",
+      "scanValues": [
+        4240,
+        8480,
+        12720,
+        16960,
+        21200,
+        25440
+      ]
+    },
+    {
+      "name": "Corundum",
+      "rarity": "Common",
+      "scanValues": [
+        4225,
+        8450,
+        12675,
+        16900,
+        21125,
+        25350
+      ]
+    },
+    {
+      "name": "Quartz",
+      "rarity": "Common",
+      "scanValues": [
+        4210,
+        8420,
+        12630,
+        16840,
+        21050,
+        25260
+      ]
+    },
+    {
+      "name": "Tin",
+      "rarity": "Common",
+      "scanValues": [
+        4195,
+        8390,
+        12585,
+        16780,
+        20975,
+        25170
+      ]
+    },
+    {
+      "name": "Hephaestanite",
+      "rarity": "Common",
+      "scanValues": [
+        4180,
+        8360,
+        12540,
+        16720,
+        20900,
+        25080
+      ]
+    },
+    {
+      "name": "Torite",
+      "rarity": "Uncommon",
+      "scanValues": [
+        3900,
+        7800,
+        11700,
+        15600,
+        19500,
+        23400
+      ]
+    },
+    {
+      "name": "Agricium",
+      "rarity": "Uncommon",
+      "scanValues": [
+        3885,
+        7770,
+        11655,
+        15540,
+        19425,
+        23310
+      ]
+    },
+    {
+      "name": "Tungsten",
+      "rarity": "Uncommon",
+      "scanValues": [
+        3870,
+        7740,
+        11610,
+        15480,
+        19350,
+        23220
+      ]
+    },
+    {
+      "name": "Titanium",
+      "rarity": "Uncommon",
+      "scanValues": [
+        3855,
+        7710,
+        11565,
+        15420,
+        19275,
+        23130
+      ]
+    },
+    {
+      "name": "Aslarite",
+      "rarity": "Uncommon",
+      "scanValues": [
+        3840,
+        7680,
+        11520,
+        15360,
+        19200,
+        23040
+      ]
+    },
+    {
+      "name": "Laranite",
+      "rarity": "Uncommon",
+      "scanValues": [
+        3825,
+        7650,
+        11475,
+        15300,
+        19125,
+        22950
+      ]
+    },
+    {
+      "name": "Bexalite",
+      "rarity": "Rare",
+      "scanValues": [
+        3600,
+        7200,
+        10800,
+        14400,
+        18000,
+        21600
+      ]
+    },
+    {
+      "name": "Gold",
+      "rarity": "Rare",
+      "scanValues": [
+        3585,
+        7170,
+        10755,
+        14340,
+        17925,
+        21510
+      ]
+    },
+    {
+      "name": "Borase",
+      "rarity": "Rare",
+      "scanValues": [
+        3570,
+        7140,
+        10710,
+        14280,
+        17850,
+        21420
+      ]
+    },
+    {
+      "name": "Taranite",
+      "rarity": "Rare",
+      "scanValues": [
+        3555,
+        7110,
+        10665,
+        14220,
+        17775,
+        21330
+      ]
+    },
+    {
+      "name": "Beryl",
+      "rarity": "Rare",
+      "scanValues": [
+        3540,
+        7080,
+        10620,
+        14160,
+        17700,
+        21240
+      ]
+    },
+    {
+      "name": "Lindinium",
+      "rarity": "Epic",
+      "scanValues": [
+        3400,
+        6800,
+        10200,
+        13600,
+        17000,
+        20400
+      ]
+    },
+    {
+      "name": "Riccite",
+      "rarity": "Epic",
+      "scanValues": [
+        3385,
+        6770,
+        10155,
+        13540,
+        16925,
+        20310
+      ]
+    },
+    {
+      "name": "Ouratite",
+      "rarity": "Epic",
+      "scanValues": [
+        3370,
+        6740,
+        10110,
+        13480,
+        16850,
+        20220
+      ]
+    },
+    {
+      "name": "Savrilium",
+      "rarity": "Legendary",
+      "scanValues": [
+        3200,
+        6400,
+        9600,
+        12800,
+        16000,
+        19200
+      ]
+    },
+    {
+      "name": "Stileron",
+      "rarity": "Legendary",
+      "scanValues": [
+        3185,
+        6370,
+        9555,
+        12740,
+        15925,
+        19110
+      ]
+    },
+    {
+      "name": "Quantainium",
+      "rarity": "Legendary",
+      "scanValues": [
+        3170,
+        6340,
+        9510,
+        12680,
+        15850,
+        19020
+      ]
+    }
+  ],
+  "deposits": [
+    {
+      "name": "Agricium",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Found in All Deposits"
+      ]
+    },
+    {
+      "name": "Aluminium",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Cellin",
+        "Yela",
+        "Stanton Lagrange Points",
+        "Pyro Asteroid Clusters"
+      ]
+    },
+    {
+      "name": "Aluminum",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Hurston",
+        "Arial",
+        "Aberdeen",
+        "Magda"
+      ]
+    },
+    {
+      "name": "Alumium",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Ita (CIG typo)"
+      ]
+    },
+    {
+      "name": "Amiant Pod",
+      "type": "Harvestable",
+      "foundAt": [
+        "Bloom (Pyro III)"
+      ]
+    },
+    {
+      "name": "Amioshi Plague",
+      "type": "Harvestable",
+      "foundAt": [
+        "All Moons/Planets (Caves)"
+      ]
+    },
+    {
+      "name": "Aphorite",
+      "type": "Hand Mineable",
+      "foundAt": [
+        "All Moons/Planets/Caves"
+      ]
+    },
+    {
+      "name": "Armillaria",
+      "type": "Harvestable",
+      "foundAt": [
+        "All Moons/Planets (Caves)"
+      ]
+    },
+    {
+      "name": "Aslarite",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Magda",
+        "Ita",
+        "Pyro Asteroid Clusters",
+        "Fuego",
+        "Vuur"
+      ]
+    },
+    {
+      "name": "Beradon",
+      "type": "Ground Vehicle Mineable",
+      "foundAt": [
+        "Pyro I",
+        "Bloom (Pyro III)"
+      ]
+    },
+    {
+      "name": "Beryl",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Found in All Deposits"
+      ]
+    },
+    {
+      "name": "Bexalite",
+      "type": "Ship Mineable (Rare)",
+      "foundAt": [
+        "Found in All Deposits (Rare)"
+      ]
+    },
+    {
+      "name": "Borase",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Found in All Deposits"
+      ]
+    },
+    {
+      "name": "Caranite",
+      "type": "Hand Mineable",
+      "foundAt": [
+        "Aberdeen",
+        "Daymar"
+      ]
+    },
+    {
+      "name": "CompBoard",
+      "type": "Harvestable",
+      "foundAt": [
+        "Hurston"
+      ]
+    },
+    {
+      "name": "Copper",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Aberdeen",
+        "Daymar",
+        "Stanton Lagrange Points",
+        "Pyro Asteroid Clusters",
+        "Lyria",
+        "Clio",
+        "Euterpe",
+        "Pyro I",
+        "Pyro IV",
+        "Terminus"
+      ]
+    },
+    {
+      "name": "Corundum",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Calliope",
+        "Clio",
+        "Euterpe",
+        "Lyria",
+        "microTech",
+        "Pyro Asteroid Clusters",
+        "Arial"
+      ]
+    },
+    {
+      "name": "Decari Pod",
+      "type": "Harvestable",
+      "foundAt": [
+        "Pyro I"
+      ]
+    },
+    {
+      "name": "Degnous Root",
+      "type": "Harvestable",
+      "foundAt": [
+        "Hurston"
+      ]
+    },
+    {
+      "name": "Dolivine",
+      "type": "Hand Mineable",
+      "foundAt": [
+        "All Moons/Planets/Caves"
+      ]
+    },
+    {
+      "name": "Feynmaline",
+      "type": "Ground Vehicle Mineable",
+      "foundAt": [
+        "Pyro IV"
+      ]
+    },
+    {
+      "name": "Flareweed Stalk",
+      "type": "Harvestable",
+      "foundAt": [
+        "Bloom (Pyro III)"
+      ]
+    },
+    {
+      "name": "Fotia Seedpod",
+      "type": "Harvestable",
+      "foundAt": [
+        "Pyro I"
+      ]
+    },
+    {
+      "name": "Glacosite",
+      "type": "Ground Vehicle Mineable",
+      "foundAt": [
+        "Monox (Pyro II)"
+      ]
+    },
+    {
+      "name": "Gold",
+      "type": "Ship Mineable (Rare)",
+      "foundAt": [
+        "Found in All Deposits (Rare)"
+      ]
+    },
+    {
+      "name": "Golden Medmon",
+      "type": "Harvestable",
+      "foundAt": [
+        "Hurston",
+        "microTech"
+      ]
+    },
+    {
+      "name": "Hadanite",
+      "type": "Hand Mineable",
+      "foundAt": [
+        "All Moons/Planets/Caves"
+      ]
+    },
+    {
+      "name": "Heart of the Woods",
+      "type": "Harvestable",
+      "foundAt": [
+        "microTech"
+      ]
+    },
+    {
+      "name": "Hephaestanite",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Found in All Deposits"
+      ]
+    },
+    {
+      "name": "Ice",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Outer Pyro Asteroids",
+        "microTech",
+        "Calliope",
+        "Clio",
+        "Euterpe",
+        "Terminus"
+      ]
+    },
+    {
+      "name": "Iron",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Aberdeen",
+        "Arial",
+        "Daymar",
+        "Ita",
+        "Magda",
+        "Stanton Lagrange Points",
+        "Pyro Asteroid Clusters",
+        "Lyria",
+        "Wala",
+        "microTech",
+        "Calliope",
+        "Pyro I",
+        "Monox",
+        "Vatra",
+        "Adir",
+        "Terminus"
+      ]
+    },
+    {
+      "name": "Janalite",
+      "type": "Hand Mineable",
+      "foundAt": [
+        "Daymar",
+        "Hurston",
+        "Ita",
+        "Magda Sand Caves",
+        "Wala",
+        "Lyria",
+        "microTech",
+        "Calliope",
+        "Clio",
+        "Euterpe",
+        "Bloom",
+        "Fuego",
+        "Terminus"
+      ]
+    },
+    {
+      "name": "Janalite (Caves only)",
+      "type": "Hand Mineable",
+      "foundAt": [
+        "Hurston",
+        "Arial",
+        "Aberdeen",
+        "Magda",
+        "Ita",
+        "Cellin",
+        "Daymar",
+        "Pyro I",
+        "Monox",
+        "Pyro IV",
+        "Ignis",
+        "Vatra",
+        "Adir",
+        "Fairo",
+        "Vuur"
+      ]
+    },
+    {
+      "name": "Juvenile Valakkar",
+      "type": "Creature",
+      "foundAt": [
+        "Hurston",
+        "Daymar"
+      ]
+    },
+    {
+      "name": "Kopion",
+      "type": "Creature",
+      "foundAt": [
+        "Hurston",
+        "microTech"
+      ]
+    },
+    {
+      "name": "Laranite",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Found in All Deposits"
+      ]
+    },
+    {
+      "name": "Lindinium",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Glaciem Ring"
+      ]
+    },
+    {
+      "name": "Marok",
+      "type": "Creature",
+      "foundAt": [
+        "Hurston",
+        "microTech"
+      ]
+    },
+    {
+      "name": "Ouratite",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Hurston",
+        "Arial",
+        "Aberdeen",
+        "Cellin",
+        "Yela's Ring"
+      ]
+    },
+    {
+      "name": "Pingala Seeds",
+      "type": "Harvestable",
+      "foundAt": [
+        "Monox (Pyro II)"
+      ]
+    },
+    {
+      "name": "Pitambu",
+      "type": "Harvestable",
+      "foundAt": [
+        "Hurston",
+        "microTech"
+      ]
+    },
+    {
+      "name": "Prota",
+      "type": "Harvestable",
+      "foundAt": [
+        "Hurston"
+      ]
+    },
+    {
+      "name": "Quantainium",
+      "type": "Ship Mineable (Rare)",
+      "foundAt": [
+        "Found in All Deposits (Rare)"
+      ]
+    },
+    {
+      "name": "Quartz",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Aberdeen",
+        "Ariel",
+        "Calliope",
+        "Clio",
+        "Euterpe",
+        "Lyria",
+        "microTech",
+        "CRU-L5",
+        "ARC-L3",
+        "MIC-L4",
+        "Pyro Asteroid Clusters",
+        "Cellin",
+        "Daymar",
+        "Yela",
+        "Bloom"
+      ]
+    },
+    {
+      "name": "Quasigrazer",
+      "type": "Creature",
+      "foundAt": [
+        "Hurston",
+        "microTech",
+        "Monox (Pyro II)",
+        "Bloom (Pyro III)",
+        "Pyro IV"
+      ]
+    },
+    {
+      "name": "Ranta Dung",
+      "type": "Harvestable",
+      "foundAt": [
+        "All Moons/Planets (Caves)"
+      ]
+    },
+    {
+      "name": "Revenant Pod",
+      "type": "Harvestable",
+      "foundAt": [
+        "Hurston"
+      ]
+    },
+    {
+      "name": "Riccite",
+      "type": "Ship Mineable (Rare, Pyro Only)",
+      "foundAt": [
+        "Found in All Pyro Deposits (Rare)"
+      ]
+    },
+    {
+      "name": "Sadaryx",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "QV Breaker Stations (Nyx)"
+      ]
+    },
+    {
+      "name": "Savrilium",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Glaciem Ring",
+        "QV Breaker Stations (Nyx)"
+      ]
+    },
+    {
+      "name": "Silicon",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Inner Pyro Asteroids",
+        "Daymar",
+        "Yela",
+        "Ignis",
+        "Vatra",
+        "Fairo"
+      ]
+    },
+    {
+      "name": "Stileron",
+      "type": "Ship Mineable (Rare, Pyro Only)",
+      "foundAt": [
+        "Found in All Pyro Deposits (Rare)"
+      ]
+    },
+    {
+      "name": "Stone Bug Shell",
+      "type": "Harvestable",
+      "foundAt": [
+        "Daymar (Caves)"
+      ]
+    },
+    {
+      "name": "Sunset Berry",
+      "type": "Harvestable",
+      "foundAt": [
+        "microTech"
+      ]
+    },
+    {
+      "name": "Taranite",
+      "type": "Ship Mineable (Rare)",
+      "foundAt": [
+        "Found in All Deposits (Rare)"
+      ]
+    },
+    {
+      "name": "Tarantite",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Cellin",
+        "Yela"
+      ]
+    },
+    {
+      "name": "Tin",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Pyro III",
+        "Pyro IV",
+        "Hurston",
+        "Arial",
+        "Ita",
+        "Pyro I",
+        "Monox",
+        "Ignis"
+      ]
+    },
+    {
+      "name": "Titanium",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Cellin",
+        "Daymar",
+        "Yela",
+        "Stanton Lagrange Points",
+        "Pyro Asteroid Clusters",
+        "Aberdeen",
+        "Magda",
+        "Terminus"
+      ]
+    },
+    {
+      "name": "Torite",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Glaciem Ring",
+        "QV Breaker Stations (Nyx)"
+      ]
+    },
+    {
+      "name": "Tungsten",
+      "type": "Ship Mineable",
+      "foundAt": [
+        "Aaron Halo",
+        "Lyria",
+        "Wala",
+        "CRU-L1",
+        "CRU-L2",
+        "CRU-L5",
+        "ARC-L3",
+        "MIC-L4",
+        "HUR-L3",
+        "Adir",
+        "Fairo"
+      ]
+    },
+    {
+      "name": "Wuotan Seeds",
+      "type": "Harvestable",
+      "foundAt": [
+        "Pyro I"
+      ]
+    }
+  ]
+}

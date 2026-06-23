@@ -35,6 +35,7 @@ import type {
   StrippedComponentInput,
   StrippedComponentPatch,
   SalvageReferenceData,
+  MiningReferenceData,
 } from "@shared/types";
 
 let idSeq = 0;
@@ -362,6 +363,32 @@ const DEV_SALVAGE_REFERENCE: SalvageReferenceData = {
   ],
   materialPrices: { rmcPerScu: 7200, cmatPerScu: 12000 },
   haulers: [{ name: "Dev Hauler", gridScu: 64 }],
+};
+
+// Tiny mock mining reference so the Mining views (scan lookup / rock table /
+// deposits) can be developed in a plain browser tab. Shapes mirror the bundled
+// snapshot; values are placeholders, not the real game data.
+const DEV_MINING_REFERENCE: MiningReferenceData = {
+  rocks: [
+    {
+      name: "Dev Ice",
+      rarity: "Common",
+      scanValues: [4300, 8600, 12900, 17200, 21500, 25800],
+    },
+    {
+      name: "Dev Quantainium",
+      rarity: "Legendary",
+      scanValues: [3170, 6340, 9510, 12680, 15850, 19020],
+    },
+  ],
+  deposits: [
+    { name: "Dev Ice", type: "Ship Mineable", foundAt: ["Dev microTech"] },
+    {
+      name: "Dev Quantainium",
+      type: "Ship Mineable (Rare)",
+      foundAt: ["Found in All Deposits (Rare)"],
+    },
+  ],
 };
 
 /**
@@ -695,6 +722,9 @@ function createMockApi(): ApiBridge {
     },
     getSalvageReference: async (): Promise<SalvageReferenceData> =>
       DEV_SALVAGE_REFERENCE,
+
+    getMiningReference: async (): Promise<MiningReferenceData> =>
+      DEV_MINING_REFERENCE,
 
     onMissionsChanged: (cb) => {
       missionListeners.add(cb);

@@ -14,6 +14,10 @@ describe("themeForMode", () => {
     expect(themeForMode("salvage")).toBe("salvage");
   });
 
+  it("maps mining -> mining", () => {
+    expect(themeForMode("mining")).toBe("mining");
+  });
+
   it("defaults any unknown/corrupt value to cargo (never a missing theme)", () => {
     expect(themeForMode("wormhole" as AppMode)).toBe("cargo");
     expect(themeForMode(null)).toBe("cargo");
@@ -35,9 +39,18 @@ describe("applyTheme", () => {
     expect(root.dataset.mode).toBe("cargo");
   });
 
-  it("overwrites a previous mode attribute (switching back and forth)", () => {
+  it("writes data-mode=mining for mining mode", () => {
     const root = { dataset: {} as { mode?: string } };
+    applyTheme("mining", root);
+    expect(root.dataset.mode).toBe("mining");
+  });
+
+  it("overwrites a previous mode attribute (cycling cargo->salvage->mining)", () => {
+    const root = { dataset: {} as { mode?: string } };
+    applyTheme("cargo", root);
     applyTheme("salvage", root);
+    applyTheme("mining", root);
+    expect(root.dataset.mode).toBe("mining");
     applyTheme("cargo", root);
     expect(root.dataset.mode).toBe("cargo");
   });
