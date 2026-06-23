@@ -16,7 +16,13 @@ export default defineConfig({
   },
   test: {
     // Store/parser/watcher tests live under electron/; pure renderer-selector
-    // tests live alongside the renderer lib. Both run under the same Node ABI.
-    include: ["electron/**/*.test.ts", "src/renderer/src/**/*.test.ts"],
+    // tests live alongside the renderer lib; pure shared-contract modules
+    // (e.g. payout.ts) keep their tests beside them under src/shared. All run
+    // under the same Node ABI.
+    include: [
+      "electron/**/*.test.ts",
+      "src/renderer/src/**/*.test.ts",
+      "src/shared/**/*.test.ts",
+    ],
   },
 });

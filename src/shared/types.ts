@@ -121,6 +121,15 @@ export interface Mission {
   /** aUEC payout. null until correlated (or when attribution failed). */
   payout: number | null;
   payoutConfidence: PayoutConfidence;
+  /**
+   * The full contract REWARD in aUEC (manual entry). Distinct from `payout`:
+   *  - reward  = the contract's advertised reward, entered by the user (the log
+   *              never reports it before completion). Drives the partial-payout
+   *              ESTIMATE (see @shared/payout) for in-progress / partial hauls.
+   *  - payout  = the ACTUAL aUEC awarded, captured from the log on completion.
+   * null until the user enters it.
+   */
+  reward: number | null;
   source: MissionSource;
   /** Epoch ms when accepted; null if unknown. */
   acceptedAt: number | null;
@@ -368,6 +377,8 @@ export interface ManualMissionInput {
 export interface MissionPatch {
   payout?: number | null;
   payoutConfidence?: PayoutConfidence;
+  /** Full contract reward (aUEC) for the partial-payout estimate. null clears it. */
+  reward?: number | null;
   notes?: string;
   status?: MissionStatus;
   /**

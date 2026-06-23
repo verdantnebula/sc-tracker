@@ -239,6 +239,20 @@ function CargoApp({
     });
   };
 
+  // Set a partial delivered amount on a leg (Phase B1). Persists scuDelivered
+  // WITHOUT touching `completed` — a value strictly between 0 and scuTotal is the
+  // partial state. The store stamps manual_override (any leg patch is a user
+  // action), so historical replay can't clobber the partial.
+  const setDelivered = (
+    missionId: string,
+    legId: string,
+    scuDelivered: number,
+  ): void => {
+    void window.api.updateMission(missionId, {
+      legs: [{ legId, scuDelivered }],
+    });
+  };
+
   // Add a new pickup/dropoff leg to an existing mission (Multi-to-Single /
   // Single-to-Multi hauls, or log-suppressed missions). The store generates the
   // leg id, defaults the fields blank, and stamps manual_override. The user then
@@ -301,6 +315,11 @@ function CargoApp({
       payout,
       payoutConfidence: "confirmed",
     });
+  };
+  // Set the full contract reward (Phase B2) that drives the partial-payout
+  // estimate. Independent of the actual logged `payout`. null clears it.
+  const setReward = (missionId: string, reward: number | null): void => {
+    void window.api.updateMission(missionId, { reward });
   };
   const setNotes = (missionId: string, notes: string): void => {
     void window.api.updateMission(missionId, { notes });
@@ -494,6 +513,7 @@ function CargoApp({
               reference={reference}
               onCheckOff={checkOffLine}
               onEditLeg={editLeg}
+              onSetDelivered={setDelivered}
               onOpenMission={setSelectedId}
             />
           ) : tab === "route" ? (
@@ -528,9 +548,13 @@ function CargoApp({
               toggleLeg(selected.id, legId, completed)
             }
             onEditLeg={(legId, patch) => editLeg(selected.id, legId, patch)}
+            onSetDelivered={(legId, scuDelivered) =>
+              setDelivered(selected.id, legId, scuDelivered)
+            }
             onAddLeg={(kind) => addLeg(selected.id, kind)}
             onRemoveLeg={(legId) => removeLeg(selected.id, legId)}
             onSetPayout={(payout) => setPayout(selected.id, payout)}
+            onSetReward={(reward) => setReward(selected.id, reward)}
             onSetNotes={(notes) => setNotes(selected.id, notes)}
             onAbandon={() => abandon(selected.id)}
           />

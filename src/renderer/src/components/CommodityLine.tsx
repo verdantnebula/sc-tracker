@@ -21,6 +21,7 @@ export function CommodityLine({
   reference,
   onCheckOff,
   onEditLeg,
+  onSetDelivered,
   onOpenMission,
   needsLocation = false,
   defaultExpanded = false,
@@ -38,6 +39,12 @@ export function CommodityLine({
     missionId: string,
     legId: string,
     patch: { commodity?: string; scuTotal?: number; location?: string | null },
+  ) => void;
+  /** Set a partial delivered amount (0..scuTotal) on a specific leg. */
+  onSetDelivered: (
+    missionId: string,
+    legId: string,
+    scuDelivered: number,
   ) => void;
   /** Open the full MissionDetailPanel for a mission. */
   onOpenMission: (missionId: string) => void;
@@ -192,11 +199,16 @@ export function CommodityLine({
               legKind={leg.kind}
               commodity={leg.commodity}
               scuTotal={leg.scuTotal}
+              scuDelivered={leg.scuDelivered}
+              completed={leg.completed}
               location={leg.location ?? ""}
               reference={reference}
               accent={accent}
               autoFocusDestination={needsLocation}
               onEditLeg={(patch) => onEditLeg(mission.id, leg.id, patch)}
+              onSetDelivered={(scuDelivered) =>
+                onSetDelivered(mission.id, leg.id, scuDelivered)
+              }
               onOpenMission={() => onOpenMission(mission.id)}
             />
           ))}
@@ -214,17 +226,22 @@ function LegEditRow({
   legKind,
   commodity,
   scuTotal,
+  scuDelivered,
+  completed,
   location,
   reference,
   accent,
   autoFocusDestination,
   onEditLeg,
+  onSetDelivered,
   onOpenMission,
 }: {
   missionTitle: string;
   legKind: "pickup" | "dropoff";
   commodity: string;
   scuTotal: number;
+  scuDelivered: number;
+  completed: boolean;
   location: string;
   reference: ReferenceData;
   accent: string;
@@ -234,6 +251,7 @@ function LegEditRow({
     scuTotal?: number;
     location?: string | null;
   }) => void;
+  onSetDelivered: (scuDelivered: number) => void;
   onOpenMission: () => void;
 }): React.JSX.Element {
   // Locally controlled text so typing is smooth; commit on change. Keyed by the
@@ -242,12 +260,22 @@ function LegEditRow({
   const [scuText, setScuText] = useState(
     scuTotal === 0 ? "" : String(scuTotal),
   );
+  const [deliveredText, setDeliveredText] = useState(String(scuDelivered));
 
   // Re-sync when the underlying leg changes (e.g. a live event updated it).
   useEffect(() => {
     setCommodityText(commodity);
     setScuText(scuTotal === 0 ? "" : String(scuTotal));
-  }, [commodity, scuTotal]);
+    setDeliveredText(String(scuDelivered));
+  }, [commodity, scuTotal, scuDelivered, completed]);
+
+  const partial =
+    !completed && scuTotal > 0 && scuDelivered > 0 && scuDelivered < scuTotal;
+  const commitDelivered = (raw: number): void => {
+    const clamped = Math.max(0, Math.min(scuTotal, Math.round(raw) || 0));
+    setDeliveredText(String(clamped));
+    onSetDelivered(clamped);
+  };
 
   const commodityListId = `bd-commodities-${missionTitle}-${legKind}`;
 
@@ -377,6 +405,117 @@ function LegEditRow({
           }}
         />
       </div>
+
+      {/* Partial turn-in (Phase B1): a compact delivered stepper for dropoff legs
+          with a known quantity. The summary row's click is the all-or-nothing
+          deliver; this records a partial (e.g. 60/100) without flipping
+          `completed`. Hidden when the quantity is unknown (no scale to fill). */}
+      {legKind === "dropoff" && scuTotal > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              fontSize: 9,
+              letterSpacing: 1,
+              color: "var(--muted)",
+              fontFamily: "var(--font-display)",
+              fontWeight: 600,
+              flex: "none",
+            }}
+          >
+            DELIVERED
+          </span>
+          <button
+            onClick={() => commitDelivered(scuDelivered - 1)}
+            disabled={scuDelivered <= 0}
+            aria-label="Decrease delivered SCU"
+            style={{
+              width: 22,
+              height: 22,
+              flex: "none",
+              background: "transparent",
+              border: "1px solid var(--border-strong)",
+              color: "var(--text-2)",
+              cursor: scuDelivered <= 0 ? "not-allowed" : "pointer",
+              opacity: scuDelivered <= 0 ? 0.4 : 1,
+              fontSize: 13,
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            −
+          </button>
+          <input
+            value={deliveredText}
+            inputMode="numeric"
+            aria-label="Delivered SCU"
+            onChange={(e) =>
+              setDeliveredText(e.target.value.replace(/[^0-9]/g, ""))
+            }
+            onBlur={() => commitDelivered(parseInt(deliveredText || "0", 10))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter")
+                commitDelivered(parseInt(deliveredText || "0", 10));
+            }}
+            style={{
+              width: 46,
+              flex: "none",
+              background: "var(--window)",
+              border: "1px solid rgba(86,180,200,0.25)",
+              color: partial ? "var(--success)" : "var(--text-bright)",
+              fontFamily: "var(--font-mono)",
+              fontWeight: 700,
+              fontSize: 12,
+              padding: "4px 5px",
+              outline: "none",
+              textAlign: "right",
+            }}
+          />
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--muted)",
+              flex: "none",
+            }}
+          >
+            / {scuTotal}
+          </span>
+          <button
+            onClick={() => commitDelivered(scuDelivered + 1)}
+            disabled={scuDelivered >= scuTotal}
+            aria-label="Increase delivered SCU"
+            style={{
+              width: 22,
+              height: 22,
+              flex: "none",
+              background: "transparent",
+              border: "1px solid var(--border-strong)",
+              color: "var(--text-2)",
+              cursor: scuDelivered >= scuTotal ? "not-allowed" : "pointer",
+              opacity: scuDelivered >= scuTotal ? 0.4 : 1,
+              fontSize: 13,
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            +
+          </button>
+          {partial && (
+            <span
+              style={{
+                marginLeft: "auto",
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--success)",
+                fontWeight: 700,
+                flex: "none",
+              }}
+            >
+              {scuDelivered}/{scuTotal}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

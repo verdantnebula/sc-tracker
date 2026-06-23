@@ -6,6 +6,7 @@ import type { Mission, Leg, LogPathInfo, LogStatus } from "@shared/types";
 import {
   isLegIncomplete,
   isMissionIncomplete,
+  missionTotals,
   dropoffGroups,
   pickupGroups,
   routeEdges,
@@ -40,6 +41,7 @@ function mission(legs: Leg[]): Mission {
     status: "accepted",
     payout: null,
     payoutConfidence: "unknown",
+    reward: null,
     source: "log",
     acceptedAt: 1000,
     completedAt: null,
@@ -694,5 +696,72 @@ describe("shouldShowLogBanner", () => {
     expect(shouldShowLogBanner(pathInfo({ gameLogExists: false }), null)).toBe(
       true,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase B1 — partial turn-in: the renderer selectors reflect 0 < delivered < total.
+// ---------------------------------------------------------------------------
+describe("partial turn-in (renderer selectors)", () => {
+  it("missionTotals: a partial leg's remaining = total - delivered (not full, not zero)", () => {
+    const m = mission([
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 100,
+        scuDelivered: 60,
+        location: "HDPC-Cassillo",
+        completed: false,
+      }),
+    ]);
+    const t = missionTotals(m);
+    expect(t.scuTotal).toBe(100);
+    expect(t.scuRemaining).toBe(40); // 100 - 60
+    expect(t.legsDone).toBe(0); // partial is NOT done
+    expect(t.legsTotal).toBe(1);
+  });
+
+  it("dropoffGroups: a partial leg stays in todo with the partial remaining", () => {
+    const m = mission([
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 100,
+        scuDelivered: 45,
+        location: "HDPC-Cassillo",
+        completed: false,
+      }),
+    ]);
+    const g = dropoffGroups([m], null).find(
+      (x) => x.location === "HDPC-Cassillo",
+    )!;
+    const ice = g.todo.find((c) => c.commodity === "Ice")!;
+    expect(ice).toBeDefined(); // still TODO, not delivered
+    expect(ice.scuRemaining).toBe(55); // 100 - 45
+    expect(g.scuRemaining).toBe(55);
+    expect(g.allDone).toBe(false);
+    expect(g.pctDelivered).toBe(45);
+  });
+
+  it("dropoffGroups: a fully-completed leg leaves todo (delivered), unlike a partial", () => {
+    const m = mission([
+      leg({
+        id: "d0",
+        kind: "dropoff",
+        commodity: "Ice",
+        scuTotal: 100,
+        scuDelivered: 100,
+        location: "HDPC-Cassillo",
+        completed: true,
+      }),
+    ]);
+    const g = dropoffGroups([m], null).find(
+      (x) => x.location === "HDPC-Cassillo",
+    )!;
+    expect(g.todo.find((c) => c.commodity === "Ice")).toBeUndefined();
+    expect(g.allDone).toBe(true);
+    expect(g.pctDelivered).toBe(100);
   });
 });

@@ -14,6 +14,7 @@ export function DropoffGroupCard({
   reference,
   onCheckOff,
   onEditLeg,
+  onSetDelivered,
   onOpenMission,
 }: {
   group: DropoffGroup;
@@ -25,6 +26,11 @@ export function DropoffGroupCard({
     missionId: string,
     legId: string,
     patch: { commodity?: string; scuTotal?: number; location?: string | null },
+  ) => void;
+  onSetDelivered: (
+    missionId: string,
+    legId: string,
+    scuDelivered: number,
   ) => void;
   onOpenMission: (missionId: string) => void;
 }): React.JSX.Element | null {
@@ -179,6 +185,7 @@ export function DropoffGroupCard({
                 defaultExpanded={needsLocation}
                 onCheckOff={() => onCheckOff(group.location, line.commodity)}
                 onEditLeg={onEditLeg}
+                onSetDelivered={onSetDelivered}
                 onOpenMission={onOpenMission}
               />
             ))}

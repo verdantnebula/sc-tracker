@@ -290,6 +290,7 @@ interface MissionRow {
   status: string;
   payout: number | null;
   payout_confidence: string;
+  reward: number | null;
   source: string;
   accepted_at: number | null;
   completed_at: number | null;
@@ -987,6 +988,13 @@ class SqliteMissionStore implements MissionStore {
         .prepare(`UPDATE missions SET payout_confidence = @c WHERE id = @id`)
         .run({ c: patch.payoutConfidence, id: missionId });
     }
+    if (patch.reward !== undefined) {
+      // Full contract reward (manual). Drives the partial-payout ESTIMATE only;
+      // it never touches the actual logged `payout`/confidence. null clears it.
+      this.db
+        .prepare(`UPDATE missions SET reward = @r WHERE id = @id`)
+        .run({ r: patch.reward, id: missionId });
+    }
     if (patch.notes !== undefined) {
       this.db
         .prepare(`UPDATE missions SET notes = @n WHERE id = @id`)
@@ -1187,6 +1195,7 @@ class SqliteMissionStore implements MissionStore {
       status: r.status as MissionStatus,
       payout: r.payout,
       payoutConfidence: r.payout_confidence as PayoutConfidence,
+      reward: r.reward,
       source: r.source as Mission["source"],
       acceptedAt: r.accepted_at,
       completedAt: r.completed_at,

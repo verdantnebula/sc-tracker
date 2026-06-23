@@ -99,6 +99,7 @@ function mkMission(over: Partial<Mission>): Mission {
     status: over.status ?? "accepted",
     payout: over.payout ?? null,
     payoutConfidence: over.payoutConfidence ?? "unknown",
+    reward: over.reward ?? null,
     source: over.source ?? "log",
     acceptedAt: over.acceptedAt ?? null,
     completedAt: over.completedAt ?? null,

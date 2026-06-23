@@ -15,7 +15,7 @@ import Database from "better-sqlite3";
 import type { Database as DB } from "better-sqlite3";
 
 /** Current schema version. Bump + add a migration block when the shape changes. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS missions (
@@ -27,8 +27,9 @@ CREATE TABLE IF NOT EXISTS missions (
   contract_template    TEXT,
   contract_definition_id TEXT,
   status               TEXT NOT NULL DEFAULT 'accepted',
-  payout               INTEGER,                       -- nullable aUEC
+  payout               INTEGER,                       -- nullable aUEC (actual, logged on completion)
   payout_confidence    TEXT NOT NULL DEFAULT 'unknown',
+  reward               INTEGER,                       -- nullable aUEC (full contract reward, manual; drives partial-payout estimate)
   source               TEXT NOT NULL DEFAULT 'log',
   accepted_at          INTEGER,                       -- epoch ms, nullable
   completed_at         INTEGER,                       -- epoch ms, nullable
@@ -224,5 +225,13 @@ function migrate(db: DB): void {
   }
   if (!cols.some((c) => c.name === "title_dropoff")) {
     db.exec(`ALTER TABLE missions ADD COLUMN title_dropoff TEXT`);
+  }
+
+  // v6: add missions.reward (nullable aUEC — the full contract reward, entered
+  // manually, that drives the partial-payout ESTIMATE; see @shared/payout). The
+  // log never reports a reward pre-completion, so pre-existing rows have none and
+  // NULL is correct (the estimate simply isn't shown until the user enters one).
+  if (!cols.some((c) => c.name === "reward")) {
+    db.exec(`ALTER TABLE missions ADD COLUMN reward INTEGER`);
   }
 }

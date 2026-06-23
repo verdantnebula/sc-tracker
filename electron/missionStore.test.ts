@@ -1344,3 +1344,125 @@ describe("updateMission add/remove legs", () => {
     ).toBeUndefined();
   });
 });
+
+// =============================================================================
+// Phase B1 — partial turn-in (scuDelivered between 0 and scuTotal)
+// =============================================================================
+
+describe("partial turn-in", () => {
+  const seed = (scuTotal = 100): void => {
+    store.applyEvent(accepted("m1", "Haul", 1000), "live");
+    store.applyEvent(
+      declared("m1", "d0", "Ice", scuTotal, "HDPC-Cassillo", 1000),
+      "live",
+    );
+  };
+
+  it("updateMission persists a partial scuDelivered (no completion)", () => {
+    seed(100);
+    const m = store.updateMission("m1", {
+      legs: [{ legId: "d0", scuDelivered: 60 }],
+    });
+    expect(m.legs[0].scuDelivered).toBe(60);
+    expect(m.legs[0].completed).toBe(false);
+  });
+
+  it("a partial leg stays in by-dropoff todo with remaining = total - delivered", () => {
+    seed(100);
+    store.updateMission("m1", { legs: [{ legId: "d0", scuDelivered: 60 }] });
+    const g = store
+      .dropoffGroups(null)
+      .find((x) => x.location === "HDPC-Cassillo")!;
+    // Still outstanding (NOT delivered) until full.
+    const ice = g.todo.find((c) => c.commodity === "Ice")!;
+    expect(ice).toBeDefined();
+    expect(ice.scuRemaining).toBe(40); // 100 - 60
+    expect(g.scuRemaining).toBe(40);
+    expect(g.allDone).toBe(false);
+    // 60% delivered shows on the group progress.
+    expect(g.pctDelivered).toBe(60);
+  });
+
+  it("checking the box from a partial fills to full (completed, scuDelivered = scuTotal)", () => {
+    seed(100);
+    store.updateMission("m1", { legs: [{ legId: "d0", scuDelivered: 60 }] });
+    const m = store.toggleLeg("m1", "d0", true);
+    expect(m.legs[0].completed).toBe(true);
+    expect(m.legs[0].scuDelivered).toBe(100);
+    const g = store
+      .dropoffGroups(null)
+      .find((x) => x.location === "HDPC-Cassillo")!;
+    expect(g.allDone).toBe(true);
+  });
+
+  it("un-checking resets a partial leg to 0 (completed=false, scuDelivered=0)", () => {
+    seed(100);
+    store.updateMission("m1", { legs: [{ legId: "d0", scuDelivered: 60 }] });
+    const m = store.toggleLeg("m1", "d0", false);
+    expect(m.legs[0].completed).toBe(false);
+    expect(m.legs[0].scuDelivered).toBe(0);
+  });
+
+  it("delivering exactly scuTotal via scuDelivered does NOT auto-complete (box still drives completed)", () => {
+    // scuDelivered alone never flips `completed`; only the checkbox/full toggle
+    // does. A leg with scuDelivered == scuTotal but completed=false has 0
+    // remaining yet is still 'open' -> stays in todo (suppressed-qty rule).
+    seed(100);
+    const m = store.updateMission("m1", {
+      legs: [{ legId: "d0", scuDelivered: 100 }],
+    });
+    expect(m.legs[0].completed).toBe(false);
+    const g = store
+      .dropoffGroups(null)
+      .find((x) => x.location === "HDPC-Cassillo")!;
+    // Remaining is 0, but the leg is still open -> remains actionable in todo.
+    const ice = g.todo.find((c) => c.commodity === "Ice")!;
+    expect(ice).toBeDefined();
+    expect(g.allDone).toBe(false);
+  });
+});
+
+// =============================================================================
+// Phase B2 — mission.reward (manual; drives the partial-payout estimate)
+// =============================================================================
+
+describe("mission reward", () => {
+  it("defaults to null and is settable via updateMission, independent of payout", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000), "live");
+    expect(store.getMission("m1")!.reward).toBeNull();
+
+    const m = store.updateMission("m1", { reward: 130000 });
+    expect(m.reward).toBe(130000);
+    // Setting reward must NOT touch the actual logged payout / confidence.
+    expect(m.payout).toBeNull();
+    expect(m.payoutConfidence).toBe("unknown");
+  });
+
+  it("reward and payout coexist (estimate vs actual)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000), "live");
+    const m = store.updateMission("m1", { reward: 130000, payout: 124750 });
+    expect(m.reward).toBe(130000);
+    expect(m.payout).toBe(124750);
+    expect(m.payoutConfidence).toBe("confirmed"); // payout edit -> confirmed
+  });
+
+  it("reward = null clears a previously-set reward", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000), "live");
+    store.updateMission("m1", { reward: 99999 });
+    expect(store.getMission("m1")!.reward).toBe(99999);
+    const m = store.updateMission("m1", { reward: null });
+    expect(m.reward).toBeNull();
+  });
+
+  it("reward survives a manual mission round-trip (defaults null)", () => {
+    const created = store.addManualMission({
+      title: "Manual",
+      giver: "Covalex Hauling",
+      status: "accepted",
+      legs: [],
+    });
+    expect(created.reward).toBeNull();
+    const m = store.updateMission(created.id, { reward: 75000 });
+    expect(store.getMission(m.id)!.reward).toBe(75000);
+  });
+});

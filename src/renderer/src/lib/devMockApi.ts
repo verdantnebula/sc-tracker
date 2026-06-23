@@ -73,6 +73,7 @@ function seedMissions(): Mission[] {
       status: "in_progress",
       payout: 120000,
       payoutConfidence: "confirmed",
+      reward: 130000,
       source: "log",
       acceptedAt: Date.now() - 3_600_000,
       completedAt: null,
@@ -131,6 +132,7 @@ function seedMissions(): Mission[] {
       status: "in_progress",
       payout: 90000,
       payoutConfidence: "approximate",
+      reward: null,
       source: "log",
       acceptedAt: Date.now() - 1_800_000,
       completedAt: null,
@@ -172,6 +174,7 @@ function seedMissions(): Mission[] {
       status: "accepted",
       payout: null,
       payoutConfidence: "unknown",
+      reward: 240000,
       source: "log",
       acceptedAt: Date.now() - 600_000,
       completedAt: null,
@@ -205,6 +208,7 @@ function seedMissions(): Mission[] {
       status: "complete",
       payout: 184500,
       payoutConfidence: "confirmed",
+      reward: 184500,
       source: "log",
       acceptedAt: Date.now() - 86_400_000,
       completedAt: Date.now() - 80_000_000,
@@ -239,6 +243,7 @@ function seedMissions(): Mission[] {
       status: "abandoned",
       payout: null,
       payoutConfidence: "unknown",
+      reward: null,
       source: "log",
       acceptedAt: Date.now() - 172_800_000,
       completedAt: Date.now() - 170_000_000,
@@ -426,6 +431,7 @@ function createMockApi(): ApiBridge {
         status: input.status,
         payout: null,
         payoutConfidence: "unknown",
+        reward: null,
         source: "manual",
         acceptedAt: Date.now(),
         completedAt: null,
@@ -444,6 +450,7 @@ function createMockApi(): ApiBridge {
         if (patch.payout !== undefined) next.payout = patch.payout;
         if (patch.payoutConfidence !== undefined)
           next.payoutConfidence = patch.payoutConfidence;
+        if (patch.reward !== undefined) next.reward = patch.reward;
         if (patch.notes !== undefined) next.notes = patch.notes;
         if (patch.status !== undefined) next.status = patch.status;
         if (patch.legs) {

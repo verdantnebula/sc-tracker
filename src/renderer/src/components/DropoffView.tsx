@@ -14,6 +14,7 @@ export function DropoffView({
   reference,
   onCheckOff,
   onEditLeg,
+  onSetDelivered,
   onOpenMission,
 }: {
   groups: DropoffGroup[];
@@ -28,6 +29,11 @@ export function DropoffView({
     missionId: string,
     legId: string,
     patch: { commodity?: string; scuTotal?: number; location?: string | null },
+  ) => void;
+  onSetDelivered: (
+    missionId: string,
+    legId: string,
+    scuDelivered: number,
   ) => void;
   onOpenMission: (missionId: string) => void;
 }): React.JSX.Element {
@@ -87,6 +93,7 @@ export function DropoffView({
             reference={reference}
             onCheckOff={onCheckOff}
             onEditLeg={onEditLeg}
+            onSetDelivered={onSetDelivered}
             onOpenMission={onOpenMission}
           />
         ))}

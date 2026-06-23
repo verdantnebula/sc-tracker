@@ -10,6 +10,7 @@ import {
   gradeLabel,
   isMissionIncomplete,
 } from "../lib/selectors";
+import { payoutFactor, partialPayout } from "@shared/payout";
 import { StatusBadge } from "./StatusBadge";
 import { EditableLegRow } from "./EditableLegRow";
 
@@ -19,9 +20,11 @@ export function MissionDetailPanel({
   onClose,
   onToggleLeg,
   onEditLeg,
+  onSetDelivered,
   onAddLeg,
   onRemoveLeg,
   onSetPayout,
+  onSetReward,
   onSetNotes,
   onAbandon,
 }: {
@@ -33,9 +36,13 @@ export function MissionDetailPanel({
     legId: string,
     patch: { commodity?: string; scuTotal?: number; location?: string | null },
   ) => void;
+  /** Set a partial delivered amount on a leg (0..scuTotal). */
+  onSetDelivered: (legId: string, scuDelivered: number) => void;
   onAddLeg: (kind: LegKind) => void;
   onRemoveLeg: (legId: string) => void;
   onSetPayout: (payout: number) => void;
+  /** Set the full contract reward (aUEC) for the partial-payout estimate. */
+  onSetReward: (reward: number | null) => void;
   onSetNotes: (notes: string) => void;
   onAbandon: () => void;
 }): React.JSX.Element {
@@ -45,13 +52,46 @@ export function MissionDetailPanel({
   const [payoutText, setPayoutText] = useState<string>(
     mission.payout != null ? String(mission.payout) : "",
   );
+  const [rewardText, setRewardText] = useState<string>(
+    mission.reward != null ? String(mission.reward) : "",
+  );
   const [notes, setNotes] = useState<string>(mission.notes);
 
   // Re-sync when a different mission opens.
   useEffect(() => {
     setPayoutText(mission.payout != null ? String(mission.payout) : "");
+    setRewardText(mission.reward != null ? String(mission.reward) : "");
     setNotes(mission.notes);
   }, [mission.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- partial-payout estimate (see @shared/payout — APPROXIMATION) ---
+  // Sum dropoff legs only (the SCU that actually pays). A completed leg counts as
+  // fully delivered. Ratio drives the step-function factor; reward (if set) drives
+  // the expected cash payout, both updating live as partials change.
+  const drops = mission.legs.filter((l) => l.kind === "dropoff");
+  const totalRequired = drops.reduce((a, l) => a + l.scuTotal, 0);
+  const totalDelivered = drops.reduce(
+    (a, l) => a + (l.completed ? l.scuTotal : l.scuDelivered),
+    0,
+  );
+  const deliveredRatio = totalRequired > 0 ? totalDelivered / totalRequired : 0;
+  const factor = payoutFactor(deliveredRatio);
+  const reward = mission.reward;
+  const expectedPayout =
+    reward != null
+      ? partialPayout(reward, totalDelivered, totalRequired)
+      : null;
+  // The next bracket to chase (for the "deliver ≥X% for Y%" hint).
+  const nextBracket =
+    factor >= 1
+      ? null
+      : factor >= 0.76
+        ? { pct: 100, factorPct: 100 }
+        : factor >= 0.45
+          ? { pct: 75, factorPct: 76 }
+          : factor >= 0.15
+            ? { pct: 50, factorPct: 45 }
+            : { pct: 25, factorPct: 15 };
 
   return (
     <>
@@ -260,6 +300,9 @@ export function MissionDetailPanel({
                 reference={reference}
                 onToggle={() => onToggleLeg(leg.id, !leg.completed)}
                 onEditLeg={(patch) => onEditLeg(leg.id, patch)}
+                onSetDelivered={(scuDelivered) =>
+                  onSetDelivered(leg.id, scuDelivered)
+                }
                 onRemove={() => onRemoveLeg(leg.id)}
                 canRemove={mission.legs.length > 1}
               />
@@ -319,7 +362,7 @@ export function MissionDetailPanel({
                 fontWeight: 600,
               }}
             >
-              PAYOUT · aUEC (manual)
+              PAYOUT · aUEC (actual, logged)
             </label>
             <input
               value={payoutText}
@@ -340,6 +383,147 @@ export function MissionDetailPanel({
                 outline: "none",
               }}
             />
+          </div>
+
+          {/* Reward + partial-payout estimate (Phase B2). The reward is the full
+              contract reward (manual); the readout shows the delivered ratio, the
+              factor %, and — once a reward is set — the estimated payout for the
+              current delivered SCU. The model is an APPROXIMATION (see
+              @shared/payout); the ACTUAL payout above wins once logged. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label
+              style={{
+                fontSize: 10,
+                letterSpacing: 1.5,
+                color: "var(--muted)",
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+              }}
+            >
+              REWARD · aUEC (full contract)
+            </label>
+            <input
+              value={rewardText}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/[^0-9]/g, "");
+                setRewardText(digits);
+                onSetReward(digits === "" ? null : parseInt(digits, 10));
+              }}
+              inputMode="numeric"
+              placeholder="e.g. 130000"
+              style={{
+                background: "var(--window)",
+                border: "1px solid rgba(86,180,200,0.25)",
+                color: "var(--primary)",
+                fontFamily: "var(--font-mono)",
+                fontWeight: 700,
+                fontSize: 16,
+                padding: "10px 12px",
+                outline: "none",
+              }}
+            />
+
+            {/* Delivered ratio + factor readout. Only meaningful when there is a
+                known quantity to deliver against. */}
+            {totalRequired > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  padding: "10px 12px",
+                  border: "1px solid var(--border)",
+                  background: "rgba(52,224,224,0.04)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-2)",
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Delivered{" "}
+                    <strong style={{ color: "var(--text-bright)" }}>
+                      {Math.round(deliveredRatio * 100)}%
+                    </strong>{" "}
+                    ({fmt(totalDelivered)}/{fmt(totalRequired)} SCU) →{" "}
+                    <strong style={{ color: "var(--primary)" }}>
+                      {Math.round(factor * 100)}%
+                    </strong>{" "}
+                    of reward
+                  </span>
+                </div>
+                {nextBracket && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "var(--muted)",
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Deliver ≥{nextBracket.pct}% for {nextBracket.factorPct}% of
+                    reward.
+                  </span>
+                )}
+                {expectedPayout != null && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      marginTop: 2,
+                      paddingTop: 6,
+                      borderTop: "1px dashed rgba(86,180,200,0.18)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        color: "var(--muted)",
+                        fontFamily: "var(--font-display)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      EXPECTED PAYOUT (EST.)
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
+                        fontSize: 16,
+                        color: "var(--success)",
+                      }}
+                    >
+                      {fmt(expectedPayout)} aUEC
+                    </span>
+                  </div>
+                )}
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: "var(--muted)",
+                    fontFamily: "var(--font-body)",
+                    fontStyle: "italic",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Estimate only — re-validate the curve per patch. The actual
+                  logged payout above is authoritative once the mission
+                  completes.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Notes */}
