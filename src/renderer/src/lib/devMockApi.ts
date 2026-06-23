@@ -562,6 +562,10 @@ function createMockApi(): ApiBridge {
       outcome: "error" as const,
       error: "Screen capture is unavailable in standalone dev mode.",
     }),
+    recognizeOcr: async () => ({
+      outcome: "error" as const,
+      error: "OCR is unavailable in standalone dev mode.",
+    }),
 
     // --- overlay window (dev stub — no second window in a plain browser tab) ---
     toggleOverlay: async () => {

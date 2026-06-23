@@ -389,6 +389,24 @@ export interface OcrCaptureResult {
   error?: string;
 }
 
+/**
+ * Result of the MAIN-PROCESS OCR pass over a captured frame (Phase F). The
+ * renderer hands the captured PNG data URL to main (where tesseract.js can load
+ * its worker/core/traineddata from disk with no CSP/sandbox/asar constraints) and
+ * gets back the recognized text + a confidence score; the pure parser/fuzzy-match
+ * still run renderer-side. On failure `outcome: 'error'` with a readable reason —
+ * the handler never throws into the renderer. No image is ever persisted.
+ */
+export interface OcrRecognizeResult {
+  outcome: "ok" | "error";
+  /** Raw recognized text (present when outcome === 'ok'). */
+  rawText?: string;
+  /** Tesseract mean word confidence, normalized 0..1 (present when ok). */
+  confidence?: number;
+  /** Human-readable reason when outcome === 'error'. */
+  error?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Manual entry payloads (renderer -> main; SPEC §4 secondary capture)
 // ---------------------------------------------------------------------------

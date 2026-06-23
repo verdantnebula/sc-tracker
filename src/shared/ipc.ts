@@ -18,6 +18,7 @@ import type {
   PickLogFolderResult,
   ExportReportResult,
   OcrCaptureResult,
+  OcrRecognizeResult,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -56,8 +57,10 @@ export const IPC = {
   SETTINGS_SET_OCR_ENABLED: "settings:setOcrEnabled",
 
   // EXPERIMENTAL OCR contract capture (Phase F) — capture the primary display
-  // as a PNG data URL in main; the renderer runs tesseract.js + the parser.
+  // as a PNG data URL in main; main also runs tesseract.js (assets load from
+  // disk there, unconstrained by the renderer's CSP/sandbox) and returns text.
   OCR_CAPTURE_SCREEN: "ocr:captureScreen",
+  OCR_RECOGNIZE: "ocr:recognize",
 
   // always-on-top "next stop" overlay window (Phase D)
   OVERLAY_TOGGLE: "overlay:toggle",
@@ -141,6 +144,11 @@ export interface IpcRequestMap {
   };
   /** Capture the primary display as a PNG data URL for OCR (Phase F). */
   [IPC.OCR_CAPTURE_SCREEN]: { args: []; result: OcrCaptureResult };
+  /** Run tesseract.js OCR (in main) over a captured PNG data URL (Phase F). */
+  [IPC.OCR_RECOGNIZE]: {
+    args: [imageDataUrl: string];
+    result: OcrRecognizeResult;
+  };
 
   // --- overlay window (Phase D) ---
   /** Toggle the always-on-top overlay open/closed; returns the resulting state. */
@@ -252,6 +260,8 @@ export interface ApiBridge {
   setOcrEnabled(enabled: boolean): Promise<boolean>;
   /** Capture the primary display as a PNG data URL for the OCR pipeline. */
   captureScreenForOcr(): Promise<OcrCaptureResult>;
+  /** Run OCR (in main) over a captured PNG data URL; resolves text + confidence. */
+  recognizeOcr(imageDataUrl: string): Promise<OcrRecognizeResult>;
 
   // --- overlay window (Phase D) ---
   /** Toggle the always-on-top overlay open/closed; resolves to the new state. */

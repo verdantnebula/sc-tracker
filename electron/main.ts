@@ -36,6 +36,7 @@ import type {
   LogPathInfo,
   PickLogFolderResult,
   OcrCaptureResult,
+  OcrRecognizeResult,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -82,6 +83,7 @@ import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { installConsoleLogger, buildAppInfo, writeAppInfo } from "./logger";
 import { buildDiagnosticsReport } from "./diagnosticsExport";
+import { ocrAssetDir, recognize as recognizeOcr } from "./ocrRecognize";
 import type { ExportReportResult } from "@shared/types";
 
 // ---------------------------------------------------------------------------
@@ -874,6 +876,43 @@ function registerIpc(): void {
           error:
             "Screen capture failed. " +
             String(err instanceof Error ? err.message : err),
+        };
+      }
+    },
+  );
+
+  // Run tesseract.js OCR over the captured frame IN MAIN. The renderer can't load
+  // the worker/core/traineddata reliably in the packaged app (sandbox + strict
+  // CSP + assets inside app.asar); main loads them from disk with no such limits.
+  // Resolves the asset dir from the UNPACKED location (packaged) or the built
+  // renderer dir (dev). Fully defensive: any failure returns { outcome: 'error' }
+  // instead of throwing into the renderer. The image is consumed in-memory only.
+  ipcMain.handle(
+    IPC.OCR_RECOGNIZE,
+    async (_e, imageDataUrl: string): Promise<OcrRecognizeResult> => {
+      if (!settings.ocrEnabled) {
+        return {
+          outcome: "error",
+          error: "OCR contract capture is disabled in settings.",
+        };
+      }
+      try {
+        const assetDir = ocrAssetDir({
+          isPackaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          appPath: app.getAppPath(),
+        });
+        const { rawText, confidence } = await recognizeOcr(
+          imageDataUrl,
+          assetDir,
+        );
+        return { outcome: "ok", rawText, confidence };
+      } catch (err) {
+        console.error("[main] OCR recognize failed:", err);
+        return {
+          outcome: "error",
+          error:
+            "OCR failed. " + String(err instanceof Error ? err.message : err),
         };
       }
     },

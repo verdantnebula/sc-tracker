@@ -1,20 +1,17 @@
 // ============================================================================
-// ocrRunner.ts — renderer-side tesseract.js wrapper  (Phase F, EXPERIMENTAL)
+// ocrRunner.ts — renderer-side OCR entry point  (Phase F, EXPERIMENTAL)
 // ----------------------------------------------------------------------------
-// Runs OCR on a captured screen frame using a tesseract.js worker, loading the
-// core WASM, worker script and `eng.traineddata` from BUNDLED LOCAL paths — NOT
-// a CDN — so the packaged app works fully offline (consistent with the app's
-// no-runtime-network philosophy; tesseract.js otherwise defaults to a jsDelivr
-// CDN). The assets are copied next to the built renderer at `out/renderer/ocr/`
-// by scripts/copy-ocr-assets.mjs (run after electron-vite build + by package:exe).
+// Runs OCR on a captured screen frame and parses the recognized text into
+// contract fields. The heavy lifting (tesseract.js: spawning a worker, streaming
+// the core WASM, reading eng.traineddata) happens in the MAIN process via
+// `window.api.recognizeOcr` — NOT here. See electron/ocrRecognize.ts for why:
+// in the packaged app the renderer is sandboxed under a strict CSP and is loaded
+// from inside app.asar, so it cannot reliably spawn a tesseract worker or
+// stream the wasm/traineddata; main (Node) loads those from disk unconstrained.
 //
-// We import tesseract.js DYNAMICALLY (inside recognizeContract) so the ~60KB+
-// library is only loaded when the user actually triggers a capture — the
-// experimental feature costs nothing on a normal launch where it stays off.
-//
-// Defensive: any failure (missing assets, worker error, bad image) rejects with
-// a readable Error; the dialog surfaces it. OCR output is text only — the image
-// is consumed in-memory and never persisted.
+// This module is therefore thin: it asks main to OCR the frame, then runs the
+// PURE parser (parseContractOcr) on the returned text. The image never leaves
+// memory — main consumes the data URL for the OCR pass only and returns text.
 // ============================================================================
 
 import { parseContractOcr, type OcrContract } from "@shared/ocrParse";
@@ -29,23 +26,9 @@ export interface OcrRunResult {
 }
 
 /**
- * Resolve the directory that holds the bundled OCR assets. The renderer is
- * loaded from `file://…/out/renderer/index.html` (packaged) or served by Vite
- * (dev). In both cases the assets live in a sibling `ocr/` folder relative to
- * the document, so a relative URL against the document base resolves correctly
- * without hard-coding an absolute filesystem path.
- */
-function assetBase(): string {
-  // new URL("ocr/", baseURI) yields the absolute file:// (or http:// in dev)
-  // URL of the assets folder next to the current document.
-  return new URL("ocr/", document.baseURI).href;
-}
-
-/**
  * Run OCR on a PNG/JPEG data URL (from the main-process screen capture) and
- * parse the recognized text into contract fields. Pure-ish: the only side effect
- * is creating + terminating a short-lived tesseract worker. Always terminates
- * the worker (even on error) so a failed run can't leak a worker.
+ * parse the recognized text into contract fields. Delegates recognition to the
+ * main process (window.api.recognizeOcr); the parse runs here.
  *
  * @param imageDataUrl a `data:image/png;base64,…` frame.
  */
@@ -56,36 +39,19 @@ export async function recognizeContract(
     throw new Error("No image to recognize.");
   }
 
-  // Dynamic import keeps tesseract.js out of the initial renderer bundle/cost.
-  const Tesseract = await import("tesseract.js");
-  const base = assetBase();
-
-  // All asset paths point at the bundled local copies — never a CDN. corePath is
-  // PINNED to the exact simd-lstm glue file we ship (copy-ocr-assets.mjs), so the
-  // worker never tries to fetch a variant that isn't bundled. langPath is the
-  // folder holding eng.traineddata.gz (tesseract.js gunzips it transparently).
-  const worker = await Tesseract.createWorker("eng", undefined, {
-    workerPath: `${base}worker.min.js`,
-    corePath: `${base}tesseract-core-simd-lstm.wasm.js`,
-    langPath: base,
-    // No `logger` callback by default (keeps the console clean); progress is
-    // coarse-grained and the capture is fast enough not to need a bar.
-  });
-
-  try {
-    const { data } = await worker.recognize(imageDataUrl);
-    const rawText = data.text ?? "";
-    const confidence =
-      typeof data.confidence === "number"
-        ? Math.max(0, Math.min(1, data.confidence / 100))
-        : 0;
-    return {
-      contract: parseContractOcr(rawText),
-      rawText,
-      confidence,
-    };
-  } finally {
-    // Always free the worker — a leaked worker holds the wasm heap alive.
-    await worker.terminate();
+  const result = await window.api.recognizeOcr(imageDataUrl);
+  if (result.outcome !== "ok") {
+    throw new Error(result.error ?? "OCR failed.");
   }
+
+  const rawText = result.rawText ?? "";
+  const confidence =
+    typeof result.confidence === "number"
+      ? Math.max(0, Math.min(1, result.confidence))
+      : 0;
+  return {
+    contract: parseContractOcr(rawText),
+    rawText,
+    confidence,
+  };
 }

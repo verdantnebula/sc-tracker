@@ -20,6 +20,7 @@ import type {
   PickLogFolderResult,
   ExportReportResult,
   OcrCaptureResult,
+  OcrRecognizeResult,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -91,6 +92,11 @@ const api: ApiBridge = {
     ) as Promise<boolean>,
   captureScreenForOcr: () =>
     ipcRenderer.invoke(IPC.OCR_CAPTURE_SCREEN) as Promise<OcrCaptureResult>,
+  recognizeOcr: (imageDataUrl: string) =>
+    ipcRenderer.invoke(
+      IPC.OCR_RECOGNIZE,
+      imageDataUrl,
+    ) as Promise<OcrRecognizeResult>,
 
   // --- overlay window (Phase D) ---
   toggleOverlay: () =>
