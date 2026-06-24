@@ -452,7 +452,6 @@ function CargoApp({
         selectedShipSlug={selectedShipSlug}
         onSelectShip={selectShip}
         onResync={() => void window.api.startBackfill()}
-        onManualAdd={() => setShowForm(true)}
         onReset={resetAll}
         onPickLogFolder={pickLogFolder}
         onCollectLogs={() => setShowCollectLogs(true)}
@@ -591,6 +590,7 @@ function CargoApp({
               gap={gap}
               onToggleLeg={toggleLeg}
               onOpenDetails={setSelectedId}
+              onManualAdd={() => setShowForm(true)}
               onClearActive={clearActive}
             />
           ) : (

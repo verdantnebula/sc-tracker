@@ -1,20 +1,39 @@
 // ============================================================================
 // SalvageTopBar — the salvage shell's 58px header.
 // ----------------------------------------------------------------------------
-// PHASE-1: a minimal header carrying ONLY the shared Cargo<->Salvage switcher
-// (top-left) on the Drake theme. It deliberately omits cargo's domain actions
-// (re-sync / manual add / reset / LIVE-folder), which are cargo concerns. Later
-// salvage phases add salvage-appropriate controls into the right-hand flex slot
-// that is already laid out here.
+// Carries the shared Cargo<->Salvage switcher (top-left) on the Drake theme,
+// plus — for cross-mode consistency — the shared LOCATION chip and the shared
+// Settings gear (SettingsGear) reused from the cargo bar. The gear houses the
+// app-wide controls (LIVE folder, Re-sync, Reset Data, Collect Logs); since
+// Collect Logs now lives inside the gear, the standalone Collect Logs button is
+// gone. Everything is token-driven so it skins to the Drake theme for free.
 // ============================================================================
 
+import type { LogPathInfo } from "@shared/types";
 import { ModeSwitcher } from "./ModeSwitcher";
+import { LocationChip } from "./LocationChip";
+import { SettingsGear } from "./SettingsGear";
 
 export function SalvageTopBar({
   onToggleMode,
+  currentLocation,
+  logPathInfo,
+  onPickLogFolder,
+  onResync,
+  onReset,
   onCollectLogs,
 }: {
   onToggleMode: () => void;
+  /** Player's last-known location — same source the cargo bar/chip uses. */
+  currentLocation: string | null;
+  /** Resolved Game.log path info for the gear popover. */
+  logPathInfo: LogPathInfo | null;
+  /** Open the native folder picker to choose a custom LIVE folder. */
+  onPickLogFolder: () => void;
+  /** Re-read the Game.log (re-run the logbackups backfill). */
+  onResync: () => void;
+  /** Wipe cargo/mission data + re-run backfill — destructive, confirmed. */
+  onReset: () => void;
   /** Open the "Collect Logs" / Report a Problem dialog. */
   onCollectLogs: () => void;
 }): React.JSX.Element {
@@ -34,31 +53,20 @@ export function SalvageTopBar({
     >
       <ModeSwitcher mode="salvage" onToggle={onToggleMode} />
 
+      {/* Location chip — shared component (same source as the cargo bar). */}
+      <LocationChip currentLocation={currentLocation} />
+
       <div style={{ flex: 1 }} />
 
-      {/* Report a Problem ("Collect Logs") — token-driven so it skins to Drake. */}
-      <button
-        className="sc-ghost-btn"
-        onClick={onCollectLogs}
-        title="Report a problem (collect logs)"
-        aria-label="Report a problem (collect logs)"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 7,
-          padding: "8px 13px",
-          background: "transparent",
-          border: "1px solid var(--border-strong)",
-          color: "var(--text-2)",
-          fontFamily: "var(--font-display)",
-          fontWeight: 600,
-          fontSize: 12,
-          letterSpacing: 1,
-          cursor: "pointer",
-        }}
-      >
-        🛟 COLLECT LOGS
-      </button>
+      {/* Settings (gear) — shared component. App-wide controls (LIVE folder,
+          Re-sync, Reset Data, Collect Logs). No OCR section in salvage. */}
+      <SettingsGear
+        logPathInfo={logPathInfo}
+        onPickLogFolder={onPickLogFolder}
+        onResync={onResync}
+        onReset={onReset}
+        onCollectLogs={onCollectLogs}
+      />
     </header>
   );
 }

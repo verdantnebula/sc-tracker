@@ -12,7 +12,11 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
-import type { SalvageRun, SalvageReferenceData } from "@shared/types";
+import type {
+  SalvageRun,
+  SalvageReferenceData,
+  LogPathInfo,
+} from "@shared/types";
 import { SalvageTopBar } from "./SalvageTopBar";
 import { SalvageActiveRunView } from "./salvage/SalvageActiveRunView";
 import { SalvageSellSplitView } from "./salvage/SalvageSellSplitView";
@@ -54,10 +58,17 @@ export function SalvageShell({
   const [reference, setReference] = useState<SalvageReferenceData>(
     EMPTY_SALVAGE_REFERENCE,
   );
+  // Shared app-wide state for the LOCATION chip + the gear popover. Reuses the
+  // SAME current-location plumbing the cargo/mining shells use, and the same
+  // Game.log path info the gear displays.
+  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  const [logPathInfo, setLogPathInfo] = useState<LogPathInfo | null>(null);
 
   // Subscribe to the salvage bridge. A single salvage:runs:changed broadcast
   // feeds both the runs list (History) and the active run (Active Run / Split),
   // so we recompute the active run from the pushed snapshot — no extra round-trip.
+  // Also subscribe to the shared current-location + log-status plumbing so the
+  // LOCATION chip and the gear stay in sync (same channels cargo uses).
   useEffect(() => {
     const api = window.api;
     const applySnapshot = (list: SalvageRun[]): void => {
@@ -67,10 +78,38 @@ export function SalvageShell({
 
     void api.listSalvageRuns().then(applySnapshot);
     void api.getSalvageReference().then(setReference);
+    void api.getCurrentLocation().then(setCurrentLocation);
+    void api.getLogPathInfo().then(setLogPathInfo);
 
-    const unsub = api.onSalvageRunsChanged(applySnapshot);
-    return () => unsub();
+    const unsubs = [
+      api.onSalvageRunsChanged(applySnapshot),
+      api.onCurrentLocationChanged(setCurrentLocation),
+      // The resolved path / found-state can change with connection — keep the
+      // gear panel's display in sync, mirroring CargoApp.
+      api.onLogStatusChanged(() => {
+        void api.getLogPathInfo().then(setLogPathInfo);
+      }),
+    ];
+    return () => unsubs.forEach((u) => u());
   }, []);
+
+  // Open the native folder picker to choose a custom StarCitizen \LIVE\ folder.
+  // Mirrors CargoApp.pickLogFolder: on success refresh the gear's path info.
+  const pickLogFolder = (): void => {
+    void window.api.pickLogFolder().then((res) => {
+      if (res.outcome === "ok" && res.info) setLogPathInfo(res.info);
+      // "canceled"/"error" -> no-op here (salvage has no error toast surface).
+    });
+  };
+
+  // Reset ALL data — same destructive, confirmed reset the cargo bar exposes.
+  const resetAll = (): void => {
+    const ok = window.confirm(
+      "Reset ALL data?\n\nThis wipes every mission, leg, payout and fine from the database, then re-runs the logbackups backfill under the corrected rules. The UEX reference cache is kept. This cannot be undone.",
+    );
+    if (!ok) return;
+    void window.api.resetAllData();
+  };
 
   // --- mutations (all persist via window.api; UI refreshes off the broadcast) ---
   const createRun = (): void => {
@@ -120,6 +159,11 @@ export function SalvageShell({
     >
       <SalvageTopBar
         onToggleMode={onToggleMode}
+        currentLocation={currentLocation}
+        logPathInfo={logPathInfo}
+        onPickLogFolder={pickLogFolder}
+        onResync={() => void window.api.startBackfill()}
+        onReset={resetAll}
         onCollectLogs={() => setShowCollectLogs(true)}
       />
 

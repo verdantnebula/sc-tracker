@@ -17,12 +17,13 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
-import type { MiningReferenceData } from "@shared/types";
+import type { MiningReferenceData, LogPathInfo } from "@shared/types";
 import { resolveBody, areaRegionsForBody } from "@shared/miningArea";
 import { MiningTopBar } from "./MiningTopBar";
 import { MiningScanLookupView } from "./mining/MiningScanLookupView";
 import { MiningRockValuesView } from "./mining/MiningRockValuesView";
 import { MiningDepositsView } from "./mining/MiningDepositsView";
+import { CollectLogsDialog } from "./CollectLogsDialog";
 
 /** The mining tabs. */
 export type MiningTab = "scan" | "rocks" | "deposits";
@@ -61,16 +62,27 @@ export function MiningShell({
   // mode. Read on mount + kept in sync via onOverlayStateChanged so the pin
   // button reflects the overlay closing itself (or a toggle from the cargo bar).
   const [overlayEnabled, setOverlayEnabled] = useState(false);
+  // Shared app-wide state for the gear popover: the resolved Game.log path info.
+  const [logPathInfo, setLogPathInfo] = useState<LogPathInfo | null>(null);
+  // Collect Logs / Report a Problem dialog (now reachable from the gear).
+  const [showCollectLogs, setShowCollectLogs] = useState(false);
 
   // Load the bundled mining reference once, and subscribe to the SAME current-
-  // location plumbing the cargo renderer uses. Read-only: no mutations.
+  // location plumbing the cargo renderer uses. Read-only on mining data, but it
+  // also reads the shared Game.log path info + log status for the gear popover.
   useEffect(() => {
-    void window.api.getMiningReference().then(setReference);
-    void window.api.getCurrentLocation().then(setCurrentLocation);
-    void window.api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
+    const api = window.api;
+    void api.getMiningReference().then(setReference);
+    void api.getCurrentLocation().then(setCurrentLocation);
+    void api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
+    void api.getLogPathInfo().then(setLogPathInfo);
     const unsubs = [
-      window.api.onCurrentLocationChanged(setCurrentLocation),
-      window.api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
+      api.onCurrentLocationChanged(setCurrentLocation),
+      api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
+      // Keep the gear's path display in sync (mirrors CargoApp/SalvageShell).
+      api.onLogStatusChanged(() => {
+        void api.getLogPathInfo().then(setLogPathInfo);
+      }),
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
@@ -79,6 +91,24 @@ export function MiningShell({
   // uses). Optimistic + confirmed by the broadcast.
   const toggleOverlay = (): void => {
     void window.api.toggleOverlay().then((s) => setOverlayEnabled(s.enabled));
+  };
+
+  // Open the native folder picker to choose a custom StarCitizen \LIVE\ folder.
+  // Mirrors CargoApp.pickLogFolder: on success refresh the gear's path info.
+  const pickLogFolder = (): void => {
+    void window.api.pickLogFolder().then((res) => {
+      if (res.outcome === "ok" && res.info) setLogPathInfo(res.info);
+      // "canceled"/"error" -> no-op (mining has no error toast surface).
+    });
+  };
+
+  // Reset ALL data — same destructive, confirmed reset the cargo bar exposes.
+  const resetAll = (): void => {
+    const ok = window.confirm(
+      "Reset ALL data?\n\nThis wipes every mission, leg, payout and fine from the database, then re-runs the logbackups backfill under the corrected rules. The UEX reference cache is kept. This cannot be undone.",
+    );
+    if (!ok) return;
+    void window.api.resetAllData();
   };
 
   // Resolve location -> body -> the set of deposit regions that count as "near".
@@ -103,7 +133,16 @@ export function MiningShell({
         body={body}
         overlayEnabled={overlayEnabled}
         onToggleOverlay={toggleOverlay}
+        logPathInfo={logPathInfo}
+        onPickLogFolder={pickLogFolder}
+        onResync={() => void window.api.startBackfill()}
+        onReset={resetAll}
+        onCollectLogs={() => setShowCollectLogs(true)}
       />
+
+      {showCollectLogs && (
+        <CollectLogsDialog onClose={() => setShowCollectLogs(false)} />
+      )}
 
       {/* Hazard-stripe accent bar — cool azure industrial signature. */}
       <div

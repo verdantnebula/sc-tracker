@@ -3,18 +3,27 @@
 // ----------------------------------------------------------------------------
 // A minimal header carrying the shared mode switcher (top-left) on the MISC
 // theme, plus a short tagline on the right identifying this as a read-only
-// reference. The right-hand flex slot is laid out so a later mining phase (log
-// correlation, run tracking) can add domain controls without restructuring.
+// reference. For cross-mode consistency it also carries the shared Settings gear
+// (SettingsGear) so the app-wide controls (LIVE folder, Re-sync, Reset Data,
+// Collect Logs) are reachable from Mining too. Mining surfaces location via its
+// own "NEAR YOU" chip, so it doesn't carry the raw LOCATION chip.
 // Everything is token-driven so it skins to the MISC azure theme for free.
 // ============================================================================
 
+import type { LogPathInfo } from "@shared/types";
 import { ModeSwitcher } from "./ModeSwitcher";
+import { SettingsGear } from "./SettingsGear";
 
 export function MiningTopBar({
   onToggleMode,
   body,
   overlayEnabled,
   onToggleOverlay,
+  logPathInfo,
+  onPickLogFolder,
+  onResync,
+  onReset,
+  onCollectLogs,
 }: {
   onToggleMode: () => void;
   /** The player's resolved current body (Hurston/…/Pyro), or null if unknown. */
@@ -23,6 +32,16 @@ export function MiningTopBar({
   overlayEnabled: boolean;
   /** Toggle the shared overlay window open/closed (shows the Mining panel). */
   onToggleOverlay: () => void;
+  /** Resolved Game.log path info for the gear popover. */
+  logPathInfo: LogPathInfo | null;
+  /** Open the native folder picker to choose a custom LIVE folder. */
+  onPickLogFolder: () => void;
+  /** Re-read the Game.log (re-run the logbackups backfill). */
+  onResync: () => void;
+  /** Wipe cargo/mission data + re-run backfill — destructive, confirmed. */
+  onReset: () => void;
+  /** Open the "Collect Logs" / Report a Problem dialog. */
+  onCollectLogs: () => void;
 }): React.JSX.Element {
   return (
     <header
@@ -125,6 +144,16 @@ export function MiningTopBar({
       >
         📌
       </button>
+
+      {/* Settings (gear) — shared component. App-wide controls (LIVE folder,
+          Re-sync, Reset Data, Collect Logs). No OCR section in mining. */}
+      <SettingsGear
+        logPathInfo={logPathInfo}
+        onPickLogFolder={onPickLogFolder}
+        onResync={onResync}
+        onReset={onReset}
+        onCollectLogs={onCollectLogs}
+      />
     </header>
   );
 }

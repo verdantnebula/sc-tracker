@@ -1,11 +1,15 @@
 // TopBar — design README §1. App identity + location chip + LogStatusIndicator
-// + overlay pin + Settings gear + Manual Add. 58px fixed row. Re-sync and Reset
-// Data now live inside the gear popover (LogFolderPanel) to keep the header lean.
-import { useState } from "react";
+// + overlay pin + Settings gear. 58px fixed row. Re-sync and Reset Data live
+// inside the gear popover (SettingsGear/LogFolderPanel) to keep the header lean.
+// Manual Add now lives on the Mission List view (it's a mission-creation action),
+// not the global top bar. The LOCATION chip and the gear are shared components
+// (LocationChip / SettingsGear) reused by the Salvage + Mining bars too.
 import type { LogStatus, LogPathInfo, ShipReference } from "@shared/types";
 import { LogStatusIndicator } from "./LogStatusIndicator";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { ShipPicker } from "./ShipPicker";
+import { LocationChip } from "./LocationChip";
+import { SettingsGear } from "./SettingsGear";
 
 export function TopBar({
   logStatus,
@@ -15,7 +19,6 @@ export function TopBar({
   selectedShipSlug,
   onSelectShip,
   onResync,
-  onManualAdd,
   onReset,
   onPickLogFolder,
   onCollectLogs,
@@ -36,7 +39,6 @@ export function TopBar({
   /** Persist a ship selection (resolved slug, or null to clear). */
   onSelectShip: (slug: string | null) => void;
   onResync: () => void;
-  onManualAdd: () => void;
   onReset: () => void;
   /** Open the native folder picker to choose a custom LIVE folder. */
   onPickLogFolder: () => void;
@@ -55,7 +57,6 @@ export function TopBar({
   /** Open the OCR capture/review dialog (only shown when ocrEnabled). */
   onOcrCapture: () => void;
 }): React.JSX.Element {
-  const [settingsOpen, setSettingsOpen] = useState(false);
   return (
     <header
       style={{
@@ -73,46 +74,8 @@ export function TopBar({
       {/* Top-left Cargo<->Salvage switcher (replaces the static diamond+wordmark) */}
       <ModeSwitcher mode="cargo" onToggle={onToggleMode} />
 
-      {/* Location chip — must stay one line. flexShrink:0 keeps it sizing to
-          content (the SHIP picker after it must not squeeze it), and the value
-          span uses nowrap + ellipsis so a long location id (e.g. RR-MIC-LEO)
-          never wraps onto multiple lines inside the chip. */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 12px",
-          border: "1px solid rgba(86,180,200,0.22)",
-          background: "rgba(52,224,224,0.06)",
-          flexShrink: 0,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 600,
-            fontSize: 10,
-            color: "var(--muted)",
-            letterSpacing: 1.5,
-            flex: "none",
-          }}
-        >
-          LOCATION
-        </span>
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 13,
-            color: "var(--primary)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {currentLocation ?? "—"}
-        </span>
-      </div>
+      {/* Location chip — shared component (reused on the Salvage bar). */}
+      <LocationChip currentLocation={currentLocation} />
 
       {/* Ship picker — Cargo mode only, AFTER the LOCATION chip (Phase A) */}
       <ShipPicker
@@ -157,58 +120,17 @@ export function TopBar({
         📌
       </button>
 
-      {/* Settings (gear) — choose a custom StarCitizen \LIVE\ folder */}
-      <div style={{ position: "relative" }}>
-        <button
-          className="sc-ghost-btn"
-          onClick={() => setSettingsOpen((v) => !v)}
-          aria-label="Log folder settings"
-          title="Game.log folder settings"
-          aria-expanded={settingsOpen}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 34,
-            height: 34,
-            background: settingsOpen ? "rgba(52,224,224,0.10)" : "transparent",
-            border: `1px solid ${
-              settingsOpen ? "var(--primary)" : "var(--border-strong)"
-            }`,
-            color: settingsOpen ? "var(--primary)" : "var(--text-2)",
-            fontSize: 16,
-            lineHeight: 1,
-            cursor: "pointer",
-          }}
-        >
-          ⚙
-        </button>
-
-        {settingsOpen && (
-          <LogFolderPanel
-            info={logPathInfo}
-            ocrEnabled={ocrEnabled}
-            onToggleOcr={onToggleOcr}
-            onChangeFolder={() => {
-              setSettingsOpen(false);
-              onPickLogFolder();
-            }}
-            onResync={() => {
-              setSettingsOpen(false);
-              onResync();
-            }}
-            onReset={() => {
-              setSettingsOpen(false);
-              onReset();
-            }}
-            onCollectLogs={() => {
-              setSettingsOpen(false);
-              onCollectLogs();
-            }}
-            onClose={() => setSettingsOpen(false)}
-          />
-        )}
-      </div>
+      {/* Settings (gear) — shared component (reused on Salvage + Mining bars).
+          Houses the LIVE folder picker, Re-sync, Reset Data, Collect Logs, and
+          the EXPERIMENTAL OCR toggle (cargo only). */}
+      <SettingsGear
+        logPathInfo={logPathInfo}
+        onPickLogFolder={onPickLogFolder}
+        onResync={onResync}
+        onReset={onReset}
+        onCollectLogs={onCollectLogs}
+        ocr={{ ocrEnabled, onToggleOcr }}
+      />
 
       {/* EXPERIMENTAL OCR capture entry — only present when the feature is
           enabled in the gear panel. Reads the mobiGlas contract screen to
@@ -233,361 +155,6 @@ export function TopBar({
           ⊡ OCR Capture
         </button>
       )}
-
-      {/* Manual Add (primary) */}
-      <button
-        className="sc-primary-btn"
-        onClick={onManualAdd}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "8px 15px",
-          background: "var(--primary)",
-          border: "1px solid var(--primary)",
-          color: "#04181a",
-          fontFamily: "var(--font-display)",
-          fontWeight: 700,
-          fontSize: 12,
-          letterSpacing: 1,
-          cursor: "pointer",
-          boxShadow: "0 0 18px rgba(52,224,224,0.38)",
-          whiteSpace: "nowrap",
-        }}
-      >
-        + MANUAL ADD
-      </button>
     </header>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// LogFolderPanel — the gear popover. Shows the resolved Game.log path, whether
-// it was found, and whether we're on the default vs a custom folder, plus a
-// button to (re)pick the StarCitizen \LIVE\ folder via the native dialog.
-// ---------------------------------------------------------------------------
-
-function LogFolderPanel({
-  info,
-  ocrEnabled,
-  onToggleOcr,
-  onChangeFolder,
-  onResync,
-  onReset,
-  onCollectLogs,
-  onClose,
-}: {
-  info: LogPathInfo | null;
-  ocrEnabled: boolean;
-  onToggleOcr: () => void;
-  onChangeFolder: () => void;
-  /** Re-run the logbackups backfill (relocated from the top bar). */
-  onResync: () => void;
-  /** Wipe all data + re-run backfill — destructive, confirmed (relocated). */
-  onReset: () => void;
-  onCollectLogs: () => void;
-  onClose: () => void;
-}): React.JSX.Element {
-  const found = info?.gameLogExists ?? false;
-  return (
-    <>
-      {/* click-away backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: "fixed", inset: 0, zIndex: 40 }}
-      />
-      <div
-        role="dialog"
-        aria-label="Game.log folder settings"
-        style={{
-          position: "absolute",
-          top: "calc(100% + 8px)",
-          right: 0,
-          zIndex: 41,
-          width: 380,
-          padding: 16,
-          background: "rgba(9,16,21,0.98)",
-          border: "1px solid var(--border-strong)",
-          boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: 1.5,
-            color: "var(--muted)",
-            marginBottom: 12,
-          }}
-        >
-          GAME.LOG FOLDER
-        </div>
-
-        {/* current path + found state */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 8,
-            padding: "10px 12px",
-            border: `1px solid ${
-              found ? "rgba(84,224,138,0.3)" : "rgba(255,107,107,0.35)"
-            }`,
-            background: found
-              ? "rgba(84,224,138,0.05)"
-              : "rgba(255,107,107,0.05)",
-          }}
-        >
-          <span
-            style={{
-              flex: "none",
-              fontSize: 13,
-              color: found ? "var(--success)" : "var(--danger)",
-              fontWeight: 700,
-            }}
-          >
-            {found ? "✓" : "✗"}
-          </span>
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--text-bright)",
-                wordBreak: "break-all",
-                lineHeight: 1.4,
-              }}
-            >
-              {info?.gameLogPath ?? "—"}
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 10,
-                letterSpacing: 0.5,
-                color: found ? "var(--success)" : "var(--danger)",
-                marginTop: 4,
-              }}
-            >
-              {found ? "Game.log found" : "Game.log not found"}
-              {info
-                ? info.isDefault
-                  ? " · default location"
-                  : " · custom folder"
-                : ""}
-            </div>
-          </div>
-        </div>
-
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 11,
-            lineHeight: 1.5,
-            color: "var(--text-2)",
-            margin: "12px 0 14px",
-          }}
-        >
-          Installed Star Citizen somewhere non-standard? Point the tracker at
-          the
-          <code style={{ color: "var(--primary)" }}> \LIVE\ </code>
-          folder that contains <code>Game.log</code>. The choice is saved across
-          launches.
-        </p>
-
-        <button
-          className="sc-primary-btn"
-          onClick={onChangeFolder}
-          style={{
-            width: "100%",
-            padding: "9px 14px",
-            background: "var(--primary)",
-            border: "1px solid var(--primary)",
-            color: "#04181a",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: 1,
-            cursor: "pointer",
-          }}
-        >
-          CHOOSE \LIVE\ FOLDER…
-        </button>
-
-        {/* Divider + DATA controls (Re-sync + Reset) — relocated here from the
-            top bar so the header stays uncluttered. Re-sync re-runs the
-            logbackups backfill; Reset wipes everything (it confirms first). */}
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            margin: "16px 0 12px",
-          }}
-        />
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: 1.5,
-            color: "var(--muted)",
-            marginBottom: 8,
-          }}
-        >
-          DATA
-        </div>
-        <button
-          className="sc-ghost-btn"
-          onClick={onResync}
-          title="Re-run the logbackups backfill"
-          style={{
-            width: "100%",
-            padding: "9px 14px",
-            background: "transparent",
-            border: "1px solid var(--border-strong)",
-            color: "var(--text-bright)",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: 1,
-            cursor: "pointer",
-            marginBottom: 8,
-          }}
-        >
-          ⟳ RE-SYNC
-        </button>
-        <button
-          className="sc-ghost-btn"
-          onClick={onReset}
-          title="Wipe all mission data and re-run backfill"
-          style={{
-            width: "100%",
-            padding: "9px 14px",
-            background: "transparent",
-            border: "1px solid var(--status-abandoned, #c0556a)",
-            color: "var(--status-abandoned, #e08a9a)",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: 1,
-            cursor: "pointer",
-          }}
-        >
-          ⌫ RESET DATA
-        </button>
-
-        {/* Divider + Report a Problem ("Collect Logs") */}
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            margin: "16px 0 12px",
-          }}
-        />
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: 1.5,
-            color: "var(--muted)",
-            marginBottom: 8,
-          }}
-        >
-          SOMETHING WRONG?
-        </div>
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 11,
-            lineHeight: 1.5,
-            color: "var(--text-2)",
-            margin: "0 0 10px",
-          }}
-        >
-          Collect the logs the developer needs into one file on your Desktop
-          (your username + in-game name are removed automatically).
-        </p>
-        <button
-          className="sc-ghost-btn"
-          onClick={onCollectLogs}
-          style={{
-            width: "100%",
-            padding: "9px 14px",
-            background: "transparent",
-            border: "1px solid var(--border-strong)",
-            color: "var(--text-bright)",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: 1,
-            cursor: "pointer",
-          }}
-        >
-          🛟 COLLECT LOGS…
-        </button>
-
-        {/* Divider + EXPERIMENTAL OCR toggle (Phase F) */}
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            margin: "16px 0 12px",
-          }}
-        />
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: 1.5,
-            color: "var(--muted)",
-            marginBottom: 8,
-          }}
-        >
-          EXPERIMENTAL
-        </div>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            cursor: "pointer",
-            padding: "8px 10px",
-            border: "1px solid var(--border-strong)",
-            background: ocrEnabled ? "rgba(52,224,224,0.06)" : "transparent",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={ocrEnabled}
-            onChange={onToggleOcr}
-            aria-label="Experimental: OCR contract capture"
-            style={{ flex: "none", accentColor: "var(--primary)" }}
-          />
-          <span
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--text-bright)",
-            }}
-          >
-            OCR contract capture
-          </span>
-        </label>
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 10,
-            lineHeight: 1.5,
-            color: "var(--text-2)",
-            margin: "8px 0 0",
-          }}
-        >
-          Reads the mobiGlas contract screen to recover SCU / commodity /
-          destination / reward when the game doesn’t log them. Accuracy varies —
-          you review and confirm every field before anything is applied.
-        </p>
-      </div>
-    </>
   );
 }
