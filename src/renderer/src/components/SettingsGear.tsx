@@ -138,6 +138,12 @@ function LogFolderPanel({
           zIndex: 41,
           width: 380,
           padding: 16,
+          // Constrain to the visible window so long content (down to the
+          // EXPERIMENTAL/OCR toggle) never clips below the bottom edge — the
+          // top bar is ~58px, so leave a small bottom margin. Overflow scrolls
+          // inside the popover instead of running off-screen.
+          maxHeight: "calc(100vh - 72px)",
+          overflowY: "auto",
           background: "rgba(9,16,21,0.98)",
           border: "1px solid var(--border-strong)",
           boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
