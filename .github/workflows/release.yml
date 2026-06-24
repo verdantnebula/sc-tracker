@@ -54,9 +54,26 @@ jobs:
       - name: Build (electron-vite)
         run: npm run build
 
-      # Package the NSIS installer and publish it + latest.yml + blockmap to the
-      # GitHub Release for this tag. GH_TOKEN is the workflow's automatic token.
-      - name: Package + publish (electron-builder)
-        run: npx --yes electron-builder --win nsis --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Build the NSIS installer ONLY (no publish). electron-builder's own GitHub
+      # publisher races when uploading multiple assets to a draft and can create
+      # duplicate draft releases (splitting the .exe/latest.yml from the
+      # .blockmap), which breaks differential/delta updates. So we build here and
+      # publish in one atomic step below.
+      - name: Package (electron-builder, build only)
+        run: npx --yes electron-builder --win nsis --publish never
+
+      # Upload the installer + its .blockmap + latest.yml to a SINGLE draft
+      # release for this tag. Co-locating the .blockmap next to the installer is
+      # what lets electron-updater do delta (partial) downloads. Draft = review
+      # before it goes live. action-gh-release is idempotent per tag (re-runs
+      # update the same release; no duplicates).
+      - name: Publish artifacts to one GitHub Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: true
+          files: |
+            dist-release/SC-Cargo-Tracker-Setup-*.exe
+            dist-release/SC-Cargo-Tracker-Setup-*.exe.blockmap
+            dist-release/latest.yml
