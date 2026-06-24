@@ -8,11 +8,13 @@
 
 import { useMemo, useState } from "react";
 import type { MiningReferenceData } from "@shared/types";
+import { depositInArea } from "@shared/miningArea";
 import {
   fmt,
   rarityColor,
   rarityRank,
   RARITY_ORDER,
+  depositForRock,
 } from "../../lib/miningSelectors";
 
 const inputStyle: React.CSSProperties = {
@@ -56,24 +58,41 @@ const tdNum: React.CSSProperties = {
 
 export function MiningRockValuesView({
   reference,
+  areaRegions = [],
+  onlyNearMe = false,
 }: {
   reference: MiningReferenceData;
+  /** Deposit regions that count as "near you" (from the resolved body). */
+  areaRegions?: string[];
+  /** When true, only show rocks whose deposit is minable in the current area. */
+  onlyNearMe?: boolean;
 }): React.JSX.Element {
   const [search, setSearch] = useState("");
   const [rarity, setRarity] = useState<string>("all");
+
+  // A rock is "near you" if its deposit (matched by name) is in the area. Rocks
+  // with no deposit row can't be located, so they're never "near".
+  const isNear = useMemo(() => {
+    return (rockName: string): boolean => {
+      if (areaRegions.length === 0) return false;
+      const dep = depositForRock(rockName, reference.deposits);
+      return dep ? depositInArea(dep, areaRegions) : false;
+    };
+  }, [areaRegions, reference.deposits]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return reference.rocks
       .filter((r) => (q ? r.name.toLowerCase().includes(q) : true))
       .filter((r) => (rarity === "all" ? true : r.rarity === rarity))
+      .filter((r) => (onlyNearMe ? isNear(r.name) : true))
       .slice()
       .sort(
         (a, b) =>
           rarityRank(a.rarity) - rarityRank(b.rarity) ||
           a.name.localeCompare(b.name),
       );
-  }, [reference.rocks, search, rarity]);
+  }, [reference.rocks, search, rarity, onlyNearMe, isNear]);
 
   return (
     <div
@@ -127,39 +146,67 @@ export function MiningRockValuesView({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.name}>
-                <td
-                  style={{
-                    ...td,
-                    fontWeight: 700,
-                    color: "var(--text-bright)",
-                  }}
+            {rows.map((r) => {
+              const near = isNear(r.name);
+              return (
+                <tr
+                  key={r.name}
+                  style={
+                    near && !onlyNearMe
+                      ? { background: "rgba(52,224,224,0.06)" }
+                      : undefined
+                  }
                 >
-                  {r.name}
-                </td>
-                <td style={{ ...td, whiteSpace: "nowrap" }}>
-                  <span
+                  <td
                     style={{
-                      fontFamily: "var(--font-display)",
+                      ...td,
                       fontWeight: 700,
-                      fontSize: 10,
-                      letterSpacing: 1,
-                      color: rarityColor(r.rarity),
-                      border: `1px solid ${rarityColor(r.rarity)}`,
-                      padding: "2px 7px",
+                      color: "var(--text-bright)",
                     }}
                   >
-                    {r.rarity.toUpperCase()}
-                  </span>
-                </td>
-                {r.scanValues.map((v, i) => (
-                  <td key={i} style={tdNum}>
-                    {fmt(v)}
+                    {r.name}
+                    {near && (
+                      <span
+                        title="Minable in your current area"
+                        style={{
+                          marginLeft: 8,
+                          fontFamily: "var(--font-display)",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: 1,
+                          color: "var(--primary)",
+                          border: "1px solid var(--primary)",
+                          padding: "1px 5px",
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        NEAR
+                      </span>
+                    )}
                   </td>
-                ))}
-              </tr>
-            ))}
+                  <td style={{ ...td, whiteSpace: "nowrap" }}>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontWeight: 700,
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        color: rarityColor(r.rarity),
+                        border: `1px solid ${rarityColor(r.rarity)}`,
+                        padding: "2px 7px",
+                      }}
+                    >
+                      {r.rarity.toUpperCase()}
+                    </span>
+                  </td>
+                  {r.scanValues.map((v, i) => (
+                    <td key={i} style={tdNum}>
+                      {fmt(v)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {rows.length === 0 && (
@@ -171,7 +218,9 @@ export function MiningRockValuesView({
               fontSize: 13,
             }}
           >
-            No rocks match.
+            {onlyNearMe
+              ? "No rocks minable in your current area match."
+              : "No rocks match."}
           </div>
         )}
       </div>

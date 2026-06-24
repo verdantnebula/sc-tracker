@@ -11,6 +11,7 @@ import {
   depositForRock,
   rarityRank,
   rarityColor,
+  searchRocksByName,
 } from "./miningSelectors";
 
 // A small, deterministic rock set mirroring the real data shape. Ice/Aluminum
@@ -146,5 +147,43 @@ describe("depositForRock", () => {
     // The converter normalizes 'Gold 1' to 'Gold', so the scan match name is
     // 'Gold', which must resolve to the 'Gold' deposit row.
     expect(depositForRock("Gold", DEPOSITS)?.type).toBe("Ship Mineable (Rare)");
+  });
+});
+
+describe("searchRocksByName", () => {
+  it("returns all rocks for an empty query (rarity-desc then name)", () => {
+    const r = searchRocksByName("", ROCKS);
+    expect(r).toHaveLength(ROCKS.length);
+    // Legendary (Quantainium) sorts before the commons.
+    expect(r[0].name).toBe("Quantainium");
+  });
+
+  it("filters by case-insensitive substring", () => {
+    expect(searchRocksByName("ice", ROCKS).map((r) => r.name)).toEqual(["Ice"]);
+    expect(searchRocksByName("ALU", ROCKS).map((r) => r.name)).toEqual([
+      "Aluminum",
+    ]);
+  });
+
+  it("ranks prefix matches ahead of mere contains matches", () => {
+    const rocks: MiningRock[] = [
+      { name: "Beryl", rarity: "Common", scanValues: [1, 2, 3, 4, 5, 6] },
+      { name: "Aberyl", rarity: "Common", scanValues: [1, 2, 3, 4, 5, 6] },
+    ];
+    // Query "ber": "Beryl" starts-with, "Aberyl" only contains -> Beryl first.
+    expect(searchRocksByName("ber", rocks).map((r) => r.name)).toEqual([
+      "Beryl",
+      "Aberyl",
+    ]);
+  });
+
+  it("returns [] when nothing matches", () => {
+    expect(searchRocksByName("zzz", ROCKS)).toEqual([]);
+  });
+
+  it("trims whitespace around the query", () => {
+    expect(searchRocksByName("  ice  ", ROCKS).map((r) => r.name)).toEqual([
+      "Ice",
+    ]);
   });
 });

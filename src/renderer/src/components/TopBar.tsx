@@ -1,5 +1,6 @@
 // TopBar — design README §1. App identity + location chip + LogStatusIndicator
-// + Re-sync (backfill) + Settings (LIVE folder) + Manual Add. 58px fixed row.
+// + overlay pin + Settings gear + Manual Add. 58px fixed row. Re-sync and Reset
+// Data now live inside the gear popover (LogFolderPanel) to keep the header lean.
 import { useState } from "react";
 import type { LogStatus, LogPathInfo, ShipReference } from "@shared/types";
 import { LogStatusIndicator } from "./LogStatusIndicator";
@@ -192,6 +193,14 @@ export function TopBar({
               setSettingsOpen(false);
               onPickLogFolder();
             }}
+            onResync={() => {
+              setSettingsOpen(false);
+              onResync();
+            }}
+            onReset={() => {
+              setSettingsOpen(false);
+              onReset();
+            }}
             onCollectLogs={() => {
               setSettingsOpen(false);
               onCollectLogs();
@@ -200,43 +209,6 @@ export function TopBar({
           />
         )}
       </div>
-
-      {/* Re-sync (ghost) */}
-      <button
-        className="sc-ghost-btn"
-        onClick={onResync}
-        style={{
-          background: "transparent",
-          border: "1px solid var(--border-strong)",
-          color: "var(--text-2)",
-          fontFamily: "var(--font-display)",
-          fontWeight: 600,
-          fontSize: 12,
-          padding: "8px 13px",
-          cursor: "pointer",
-        }}
-      >
-        ⟳ Re-sync
-      </button>
-
-      {/* Reset all data (danger ghost) — wipes DB + re-runs backfill (confirmed) */}
-      <button
-        className="sc-ghost-btn"
-        onClick={onReset}
-        title="Wipe all mission data and re-run backfill"
-        style={{
-          background: "transparent",
-          border: "1px solid var(--status-abandoned, #c0556a)",
-          color: "var(--status-abandoned, #e08a9a)",
-          fontFamily: "var(--font-display)",
-          fontWeight: 600,
-          fontSize: 12,
-          padding: "8px 13px",
-          cursor: "pointer",
-        }}
-      >
-        ⌫ Reset Data
-      </button>
 
       {/* EXPERIMENTAL OCR capture entry — only present when the feature is
           enabled in the gear panel. Reads the mobiGlas contract screen to
@@ -300,6 +272,8 @@ function LogFolderPanel({
   ocrEnabled,
   onToggleOcr,
   onChangeFolder,
+  onResync,
+  onReset,
   onCollectLogs,
   onClose,
 }: {
@@ -307,6 +281,10 @@ function LogFolderPanel({
   ocrEnabled: boolean;
   onToggleOcr: () => void;
   onChangeFolder: () => void;
+  /** Re-run the logbackups backfill (relocated from the top bar). */
+  onResync: () => void;
+  /** Wipe all data + re-run backfill — destructive, confirmed (relocated). */
+  onReset: () => void;
   onCollectLogs: () => void;
   onClose: () => void;
 }): React.JSX.Element {
@@ -435,6 +413,67 @@ function LogFolderPanel({
           }}
         >
           CHOOSE \LIVE\ FOLDER…
+        </button>
+
+        {/* Divider + DATA controls (Re-sync + Reset) — relocated here from the
+            top bar so the header stays uncluttered. Re-sync re-runs the
+            logbackups backfill; Reset wipes everything (it confirms first). */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            margin: "16px 0 12px",
+          }}
+        />
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: 1.5,
+            color: "var(--muted)",
+            marginBottom: 8,
+          }}
+        >
+          DATA
+        </div>
+        <button
+          className="sc-ghost-btn"
+          onClick={onResync}
+          title="Re-run the logbackups backfill"
+          style={{
+            width: "100%",
+            padding: "9px 14px",
+            background: "transparent",
+            border: "1px solid var(--border-strong)",
+            color: "var(--text-bright)",
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: 1,
+            cursor: "pointer",
+            marginBottom: 8,
+          }}
+        >
+          ⟳ RE-SYNC
+        </button>
+        <button
+          className="sc-ghost-btn"
+          onClick={onReset}
+          title="Wipe all mission data and re-run backfill"
+          style={{
+            width: "100%",
+            padding: "9px 14px",
+            background: "transparent",
+            border: "1px solid var(--status-abandoned, #c0556a)",
+            color: "var(--status-abandoned, #e08a9a)",
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: 1,
+            cursor: "pointer",
+          }}
+        >
+          ⌫ RESET DATA
         </button>
 
         {/* Divider + Report a Problem ("Collect Logs") */}

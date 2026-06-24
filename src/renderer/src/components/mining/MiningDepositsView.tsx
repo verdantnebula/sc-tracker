@@ -11,6 +11,7 @@
 
 import { useMemo, useState } from "react";
 import type { MiningReferenceData } from "@shared/types";
+import { depositInArea } from "@shared/miningArea";
 
 // Base type categories for the filter. The source type may carry a rarity
 // suffix in parentheses; we match by prefix so variants group under their base.
@@ -57,8 +58,14 @@ const td: React.CSSProperties = {
 
 export function MiningDepositsView({
   reference,
+  areaRegions = [],
+  onlyNearMe = false,
 }: {
   reference: MiningReferenceData;
+  /** Deposit regions that count as "near you" (from the resolved body). */
+  areaRegions?: string[];
+  /** When true, only show deposits minable in the current area. */
+  onlyNearMe?: boolean;
 }): React.JSX.Element {
   const [search, setSearch] = useState("");
   const [type, setType] = useState<string>("all");
@@ -73,11 +80,12 @@ export function MiningDepositsView({
             d.foundAt.some((loc) => loc.toLowerCase().includes(q))
           : true,
       )
+      .filter((d) => (onlyNearMe ? depositInArea(d, areaRegions) : true))
       .slice()
       .sort(
         (a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name),
       );
-  }, [reference.deposits, search, type]);
+  }, [reference.deposits, search, type, onlyNearMe, areaRegions]);
 
   return (
     <div
@@ -127,27 +135,65 @@ export function MiningDepositsView({
             </tr>
           </thead>
           <tbody>
-            {rows.map((d) => (
-              <tr key={d.name}>
-                <td
-                  style={{
-                    ...td,
-                    fontWeight: 700,
-                    color: "var(--text-bright)",
-                  }}
+            {rows.map((d) => {
+              // Highlight rows minable in the current area (only meaningful when
+              // a body resolved -> areaRegions non-empty). When the filter is on
+              // every visible row is "near", so the highlight is redundant there.
+              const near =
+                areaRegions.length > 0 && depositInArea(d, areaRegions);
+              return (
+                <tr
+                  key={d.name}
+                  style={
+                    near && !onlyNearMe
+                      ? { background: "rgba(52,224,224,0.06)" }
+                      : undefined
+                  }
                 >
-                  {d.name}
-                </td>
-                <td
-                  style={{ ...td, color: "var(--muted)", whiteSpace: "nowrap" }}
-                >
-                  {d.type}
-                </td>
-                <td style={{ ...td, color: "var(--text-2)", lineHeight: 1.5 }}>
-                  {d.foundAt.length > 0 ? d.foundAt.join(", ") : "—"}
-                </td>
-              </tr>
-            ))}
+                  <td
+                    style={{
+                      ...td,
+                      fontWeight: 700,
+                      color: "var(--text-bright)",
+                    }}
+                  >
+                    {d.name}
+                    {near && (
+                      <span
+                        title="Minable in your current area"
+                        style={{
+                          marginLeft: 8,
+                          fontFamily: "var(--font-display)",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: 1,
+                          color: "var(--primary)",
+                          border: "1px solid var(--primary)",
+                          padding: "1px 5px",
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        NEAR
+                      </span>
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      ...td,
+                      color: "var(--muted)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {d.type}
+                  </td>
+                  <td
+                    style={{ ...td, color: "var(--text-2)", lineHeight: 1.5 }}
+                  >
+                    {d.foundAt.length > 0 ? d.foundAt.join(", ") : "—"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {rows.length === 0 && (
@@ -159,7 +205,9 @@ export function MiningDepositsView({
               fontSize: 13,
             }}
           >
-            No deposits match.
+            {onlyNearMe
+              ? "No deposits minable in your current area match."
+              : "No deposits match."}
           </div>
         )}
       </div>

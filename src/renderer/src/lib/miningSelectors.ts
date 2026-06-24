@@ -138,3 +138,40 @@ export function depositForRock(
 ): MiningDeposit | null {
   return deposits.find((d) => d.name === rockName) ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// NAME LOOKUP — the primary mining-lookup path. The player types/selects a
+// metal name and we show its detail (rarity, the six scan values to expect, its
+// mining type, and where it's found). This replaces the numeric radar-value
+// reverse-lookup as the default; a small "by scan value" affordance remains.
+// ---------------------------------------------------------------------------
+
+/**
+ * Filter the rocks by a name query (case-insensitive substring), ranked so the
+ * best matches lead: a name that STARTS WITH the query first, then any name that
+ * merely CONTAINS it, each group sorted by rarity (rarest first) then name. An
+ * empty/whitespace query returns ALL rocks (sorted the same way) so the view can
+ * render the full pickable list before the user types. Pure: no DOM, no IPC.
+ *
+ *   searchRocksByName("qua", rocks)  -> [Quantainium, Quartz, ...]
+ *   searchRocksByName("", rocks)     -> every rock, rarity-desc then name
+ */
+export function searchRocksByName(
+  query: string,
+  rocks: MiningRock[],
+): MiningRock[] {
+  const q = query.trim().toLowerCase();
+  const byRank = (a: MiningRock, b: MiningRock): number =>
+    rarityRank(b.rarity) - rarityRank(a.rarity) || a.name.localeCompare(b.name);
+
+  if (q === "") return [...rocks].sort(byRank);
+
+  const starts: MiningRock[] = [];
+  const contains: MiningRock[] = [];
+  for (const r of rocks) {
+    const n = r.name.toLowerCase();
+    if (n.startsWith(q)) starts.push(r);
+    else if (n.includes(q)) contains.push(r);
+  }
+  return [...starts.sort(byRank), ...contains.sort(byRank)];
+}
