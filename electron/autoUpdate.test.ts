@@ -3,6 +3,7 @@ import {
   shouldRunAutoUpdate,
   clampPercent,
   versionFrom,
+  resolveAutoUpdater,
   initAutoUpdate,
 } from "./autoUpdate";
 
@@ -68,6 +69,45 @@ describe("versionFrom", () => {
     expect(versionFrom(null)).toBe("");
     expect(versionFrom(undefined)).toBe("");
     expect(versionFrom("1.2.3")).toBe("");
+  });
+});
+
+describe("resolveAutoUpdater", () => {
+  // Regression guard for the v2.3.0 silent auto-update breakage: under the
+  // packaged build's CJS/ESM interop, electron-updater's `autoUpdater` export
+  // is only reachable via `mod.default.autoUpdater`. Reading `mod.autoUpdater`
+  // directly returned undefined, and the later `.autoDownload = …` threw.
+  const SENTINEL = { iAm: "the-real-autoUpdater" };
+
+  it("resolves the named-export shape ({ autoUpdater })", () => {
+    expect(resolveAutoUpdater({ autoUpdater: SENTINEL })).toBe(SENTINEL);
+  });
+
+  it("resolves the CJS-interop shape ({ default: { autoUpdater } }) — the bug case", () => {
+    expect(resolveAutoUpdater({ default: { autoUpdater: SENTINEL } })).toBe(
+      SENTINEL,
+    );
+  });
+
+  it("prefers the named export when both shapes are present", () => {
+    const other = { iAm: "default-export" };
+    expect(
+      resolveAutoUpdater({
+        autoUpdater: SENTINEL,
+        default: { autoUpdater: other },
+      }),
+    ).toBe(SENTINEL);
+  });
+
+  it("returns undefined when neither shape exposes autoUpdater", () => {
+    expect(resolveAutoUpdater({})).toBeUndefined();
+    expect(resolveAutoUpdater({ default: {} })).toBeUndefined();
+  });
+
+  it("returns undefined for non-object input", () => {
+    expect(resolveAutoUpdater(null)).toBeUndefined();
+    expect(resolveAutoUpdater(undefined)).toBeUndefined();
+    expect(resolveAutoUpdater("electron-updater")).toBeUndefined();
   });
 });
 

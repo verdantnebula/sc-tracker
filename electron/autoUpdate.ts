@@ -1,5 +1,5 @@
 // ============================================================================
-// autoUpdate.ts — NON-FORCED auto-update (electron-updater) wiring  (v1.0.0)
+// autoUpdate.ts — NON-FORCED auto-update (electron-updater) wiring  (v1.0.2)
 // ----------------------------------------------------------------------------
 // FULLY USER-CONTROLLED. The app checks GitHub Releases on launch and, if a
 // newer version exists, downloads it in the BACKGROUND — but it NEVER installs
@@ -75,6 +75,24 @@ export function versionFrom(info: unknown): string {
   return "";
 }
 
+/**
+ * Resolve electron-updater's `autoUpdater` export across CJS/ESM interop shapes.
+ * electron-updater is CommonJS; under the packaged build's ESM/CJS interop its
+ * `autoUpdater` getter is only reliably reachable via `mod.default.autoUpdater`,
+ * NOT `mod.autoUpdater` — reading the latter yields undefined and a later
+ * `autoUpdater.autoDownload = …` throws, silently disabling updates. Pure +
+ * total: anything that isn't an object, or neither interop shape, yields
+ * undefined so the caller can guard instead of crashing.
+ */
+export function resolveAutoUpdater(mod: unknown): unknown {
+  if (!mod || typeof mod !== "object") return undefined;
+  const m = mod as {
+    autoUpdater?: unknown;
+    default?: { autoUpdater?: unknown };
+  };
+  return m.autoUpdater ?? m.default?.autoUpdater ?? undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Updater wiring (impure — used by main.ts at runtime)
 // ---------------------------------------------------------------------------
@@ -129,11 +147,16 @@ export async function initAutoUpdate(
     return NOOP_HANDLE;
   }
 
-  let autoUpdater: import("electron-updater").AppUpdater;
+  let autoUpdater: import("electron-updater").AppUpdater | undefined;
   try {
     // Dynamic import: only loaded in the packaged, opted-in path.
     const mod = await import("electron-updater");
-    autoUpdater = mod.autoUpdater;
+    // Resolve across CJS/ESM interop shapes. In the packaged build the
+    // `autoUpdater` export is only reachable via `mod.default.autoUpdater`;
+    // reading `mod.autoUpdater` directly yields undefined (the v2.3.0 bug).
+    autoUpdater = resolveAutoUpdater(mod) as
+      | import("electron-updater").AppUpdater
+      | undefined;
   } catch (err) {
     // Library missing/broken — should never happen in a packaged build, but a
     // failure here must not break boot. Report quietly and disable.
@@ -141,14 +164,31 @@ export async function initAutoUpdate(
     return NOOP_HANDLE;
   }
 
+  // Guard: if neither interop shape exposed `autoUpdater`, do NOT proceed to the
+  // `autoUpdater.autoDownload = …` assignment below — that is precisely what
+  // threw a TypeError and silently disabled updates. Report and no-op instead.
+  if (!autoUpdater) {
+    console.warn("[update] electron-updater autoUpdater export not found");
+    deps.emit({
+      state: "error",
+      message: "Updater unavailable (autoUpdater export missing).",
+    });
+    return NOOP_HANDLE;
+  }
+
+  // Bind to a const so the non-undefined narrowing holds inside the event
+  // handlers and the returned handle's closures (a captured `let` would widen
+  // back to `… | undefined` inside callbacks).
+  const updater = autoUpdater;
+
   // NON-FORCED configuration. Background download yes; silent install NO.
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = false;
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = false;
   // Route electron-updater's internal logger to console.* so its diagnostics
   // land in main.log (the app pipes console.* -> main.log via
   // installConsoleLogger). Without this a runtime updater failure leaves NO
   // trace — exactly the silent-failure mode we are fixing.
-  autoUpdater.logger = {
+  updater.logger = {
     info: (m: unknown) =>
       console.log("[update]", typeof m === "string" ? m : JSON.stringify(m)),
     warn: (m: unknown) =>
@@ -160,7 +200,7 @@ export async function initAutoUpdate(
         "[update:debug]",
         typeof m === "string" ? m : JSON.stringify(m),
       ),
-  } as unknown as typeof autoUpdater.logger;
+  } as unknown as typeof updater.logger;
 
   // Track which download-progress milestones we've already logged so a long
   // download doesn't spam main.log with a line per progress event. We log only
@@ -171,19 +211,19 @@ export async function initAutoUpdate(
   // --- Lifecycle events -> renderer push (all guarded by emit being safe). ---
   // Each handler also emits an explicit "[update] …" console line so the updater
   // lifecycle is visible in main.log even though the internal logger is wired.
-  autoUpdater.on("checking-for-update", () => {
+  updater.on("checking-for-update", () => {
     console.log("[update] checking…");
     deps.emit({ state: "checking" });
   });
-  autoUpdater.on("update-available", (info) => {
+  updater.on("update-available", (info) => {
     console.log(`[update] available: ${versionFrom(info)}`);
     deps.emit({ state: "available", version: versionFrom(info) });
   });
-  autoUpdater.on("update-not-available", () => {
+  updater.on("update-not-available", () => {
     console.log("[update] up to date");
     deps.emit({ state: "none" });
   });
-  autoUpdater.on("download-progress", (p) => {
+  updater.on("download-progress", (p) => {
     const percent = clampPercent(
       (p as { percent?: unknown } | undefined)?.percent,
     );
@@ -196,21 +236,23 @@ export async function initAutoUpdate(
     }
     deps.emit({ state: "progress", percent });
   });
-  autoUpdater.on("update-downloaded", (info) => {
+  updater.on("update-downloaded", (info) => {
     console.log(`[update] downloaded: ${versionFrom(info)}`);
     deps.emit({ state: "downloaded", version: versionFrom(info) });
   });
-  autoUpdater.on("error", (err) => {
+  updater.on("error", (err) => {
     // Offline / no release / rate-limited — all land here. Quiet, non-blocking.
     console.warn("[update] check failed:", stringifyError(err));
     deps.emit({ state: "error", message: stringifyError(err) });
   });
 
-  // Kick an initial check (never throws — checkForUpdates rejects on failure,
-  // which we swallow because the 'error' event already reported it).
+  // Kick an initial check. Never throws — checkForUpdates rejects on failure,
+  // which we surface as a quiet `error` status (so a manual check can never
+  // silently do nothing) in addition to the 'error' event the updater emits.
   const safeCheck = (): void => {
-    autoUpdater.checkForUpdates().catch((err) => {
+    updater.checkForUpdates().catch((err) => {
       console.warn("[update] checkForUpdates rejected:", stringifyError(err));
+      deps.emit({ state: "error", message: stringifyError(err) });
     });
   };
   safeCheck();
@@ -226,7 +268,7 @@ export async function initAutoUpdate(
       try {
         // isSilent=false (show the installer UI), isForceRunAfter=true (relaunch
         // after install). Only ever reached on the user's explicit click.
-        autoUpdater.quitAndInstall(false, true);
+        updater.quitAndInstall(false, true);
       } catch (err) {
         console.warn("[update] quitAndInstall failed:", stringifyError(err));
       }
@@ -234,6 +276,9 @@ export async function initAutoUpdate(
     checkNow: () => {
       // Manual ("Check for updates") trigger — reuse the SAME guarded path as
       // the initial/periodic check so it can never throw into the IPC handler.
+      // Emit a `checking` status FIRST so the gear UI always gets feedback and
+      // can never silently do nothing, even if the check resolves instantly.
+      deps.emit({ state: "checking" });
       safeCheck();
     },
     dispose: () => {
