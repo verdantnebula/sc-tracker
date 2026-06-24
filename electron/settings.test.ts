@@ -75,6 +75,7 @@ describe("loadSettings / saveSettings", () => {
       overlayEnabled: false,
       overlayBounds: null,
       ocrEnabled: false,
+      updateCheckEnabled: true,
     });
   });
 
@@ -198,6 +199,7 @@ describe("mergeSettings", () => {
     overlayEnabled: false,
     overlayBounds: null,
     ocrEnabled: false,
+    updateCheckEnabled: true,
   };
 
   it("collapses an empty-string liveFolder to null", () => {
@@ -219,6 +221,7 @@ describe("mergeSettings", () => {
       overlayEnabled: false,
       overlayBounds: null,
       ocrEnabled: false,
+      updateCheckEnabled: true,
     });
   });
 
@@ -228,6 +231,34 @@ describe("mergeSettings", () => {
       mergeSettings(base, {
         ocrEnabled: "yes",
       } as unknown as Partial<AppSettings>).ocrEnabled,
+    ).toBe(false);
+  });
+
+  it("updateCheckEnabled is opt-OUT: only an explicit false turns it off", () => {
+    // Default-true semantics: a settings.json written before the key existed (or
+    // a garbage value) keeps auto-update ON. Only an explicit `false` disables it.
+    expect(
+      mergeSettings(base, { updateCheckEnabled: false }).updateCheckEnabled,
+    ).toBe(false);
+    expect(
+      mergeSettings(base, { updateCheckEnabled: true }).updateCheckEnabled,
+    ).toBe(true);
+    // Non-boolean garbage -> stays true (opt-out, not opt-in).
+    expect(
+      mergeSettings(base, {
+        updateCheckEnabled: "nope",
+      } as unknown as Partial<AppSettings>).updateCheckEnabled,
+    ).toBe(true);
+  });
+
+  it("normalizeSettings defaults updateCheckEnabled to true when the key is absent", () => {
+    // An older settings.json with no updateCheckEnabled key must read back as true
+    // so existing users get auto-update on upgrade (without re-opting-in).
+    const legacy = normalizeSettings({ liveFolder: null, mode: "cargo" });
+    expect(legacy.updateCheckEnabled).toBe(true);
+    // An explicit false in the file is honored.
+    expect(
+      normalizeSettings({ updateCheckEnabled: false }).updateCheckEnabled,
     ).toBe(false);
   });
 });
@@ -328,6 +359,7 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          updateCheckEnabled: true,
         },
         exists,
       ),
@@ -344,6 +376,7 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          updateCheckEnabled: true,
         },
         () => false,
       ),
@@ -362,6 +395,7 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          updateCheckEnabled: true,
         },
         () => true,
       ),
@@ -379,6 +413,7 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          updateCheckEnabled: true,
         },
         () => true,
         custom,

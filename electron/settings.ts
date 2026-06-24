@@ -75,6 +75,15 @@ export interface AppSettings {
    * a restart. NEVER auto-applies anything — the user reviews before any write.
    */
   ocrEnabled: boolean;
+  /**
+   * Whether the app checks for updates on launch (electron-updater). Default
+   * true: on a packaged launch the app quietly checks GitHub Releases and, if a
+   * newer version exists, downloads it in the BACKGROUND and shows a dismissible
+   * banner. It is NEVER installed without the user clicking "Restart & Update"
+   * (autoInstallOnAppQuit is off). Turning this off disables the check entirely.
+   * Honored only in the packaged app — a dev/unpackaged run never auto-updates.
+   */
+  updateCheckEnabled: boolean;
 }
 
 /** Window rectangle persisted for the overlay (screen coordinates, px). */
@@ -93,6 +102,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlayEnabled: false,
   overlayBounds: null,
   ocrEnabled: false,
+  updateCheckEnabled: true,
 };
 
 /** Default overlay size (px) when no bounds are saved — small, glanceable card. */
@@ -115,6 +125,16 @@ function normalizeShipSlug(value: unknown): string | null {
 /** Coerce an arbitrary value to a boolean (anything non-true -> false). */
 function normalizeBool(value: unknown): boolean {
   return value === true;
+}
+
+/**
+ * Coerce an arbitrary value to a boolean that DEFAULTS TO TRUE when absent or
+ * non-boolean — only an explicit `false` turns it off. Used for opt-OUT flags
+ * like updateCheckEnabled (auto-update is on for everyone unless they disable it),
+ * so an older settings.json written before the key existed keeps update checks on.
+ */
+function normalizeBoolDefaultTrue(value: unknown): boolean {
+  return value !== false;
 }
 
 /**
@@ -189,6 +209,7 @@ export function mergeSettings(
   next.overlayEnabled = normalizeBool(next.overlayEnabled);
   next.overlayBounds = normalizeOverlayBounds(next.overlayBounds);
   next.ocrEnabled = normalizeBool(next.ocrEnabled);
+  next.updateCheckEnabled = normalizeBoolDefaultTrue(next.updateCheckEnabled);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
     next.liveFolder = typeof v === "string" && v.length > 0 ? v : null;
@@ -207,6 +228,11 @@ export function mergeSettings(
   }
   if ("ocrEnabled" in patch) {
     next.ocrEnabled = normalizeBool(patch.ocrEnabled);
+  }
+  if ("updateCheckEnabled" in patch) {
+    next.updateCheckEnabled = normalizeBoolDefaultTrue(
+      patch.updateCheckEnabled,
+    );
   }
   return next;
 }
@@ -231,6 +257,7 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     overlayEnabled: normalizeBool(raw.overlayEnabled),
     overlayBounds: normalizeOverlayBounds(raw.overlayBounds),
     ocrEnabled: normalizeBool(raw.ocrEnabled),
+    updateCheckEnabled: normalizeBoolDefaultTrue(raw.updateCheckEnabled),
   };
 }
 

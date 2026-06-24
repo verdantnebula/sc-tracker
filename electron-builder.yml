@@ -1,0 +1,78 @@
+# ============================================================================
+# electron-builder.yml — NSIS (per-user) Windows packaging + GitHub publish.
+# ----------------------------------------------------------------------------
+# Used by CI ONLY (.github/workflows/release.yml). DO NOT run electron-builder on
+# the local Windows dev machine: its winCodeSign step requires Developer Mode and
+# fails here — that is why local portable builds use @electron/packager
+# (`npm run package:exe`). CI (windows-latest) has the right environment.
+#
+# Packages the electron-vite output (out/) produced by `npm run build`
+# (electron-vite build + copy:ocr). `main` is out/main/index.js (package.json).
+#
+# OCR ASSET PATH — verified for this layout:
+#   files include `out/**` and asarUnpack lists `out/renderer/ocr/**`. With that,
+#   electron-builder writes the renderer into resources/app.asar and unpacks the
+#   OCR dir to resources/app.asar.unpacked/out/renderer/ocr/… — the SAME relative
+#   path ocrAssetDir() already computes for the packaged case
+#   (<resourcesPath>/app.asar.unpacked/out/renderer/ocr). So ocrAssetDir() needs
+#   NO change: the @electron/packager layout (--asar.unpackDir="out/renderer/ocr")
+#   and the electron-builder layout (asarUnpack) produce an identical unpacked path.
+#
+# better-sqlite3's native .node is auto-detected and unpacked by electron-builder
+# (it scans dependencies for .node binaries); it is also listed in asarUnpack
+# explicitly as a belt-and-braces guarantee that the prebuilt binary stays a real
+# file on disk.
+# ============================================================================
+
+appId: uk.verdantnebula.sctracker
+productName: SC Cargo Tracker
+
+# Keep electron-builder output separate from the @electron/packager `release/`
+# dir so the two packaging paths never clobber each other.
+directories:
+  output: dist-release
+  buildResources: build
+
+# What goes INTO the app. The electron-vite build emits everything the app runs
+# into out/; ship that plus package.json. Runtime node_modules are included by
+# electron-builder automatically (devDependencies are pruned). config.local.json
+# is a developer-only secret file and must NEVER be packaged.
+files:
+  - out/**/*
+  - package.json
+  - "!config.local.json"
+  - "!**/config.local.json"
+  # Trim obvious dev cruft if it ever lands beside the build output.
+  - "!**/*.map"
+  - "!**/*.ts"
+  - "!**/*.tsbuildinfo"
+
+# Keep these as REAL files on disk (not inside the virtual app.asar):
+#   - the tesseract.js worker / core wasm / eng.traineddata.gz (OCR reads them
+#     from disk in MAIN — see electron/ocrRecognize.ts);
+#   - better-sqlite3's prebuilt .node (native addons can't be loaded from asar).
+asarUnpack:
+  - out/renderer/ocr/**
+  - "**/*.node"
+  - node_modules/better-sqlite3/**
+
+win:
+  target:
+    - nsis
+  artifactName: SC-Cargo-Tracker-Setup-${version}.${ext}
+
+nsis:
+  # Per-user install: no admin elevation required (perMachine false).
+  perMachine: false
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # Friendly desktop/start-menu shortcuts.
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# Auto-update feed: GitHub Releases for verdantnebula/sc-tracker. CI publishes the
+# NSIS installer + latest.yml + .blockmap here; electron-updater reads latest.yml.
+publish:
+  provider: github
+  owner: verdantnebula
+  repo: sc-tracker

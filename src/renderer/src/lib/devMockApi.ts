@@ -406,6 +406,9 @@ function createMockApi(): ApiBridge {
   let overlayEnabled = false;
   // In-memory experimental-OCR flag (Phase F) for standalone-dev of the toggle.
   let ocrEnabled = false;
+  // In-memory update-check flag (auto-update) for standalone-dev of the gear
+  // toggle. The updater itself never runs in dev (gated on app.isPackaged).
+  let updateCheckEnabled = true;
   const overlayListeners = new Set<(s: { enabled: boolean }) => void>();
   // In-memory mode-change listeners so the standalone overlay can swap content
   // live when setMode is called (mirrors the real MODE_CHANGED broadcast).
@@ -601,6 +604,18 @@ function createMockApi(): ApiBridge {
       error: "OCR is unavailable in standalone dev mode.",
     }),
 
+    // --- auto-update (dev stub — no updater in a plain browser tab) ---
+    // updateCheckEnabled is in-memory; the updater never runs in dev (the real
+    // app gates on app.isPackaged), so installUpdate + onUpdateStatus are no-ops.
+    getUpdateCheckEnabled: async (): Promise<boolean> => updateCheckEnabled,
+    setUpdateCheckEnabled: async (enabled: boolean): Promise<boolean> => {
+      updateCheckEnabled = enabled !== false;
+      return updateCheckEnabled;
+    },
+    installUpdate: async (): Promise<void> => {
+      /* dev no-op: no electron-updater in a plain browser tab */
+    },
+
     // --- overlay window (dev stub — no second window in a plain browser tab) ---
     toggleOverlay: async () => {
       overlayEnabled = !overlayEnabled;
@@ -752,6 +767,8 @@ function createMockApi(): ApiBridge {
       modeListeners.add(cb);
       return () => modeListeners.delete(cb);
     },
+    // No updater in standalone dev — never emits, so the banner never shows.
+    onUpdateStatus: () => () => {},
   };
 }
 

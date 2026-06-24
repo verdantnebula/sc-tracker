@@ -30,6 +30,7 @@ import type {
   StrippedComponentPatch,
   SalvageReferenceData,
   MiningReferenceData,
+  UpdateStatus,
 } from "@shared/types";
 
 /** Subscribe to a push channel; returns an unsubscribe fn. */
@@ -99,6 +100,18 @@ const api: ApiBridge = {
       imageDataUrl,
       psm,
     ) as Promise<OcrRecognizeResult>,
+
+  // --- auto-update (electron-updater) ---
+  getUpdateCheckEnabled: () =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_GET_UPDATE_CHECK_ENABLED,
+    ) as Promise<boolean>,
+  setUpdateCheckEnabled: (enabled: boolean) =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_SET_UPDATE_CHECK_ENABLED,
+      enabled,
+    ) as Promise<boolean>,
+  installUpdate: () => ipcRenderer.invoke(IPC.UPDATE_INSTALL) as Promise<void>,
 
   // --- overlay window (Phase D) ---
   toggleOverlay: () =>
@@ -175,6 +188,7 @@ const api: ApiBridge = {
   onOverlayStateChanged: (cb) =>
     subscribe<OverlayState>(IPC.OVERLAY_STATE_CHANGED, cb),
   onModeChanged: (cb) => subscribe<AppMode>(IPC.MODE_CHANGED, cb),
+  onUpdateStatus: (cb) => subscribe<UpdateStatus>(IPC.UPDATE_STATUS, cb),
 };
 
 contextBridge.exposeInMainWorld("api", api);

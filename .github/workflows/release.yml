@@ -1,0 +1,62 @@
+# ============================================================================
+# release.yml — build + publish the Windows NSIS installer on a version tag.
+# ----------------------------------------------------------------------------
+# Trigger: push a tag like v2.3.0. Runs on windows-latest (the only place
+# electron-builder's Windows/winCodeSign path works — it CANNOT run on the local
+# dev machine without Developer Mode, hence CI does the real packaging).
+#
+# Result: electron-builder publishes the NSIS installer
+# (SC-Cargo-Tracker-Setup-<version>.exe), its .blockmap, and latest.yml to the
+# GitHub Release for that tag. electron-updater in the app reads latest.yml to
+# offer the NON-FORCED, user-triggered update.
+#
+# Native module note: better-sqlite3 is a native addon and must match the Electron
+# ABI. electron-builder runs `install-app-deps` (electron-builder install-app-deps)
+# as part of packaging to rebuild native deps against the bundled Electron, so a
+# separate rebuild step is generally unnecessary; an explicit
+# `electron-builder install-app-deps` step is included for determinism.
+# ============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # required for electron-builder to create/publish the GitHub Release
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Rebuild native deps (better-sqlite3) against the bundled Electron ABI so
+      # the packaged app loads the addon. electron-builder does this during pack
+      # too, but doing it explicitly keeps the build deterministic.
+      - name: Rebuild native deps for Electron
+        run: npx --yes electron-builder install-app-deps
+
+      # electron-vite build + copy:ocr -> out/ (both renderer entries + OCR assets).
+      - name: Build (electron-vite)
+        run: npm run build
+
+      # Package the NSIS installer and publish it + latest.yml + blockmap to the
+      # GitHub Release for this tag. GH_TOKEN is the workflow's automatic token.
+      - name: Package + publish (electron-builder)
+        run: npx --yes electron-builder --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -28,6 +28,7 @@ import type {
   StrippedComponentPatch,
   SalvageReferenceData,
   MiningReferenceData,
+  UpdateStatus,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,11 @@ export const IPC = {
   SETTINGS_SET_SHIP: "settings:setShip",
   SETTINGS_GET_OCR_ENABLED: "settings:getOcrEnabled",
   SETTINGS_SET_OCR_ENABLED: "settings:setOcrEnabled",
+  SETTINGS_GET_UPDATE_CHECK_ENABLED: "settings:getUpdateCheckEnabled",
+  SETTINGS_SET_UPDATE_CHECK_ENABLED: "settings:setUpdateCheckEnabled",
+
+  // auto-update (electron-updater) — NON-FORCED. The user clicks to install.
+  UPDATE_INSTALL: "update:install",
 
   // EXPERIMENTAL OCR contract capture (Phase F) — capture the primary display
   // as a PNG data URL in main; main also runs tesseract.js (assets load from
@@ -97,6 +103,10 @@ export const IPC = {
   // the always-on-top overlay window (a SEPARATE renderer) can swap its content
   // + theme live when the user switches modes in the main window.
   MODE_CHANGED: "mode:changed",
+  // Auto-update lifecycle push (electron-updater). The renderer subscribes and
+  // shows a dismissible, non-blocking banner; install happens only on the user's
+  // explicit click (UPDATE_INSTALL). See electron/autoUpdate.ts.
+  UPDATE_STATUS: "update:status",
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -150,6 +160,20 @@ export interface IpcRequestMap {
     args: [enabled: boolean];
     result: boolean;
   };
+  /** Whether the app checks for updates on launch (default true). */
+  [IPC.SETTINGS_GET_UPDATE_CHECK_ENABLED]: { args: []; result: boolean };
+  /** Persist the update-check flag; returns the saved value. */
+  [IPC.SETTINGS_SET_UPDATE_CHECK_ENABLED]: {
+    args: [enabled: boolean];
+    result: boolean;
+  };
+
+  // --- auto-update (electron-updater) ---
+  /**
+   * Install a previously-downloaded update and restart. Called ONLY when the
+   * user clicks "Restart & Update". No-op (resolves) if nothing is downloaded.
+   */
+  [IPC.UPDATE_INSTALL]: { args: []; result: void };
   /** Capture the primary display as a PNG data URL for OCR (Phase F). */
   [IPC.OCR_CAPTURE_SCREEN]: { args: []; result: OcrCaptureResult };
   /**
@@ -232,6 +256,7 @@ export interface IpcEventMap {
   [IPC.SALVAGE_RUNS_CHANGED]: { payload: SalvageRun[] };
   [IPC.OVERLAY_STATE_CHANGED]: { payload: OverlayState };
   [IPC.MODE_CHANGED]: { payload: AppMode };
+  [IPC.UPDATE_STATUS]: { payload: UpdateStatus };
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +300,14 @@ export interface ApiBridge {
   getOcrEnabled(): Promise<boolean>;
   /** Persist the OCR-enabled flag; resolves to the saved value. */
   setOcrEnabled(enabled: boolean): Promise<boolean>;
+
+  // --- auto-update (electron-updater) ---
+  /** Read whether automatic update checks are enabled (default true). */
+  getUpdateCheckEnabled(): Promise<boolean>;
+  /** Persist the update-check flag; resolves to the saved value. */
+  setUpdateCheckEnabled(enabled: boolean): Promise<boolean>;
+  /** Install the downloaded update and restart (user-triggered only). */
+  installUpdate(): Promise<void>;
   /** Capture the primary display as a PNG data URL for the OCR pipeline. */
   captureScreenForOcr(): Promise<OcrCaptureResult>;
   /**
@@ -347,4 +380,6 @@ export interface ApiBridge {
   onOverlayStateChanged(cb: (state: OverlayState) => void): () => void;
   /** App mode changed (cargo/salvage/mining) — lets the overlay swap content live. */
   onModeChanged(cb: (mode: AppMode) => void): () => void;
+  /** Auto-update lifecycle push — drives the non-blocking update banner. */
+  onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
 }

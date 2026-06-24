@@ -88,6 +88,8 @@ import { existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { installConsoleLogger, buildAppInfo, writeAppInfo } from "./logger";
 import { buildDiagnosticsReport } from "./diagnosticsExport";
+import { initAutoUpdate, type AutoUpdateHandle } from "./autoUpdate";
+import type { UpdateStatus } from "@shared/types";
 import { ocrAssetDir, recognize as recognizeOcr } from "./ocrRecognize";
 import type { ExportReportResult } from "@shared/types";
 
@@ -113,6 +115,12 @@ let salvageRef: SalvageReferenceLoader | null = null;
 
 // Mining reference singleton (read-only bundled game reference; no store yet).
 let miningRef: MiningReferenceLoader | null = null;
+
+// NON-FORCED auto-update handle (electron-updater). null until boot wires it (and
+// stays a no-op handle when gated off: dev/unpackaged or update checks disabled).
+// Holds the install() the renderer's "Restart & Update" button invokes and the
+// dispose() called on before-quit. See electron/autoUpdate.ts.
+let autoUpdate: AutoUpdateHandle | null = null;
 
 // Per-user settings (custom LIVE folder, etc.), loaded on boot. Held in memory
 // so the IPC handlers can report/resolve the current Game.log path without a disk
@@ -837,6 +845,33 @@ function registerIpc(): void {
     },
   );
 
+  // --- Auto-update (electron-updater) — NON-FORCED -------------------------
+  // Read/persist the update-check flag (default true) and install a downloaded
+  // update on the user's explicit click. The updater itself is only wired in the
+  // packaged, opted-in path (see boot()); these handlers are safe in every mode.
+  // Toggling the flag takes effect on the NEXT launch (we don't tear down a live
+  // updater mid-session) — the gear copy says as much.
+
+  ipcMain.handle(
+    IPC.SETTINGS_GET_UPDATE_CHECK_ENABLED,
+    (): boolean => settings.updateCheckEnabled,
+  );
+
+  ipcMain.handle(
+    IPC.SETTINGS_SET_UPDATE_CHECK_ENABLED,
+    (_e, enabled: boolean): boolean => {
+      settings = saveSettings({ updateCheckEnabled: enabled !== false });
+      return settings.updateCheckEnabled;
+    },
+  );
+
+  // Install the downloaded update + restart. Reached ONLY when the user clicks
+  // "Restart & Update" in the banner. No-op (the handle's install() guards it)
+  // when nothing is downloaded or the updater never initialized.
+  ipcMain.handle(IPC.UPDATE_INSTALL, (): void => {
+    autoUpdate?.install();
+  });
+
   ipcMain.handle(
     IPC.OCR_CAPTURE_SCREEN,
     async (): Promise<OcrCaptureResult> => {
@@ -1187,6 +1222,24 @@ async function boot(): Promise<void> {
   void startWatcher(resolvedLogPath()).catch((err) =>
     console.error("[main] watcher.start failed:", err),
   );
+
+  // NON-FORCED auto-update. Active only in the packaged app AND when the user
+  // left update checks enabled (the helper gates both). A dev/unpackaged run or
+  // a disabled flag yields a no-op handle. Fully guarded: a failure here logs and
+  // degrades to no-op — it must never break boot. Background-download is on;
+  // install happens ONLY when the user clicks the banner's "Restart & Update".
+  void initAutoUpdate({
+    isPackaged: app.isPackaged,
+    updateCheckEnabled: settings.updateCheckEnabled,
+    emit: (status: UpdateStatus) => broadcast(IPC.UPDATE_STATUS, status),
+  })
+    .then((handle) => {
+      autoUpdate = handle;
+    })
+    .catch((err) => {
+      console.warn("[main] auto-update init failed:", err);
+      autoUpdate = null;
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1230,6 +1283,7 @@ if (!gotTheLock) {
 
   app.on("before-quit", () => {
     destroyOverlay();
+    autoUpdate?.dispose();
     void watcher?.stop();
     uex?.close();
     store?.close();

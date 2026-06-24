@@ -1,0 +1,210 @@
+// ============================================================================
+// autoUpdate.ts — NON-FORCED auto-update (electron-updater) wiring  (v2.3.0)
+// ----------------------------------------------------------------------------
+// FULLY USER-CONTROLLED. The app checks GitHub Releases on launch and, if a
+// newer version exists, downloads it in the BACKGROUND — but it NEVER installs
+// or restarts on its own. The downloaded update sits ready until the user clicks
+// "Restart & Update" in the banner, which calls installUpdate() -> quitAndInstall.
+//
+// Key autoUpdater settings (the whole point of "non-forced"):
+//   - autoDownload          = true   → fetch the delta/full installer quietly.
+//   - autoInstallOnAppQuit  = false  → do NOT silently install on the next quit.
+//                                      Without this, electron-updater would apply
+//                                      a downloaded update the next time the app
+//                                      closes — exactly the forced behavior we
+//                                      are avoiding. Install happens ONLY via the
+//                                      explicit quitAndInstall() below.
+//
+// Activation gate: only when `app.isPackaged` AND settings.updateCheckEnabled.
+//   - A dev/unpackaged run has no real release feed and no installer, so we no-op
+//     (electron-updater would throw "dev-app-update.yml not found" otherwise).
+//   - When the user disables update checks we never even import the updater.
+//
+// Defensive by design: every updater interaction is wrapped so a failure (no
+// network, no release yet, rate-limited GitHub) is reported as a quiet `error`
+// status and NEVER throws into boot or shows a blocking dialog. The renderer
+// treats `error` as "do nothing" — checking and finding nothing is normal.
+//
+// electron-updater is imported DYNAMICALLY so a normal launch with checks off (or
+// a dev run) pays nothing for the library, and unit tests can import the pure
+// helpers in this file without pulling electron-updater into the test runtime.
+// ============================================================================
+
+import type { UpdateStatus } from "@shared/types";
+
+/** Re-check for updates on this cadence while the app stays open (6 hours). */
+export const UPDATE_RECHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+// ---------------------------------------------------------------------------
+// Pure helpers (exported for unit testing — no electron / electron-updater)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decide whether the auto-updater should run at all. Pure so it is unit-testable
+ * without Electron: the updater is active ONLY in the packaged app AND only when
+ * the user has left update checks enabled. A dev/unpackaged run never updates.
+ */
+export function shouldRunAutoUpdate(
+  isPackaged: boolean,
+  updateCheckEnabled: boolean,
+): boolean {
+  return isPackaged === true && updateCheckEnabled === true;
+}
+
+/**
+ * Clamp a raw electron-updater download percent (a float 0..100, occasionally
+ * slightly out of range) to an integer 0..100 for the renderer's progress bar.
+ * Pure + total: a non-finite/garbage value collapses to 0.
+ */
+export function clampPercent(raw: unknown): number {
+  const n = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/**
+ * Coerce an electron-updater UpdateInfo-ish object to a display version string.
+ * Pure + total: anything without a string `version` yields "" so the caller can
+ * still emit a well-formed status (the banner shows "an update" rather than
+ * crashing on a missing field). We never trust the shape blindly.
+ */
+export function versionFrom(info: unknown): string {
+  if (info && typeof info === "object") {
+    const v = (info as { version?: unknown }).version;
+    if (typeof v === "string") return v;
+  }
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// Updater wiring (impure — used by main.ts at runtime)
+// ---------------------------------------------------------------------------
+
+/** What the updater module needs from main: a way to push status to renderers. */
+export interface AutoUpdateDeps {
+  /** True in the packaged app (app.isPackaged). */
+  isPackaged: boolean;
+  /** The persisted updateCheckEnabled flag (settings). */
+  updateCheckEnabled: boolean;
+  /** Push an UpdateStatus to every renderer (main broadcasts on update:status). */
+  emit: (status: UpdateStatus) => void;
+}
+
+/** Handle returned by initAutoUpdate so main can install / dispose. */
+export interface AutoUpdateHandle {
+  /**
+   * Install a downloaded update and restart. Called ONLY on the user's explicit
+   * click. Safe to call when nothing is downloaded (quitAndInstall is a no-op in
+   * that case) and safe when the updater never initialized (no-op). Never throws.
+   */
+  install: () => void;
+  /** Stop the recheck interval (called on before-quit). Idempotent, never throws. */
+  dispose: () => void;
+}
+
+/** A disabled/no-op handle — returned when the updater is gated off. */
+const NOOP_HANDLE: AutoUpdateHandle = {
+  install: () => {},
+  dispose: () => {},
+};
+
+/**
+ * Initialize electron-updater for NON-FORCED auto-update. No-ops (returns a
+ * no-op handle) when gated off (dev/unpackaged or checks disabled). On success it
+ * wires the updater events to `emit`, kicks an initial check, and schedules a
+ * periodic recheck. Fully guarded: a load/check failure degrades to a quiet
+ * `error` emit and a no-op handle rather than throwing into boot.
+ */
+export async function initAutoUpdate(
+  deps: AutoUpdateDeps,
+): Promise<AutoUpdateHandle> {
+  if (!shouldRunAutoUpdate(deps.isPackaged, deps.updateCheckEnabled)) {
+    return NOOP_HANDLE;
+  }
+
+  let autoUpdater: import("electron-updater").AppUpdater;
+  try {
+    // Dynamic import: only loaded in the packaged, opted-in path.
+    const mod = await import("electron-updater");
+    autoUpdater = mod.autoUpdater;
+  } catch (err) {
+    // Library missing/broken — should never happen in a packaged build, but a
+    // failure here must not break boot. Report quietly and disable.
+    deps.emit({ state: "error", message: stringifyError(err) });
+    return NOOP_HANDLE;
+  }
+
+  // NON-FORCED configuration. Background download yes; silent install NO.
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = false;
+  // electron-updater logs are noisy; route nothing by default (main.log already
+  // captures our own [update] lines). Leaving logger null is fine.
+
+  // --- Lifecycle events -> renderer push (all guarded by emit being safe). ---
+  autoUpdater.on("checking-for-update", () => {
+    deps.emit({ state: "checking" });
+  });
+  autoUpdater.on("update-available", (info) => {
+    deps.emit({ state: "available", version: versionFrom(info) });
+  });
+  autoUpdater.on("update-not-available", () => {
+    deps.emit({ state: "none" });
+  });
+  autoUpdater.on("download-progress", (p) => {
+    const percent = clampPercent(
+      (p as { percent?: unknown } | undefined)?.percent,
+    );
+    deps.emit({ state: "progress", percent });
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    deps.emit({ state: "downloaded", version: versionFrom(info) });
+  });
+  autoUpdater.on("error", (err) => {
+    // Offline / no release / rate-limited — all land here. Quiet, non-blocking.
+    console.warn("[update] check failed:", stringifyError(err));
+    deps.emit({ state: "error", message: stringifyError(err) });
+  });
+
+  // Kick an initial check (never throws — checkForUpdates rejects on failure,
+  // which we swallow because the 'error' event already reported it).
+  const safeCheck = (): void => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.warn("[update] checkForUpdates rejected:", stringifyError(err));
+    });
+  };
+  safeCheck();
+
+  // Periodic recheck while the app stays open, so a long-running session still
+  // learns about a release published after launch.
+  const timer = setInterval(safeCheck, UPDATE_RECHECK_INTERVAL_MS);
+  // Don't let the interval keep the process alive on its own.
+  if (typeof timer.unref === "function") timer.unref();
+
+  return {
+    install: () => {
+      try {
+        // isSilent=false (show the installer UI), isForceRunAfter=true (relaunch
+        // after install). Only ever reached on the user's explicit click.
+        autoUpdater.quitAndInstall(false, true);
+      } catch (err) {
+        console.warn("[update] quitAndInstall failed:", stringifyError(err));
+      }
+    },
+    dispose: () => {
+      try {
+        clearInterval(timer);
+      } catch {
+        /* nothing to clean up */
+      }
+    },
+  };
+}
+
+/** Compact, never-throwing error -> string for quiet logging. */
+function stringifyError(err: unknown): string {
+  try {
+    if (err instanceof Error) return err.message;
+    return String(err);
+  } catch {
+    return "unknown error";
+  }
+}

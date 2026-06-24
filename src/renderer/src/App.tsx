@@ -17,7 +17,10 @@ import type {
   AppMode,
 } from "@shared/types";
 
+import type { UpdateStatus } from "@shared/types";
+
 import { TopBar } from "./components/TopBar";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { ShipPicker } from "./components/ShipPicker";
 import { CapacityBar } from "./components/CapacityBar";
 import { SalvageShell } from "./components/SalvageShell";
@@ -105,9 +108,92 @@ export function App(): React.JSX.Element {
 
   if (mode === null)
     return <div style={{ height: "100%", background: "var(--bg)" }} />;
-  if (mode === "salvage") return <SalvageShell onToggleMode={toggleMode} />;
-  if (mode === "mining") return <MiningShell onToggleMode={toggleMode} />;
-  return <CargoApp onToggleMode={toggleMode} />;
+
+  // The active-mode shell. The auto-update banner wraps ALL THREE so a downloaded
+  // update is surfaced in cargo, salvage, AND mining mode (subscription lives in
+  // UpdateGate, above the shell, so switching mode never drops the notification).
+  const shell =
+    mode === "salvage" ? (
+      <SalvageShell onToggleMode={toggleMode} />
+    ) : mode === "mining" ? (
+      <MiningShell onToggleMode={toggleMode} />
+    ) : (
+      <CargoApp onToggleMode={toggleMode} />
+    );
+
+  return <UpdateGate>{shell}</UpdateGate>;
+}
+
+// ============================================================================
+// UpdateGate — app-level, mode-agnostic host for the NON-FORCED update banner.
+// ----------------------------------------------------------------------------
+// Subscribes to the `update:status` push ONCE (above the mode shells) and renders
+// the dismissible UpdateBanner above whatever shell is active. The banner never
+// blocks the UI and never installs on its own: "Later" dismisses for the session
+// (the downloaded update stays on disk), "Restart & Update" calls installUpdate().
+//
+// State machine off the pushed UpdateStatus:
+//   - progress    -> show "Downloading… NN%" (subtle, no buttons).
+//   - downloaded  -> show "vX.Y.Z ready — [Restart & Update] [Later]".
+//   - checking/none/available/error -> render nothing (available means "found,
+//     downloading"; the progress event drives the visible state).
+// A session-scoped `dismissed` flag hides the ready banner after "Later" without
+// touching the downloaded update. A fresh `downloaded` for a new version resets it.
+// ============================================================================
+function UpdateGate({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+  const [readyVersion, setReadyVersion] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const unsub = window.api.onUpdateStatus((status: UpdateStatus) => {
+      switch (status.state) {
+        case "progress":
+          setDownloadPercent(status.percent);
+          break;
+        case "downloaded":
+          // Download finished — clear the progress view, surface the ready CTA,
+          // and re-arm the banner (a new ready version overrides a prior "Later").
+          setDownloadPercent(null);
+          setReadyVersion(status.version);
+          setDismissed(false);
+          break;
+        case "checking":
+        case "available":
+        case "none":
+        case "error":
+          // Nothing user-facing for these — checking/finding nothing is normal,
+          // and 'available' just means a download has started (progress follows).
+          break;
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "var(--bg)",
+      }}
+    >
+      {!dismissed && (
+        <UpdateBanner
+          downloadPercent={downloadPercent}
+          readyVersion={readyVersion}
+          onInstall={() => void window.api.installUpdate()}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+    </div>
+  );
 }
 
 // ============================================================================

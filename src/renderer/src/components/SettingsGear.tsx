@@ -10,7 +10,7 @@
 // token-driven, so it skins to the active mode's theme for free.
 // ============================================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LogPathInfo } from "@shared/types";
 
 /** Optional EXPERIMENTAL OCR controls — only the cargo bar wires these. */
@@ -358,6 +358,14 @@ function LogFolderPanel({
           🛟 COLLECT LOGS…
         </button>
 
+        {/* Divider + UPDATES toggle (auto-update) — app-wide, shown in every
+            mode. Self-contained: reads/writes the updateCheckEnabled setting via
+            window.api so no prop threading through the three top bars is needed.
+            NON-FORCED: when on, the app checks GitHub on launch and downloads a
+            newer version in the background, but only installs when the user
+            clicks "Restart & Update" in the banner. */}
+        <UpdateCheckToggle />
+
         {/* Divider + EXPERIMENTAL OCR toggle (Phase F) — cargo bar only. */}
         {ocr && (
           <>
@@ -427,6 +435,101 @@ function LogFolderPanel({
           </>
         )}
       </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// UpdateCheckToggle — self-contained "Automatically check for updates" control.
+// ----------------------------------------------------------------------------
+// Lives in the gear popover for ALL modes (auto-update is an app-wide setting).
+// Reads the persisted flag once on mount and writes it on toggle, both via
+// window.api — so it needs no props and no plumbing through the per-mode top
+// bars. The change applies on the NEXT launch (we don't tear down a running
+// updater mid-session); the copy below says so. Optimistic + confirmed by the
+// saved value returned from main.
+// ---------------------------------------------------------------------------
+function UpdateCheckToggle(): React.JSX.Element {
+  const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    void window.api.getUpdateCheckEnabled().then((v) => {
+      if (alive) setEnabled(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggle = (): void => {
+    const next = !enabled;
+    setEnabled(next); // optimistic
+    void window.api.setUpdateCheckEnabled(next).then(setEnabled);
+  };
+
+  return (
+    <>
+      <div
+        style={{
+          borderTop: "1px solid var(--border)",
+          margin: "16px 0 12px",
+        }}
+      />
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontWeight: 700,
+          fontSize: 11,
+          letterSpacing: 1.5,
+          color: "var(--muted)",
+          marginBottom: 8,
+        }}
+      >
+        UPDATES
+      </div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          cursor: "pointer",
+          padding: "8px 10px",
+          border: "1px solid var(--border-strong)",
+          background: enabled ? "rgba(52,224,224,0.06)" : "transparent",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={toggle}
+          aria-label="Automatically check for updates"
+          style={{ flex: "none", accentColor: "var(--primary)" }}
+        />
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--text-bright)",
+          }}
+        >
+          Automatically check for updates
+        </span>
+      </label>
+      <p
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 10,
+          lineHeight: 1.5,
+          color: "var(--text-2)",
+          margin: "8px 0 0",
+        }}
+      >
+        New versions download in the background. Nothing installs until you
+        click “Restart &amp; Update” — never a forced restart. Takes effect next
+        launch.
+      </p>
     </>
   );
 }

@@ -70,6 +70,38 @@ export interface OverlayState {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-update (electron-updater) — NON-FORCED, user-controlled.
+// ---------------------------------------------------------------------------
+// The main process drives electron-updater's autoUpdater and pushes its
+// lifecycle to the renderer as a single discriminated `UpdateStatus`. The
+// renderer NEVER installs anything on its own: a downloaded update sits ready
+// until the user clicks "Restart & Update" (which calls the update:install IPC).
+// `error` is intentionally a quiet terminal state — the renderer may ignore it
+// entirely (offline / no release yet is normal), so we carry only a message for
+// optional logging, never a blocking dialog. See electron/autoUpdate.ts.
+// ---------------------------------------------------------------------------
+
+/**
+ * A push-only snapshot of the updater lifecycle, sent on the `update:status`
+ * channel. Discriminated on `state`:
+ *  - checking     : a check is in flight (no payload).
+ *  - available    : a newer version exists and is downloading in the background.
+ *  - progress     : background download progress (0..100, integer percent).
+ *  - downloaded   : the update is fully downloaded and ready to install on the
+ *                   user's command (NEVER auto-installed).
+ *  - none         : checked, already up to date (no payload).
+ *  - error        : the check/download failed; `message` is for quiet logging
+ *                   only. The renderer should treat this as "do nothing".
+ */
+export type UpdateStatus =
+  | { state: "checking" }
+  | { state: "available"; version: string }
+  | { state: "progress"; percent: number }
+  | { state: "downloaded"; version: string }
+  | { state: "none" }
+  | { state: "error"; message: string };
+
+// ---------------------------------------------------------------------------
 // Core records
 // ---------------------------------------------------------------------------
 
