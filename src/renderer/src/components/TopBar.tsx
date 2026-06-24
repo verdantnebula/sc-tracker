@@ -4,10 +4,9 @@
 // Manual Add now lives on the Mission List view (it's a mission-creation action),
 // not the global top bar. The LOCATION chip and the gear are shared components
 // (LocationChip / SettingsGear) reused by the Salvage + Mining bars too.
-import type { LogStatus, LogPathInfo, ShipReference } from "@shared/types";
+import type { LogStatus, LogPathInfo } from "@shared/types";
 import { LogStatusIndicator } from "./LogStatusIndicator";
 import { ModeSwitcher } from "./ModeSwitcher";
-import { ShipPicker } from "./ShipPicker";
 import { LocationChip } from "./LocationChip";
 import { SettingsGear } from "./SettingsGear";
 
@@ -15,9 +14,6 @@ export function TopBar({
   logStatus,
   logPathInfo,
   currentLocation,
-  ships,
-  selectedShipSlug,
-  onSelectShip,
   onResync,
   onReset,
   onPickLogFolder,
@@ -32,12 +28,6 @@ export function TopBar({
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
   currentLocation: string | null;
-  /** Cargo ships for the picker (scu > 0), sorted scu-desc. */
-  ships: ShipReference[];
-  /** Currently selected ship slug, or null. */
-  selectedShipSlug: string | null;
-  /** Persist a ship selection (resolved slug, or null to clear). */
-  onSelectShip: (slug: string | null) => void;
   onResync: () => void;
   onReset: () => void;
   /** Open the native folder picker to choose a custom LIVE folder. */
@@ -76,13 +66,6 @@ export function TopBar({
 
       {/* Location chip — shared component (reused on the Salvage bar). */}
       <LocationChip currentLocation={currentLocation} />
-
-      {/* Ship picker — Cargo mode only, AFTER the LOCATION chip (Phase A) */}
-      <ShipPicker
-        ships={ships}
-        selectedSlug={selectedShipSlug}
-        onSelect={onSelectShip}
-      />
 
       <div style={{ flex: 1 }} />
 
@@ -152,7 +135,7 @@ export function TopBar({
             whiteSpace: "nowrap",
           }}
         >
-          ⊡ OCR Capture
+          ⊡ Contract Capture
         </button>
       )}
     </header>

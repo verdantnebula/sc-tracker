@@ -18,6 +18,7 @@ import type {
 } from "@shared/types";
 
 import { TopBar } from "./components/TopBar";
+import { ShipPicker } from "./components/ShipPicker";
 import { CapacityBar } from "./components/CapacityBar";
 import { SalvageShell } from "./components/SalvageShell";
 import { MiningShell } from "./components/MiningShell";
@@ -448,9 +449,6 @@ function CargoApp({
         logStatus={logStatus}
         logPathInfo={logPathInfo}
         currentLocation={currentLocation}
-        ships={reference.ships}
-        selectedShipSlug={selectedShipSlug}
-        onSelectShip={selectShip}
         onResync={() => void window.api.startBackfill()}
         onReset={resetAll}
         onPickLogFolder={pickLogFolder}
@@ -498,6 +496,14 @@ function CargoApp({
           background: "rgba(7,12,16,0.3)",
         }}
       >
+        {/* Ship picker — Cargo mode, first item in the toolbar row, immediately
+            to the LEFT of the DENSITY control. Wired to the same
+            selectedShipSlug/selectShip state the capacity bar + route reads. */}
+        <ShipPicker
+          ships={reference.ships}
+          selectedSlug={selectedShipSlug}
+          onSelect={selectShip}
+        />
         <ToggleChip
           label="DENSITY"
           value={density === "compact" ? "COMPACT" : "COMFORTABLE"}
