@@ -1,5 +1,5 @@
 // ============================================================================
-// autoUpdate.ts — NON-FORCED auto-update (electron-updater) wiring  (v2.3.0)
+// autoUpdate.ts — NON-FORCED auto-update (electron-updater) wiring  (v1.0.0)
 // ----------------------------------------------------------------------------
 // FULLY USER-CONTROLLED. The app checks GitHub Releases on launch and, if a
 // newer version exists, downloads it in the BACKGROUND — but it NEVER installs
@@ -97,6 +97,13 @@ export interface AutoUpdateHandle {
    * that case) and safe when the updater never initialized (no-op). Never throws.
    */
   install: () => void;
+  /**
+   * Trigger an update check on demand (the user clicked "Check for updates").
+   * Shares the SAME guarded, never-throwing path as the initial/periodic check,
+   * so a manual check behaves identically: failures surface as a quiet `error`
+   * status, never an exception or blocking dialog. No-op when gated off.
+   */
+  checkNow: () => void;
   /** Stop the recheck interval (called on before-quit). Idempotent, never throws. */
   dispose: () => void;
 }
@@ -104,6 +111,7 @@ export interface AutoUpdateHandle {
 /** A disabled/no-op handle — returned when the updater is gated off. */
 const NOOP_HANDLE: AutoUpdateHandle = {
   install: () => {},
+  checkNow: () => {},
   dispose: () => {},
 };
 
@@ -136,26 +144,60 @@ export async function initAutoUpdate(
   // NON-FORCED configuration. Background download yes; silent install NO.
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
-  // electron-updater logs are noisy; route nothing by default (main.log already
-  // captures our own [update] lines). Leaving logger null is fine.
+  // Route electron-updater's internal logger to console.* so its diagnostics
+  // land in main.log (the app pipes console.* -> main.log via
+  // installConsoleLogger). Without this a runtime updater failure leaves NO
+  // trace — exactly the silent-failure mode we are fixing.
+  autoUpdater.logger = {
+    info: (m: unknown) =>
+      console.log("[update]", typeof m === "string" ? m : JSON.stringify(m)),
+    warn: (m: unknown) =>
+      console.warn("[update]", typeof m === "string" ? m : JSON.stringify(m)),
+    error: (m: unknown) =>
+      console.error("[update]", typeof m === "string" ? m : JSON.stringify(m)),
+    debug: (m: unknown) =>
+      console.log(
+        "[update:debug]",
+        typeof m === "string" ? m : JSON.stringify(m),
+      ),
+  } as unknown as typeof autoUpdater.logger;
+
+  // Track which download-progress milestones we've already logged so a long
+  // download doesn't spam main.log with a line per progress event. We log only
+  // when the rounded percent first crosses a 0/25/50/75/100 boundary.
+  const loggedMilestones = new Set<number>();
+  const PROGRESS_MILESTONES = [0, 25, 50, 75, 100];
 
   // --- Lifecycle events -> renderer push (all guarded by emit being safe). ---
+  // Each handler also emits an explicit "[update] …" console line so the updater
+  // lifecycle is visible in main.log even though the internal logger is wired.
   autoUpdater.on("checking-for-update", () => {
+    console.log("[update] checking…");
     deps.emit({ state: "checking" });
   });
   autoUpdater.on("update-available", (info) => {
+    console.log(`[update] available: ${versionFrom(info)}`);
     deps.emit({ state: "available", version: versionFrom(info) });
   });
   autoUpdater.on("update-not-available", () => {
+    console.log("[update] up to date");
     deps.emit({ state: "none" });
   });
   autoUpdater.on("download-progress", (p) => {
     const percent = clampPercent(
       (p as { percent?: unknown } | undefined)?.percent,
     );
+    // Log only the first time we cross each milestone (avoids per-event spam).
+    for (const m of PROGRESS_MILESTONES) {
+      if (percent >= m && !loggedMilestones.has(m)) {
+        loggedMilestones.add(m);
+        console.log(`[update] downloading… ${m}%`);
+      }
+    }
     deps.emit({ state: "progress", percent });
   });
   autoUpdater.on("update-downloaded", (info) => {
+    console.log(`[update] downloaded: ${versionFrom(info)}`);
     deps.emit({ state: "downloaded", version: versionFrom(info) });
   });
   autoUpdater.on("error", (err) => {
@@ -188,6 +230,11 @@ export async function initAutoUpdate(
       } catch (err) {
         console.warn("[update] quitAndInstall failed:", stringifyError(err));
       }
+    },
+    checkNow: () => {
+      // Manual ("Check for updates") trigger — reuse the SAME guarded path as
+      // the initial/periodic check so it can never throw into the IPC handler.
+      safeCheck();
     },
     dispose: () => {
       try {

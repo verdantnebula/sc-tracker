@@ -112,6 +112,8 @@ const api: ApiBridge = {
       enabled,
     ) as Promise<boolean>,
   installUpdate: () => ipcRenderer.invoke(IPC.UPDATE_INSTALL) as Promise<void>,
+  checkForUpdates: () =>
+    ipcRenderer.invoke(IPC.UPDATE_CHECK_NOW) as Promise<void>,
 
   // --- overlay window (Phase D) ---
   toggleOverlay: () =>

@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
-import type { LogPathInfo } from "@shared/types";
+import type { LogPathInfo, UpdateStatus } from "@shared/types";
 
 /** Optional EXPERIMENTAL OCR controls — only the cargo bar wires these. */
 type OcrControls = {
@@ -455,8 +455,48 @@ function LogFolderPanel({
 // updater mid-session); the copy below says so. Optimistic + confirmed by the
 // saved value returned from main.
 // ---------------------------------------------------------------------------
+/**
+ * Map an updater status to the inline status line shown under the
+ * "Check for updates" button: its text and a token-driven color (so it themes
+ * per mode). Returns null for states we never surface inline here.
+ */
+function updateStatusLine(
+  status: UpdateStatus | null,
+): { text: string; color: string } | null {
+  switch (status?.state) {
+    case "checking":
+      return { text: "Checking for updates…", color: "var(--text-2)" };
+    case "none":
+      return { text: "You’re on the latest version.", color: "var(--success)" };
+    case "available":
+      return { text: "Update found — downloading…", color: "var(--primary)" };
+    case "progress":
+      return {
+        text: `Downloading update… ${status.percent}%`,
+        color: "var(--primary)",
+      };
+    case "downloaded":
+      return {
+        text: "Update ready — use the banner above to install.",
+        color: "var(--primary)",
+      };
+    case "error":
+      return {
+        text: "Couldn’t check for updates (offline or GitHub unavailable).",
+        color: "var(--text-2)",
+      };
+    default:
+      return null;
+  }
+}
+
 function UpdateCheckToggle(): React.JSX.Element {
   const [enabled, setEnabled] = useState(true);
+  // Whether the user has clicked "Check for updates" this session. Gates the
+  // inline status line so we never show "up to date" before an explicit check.
+  const [hasChecked, setHasChecked] = useState(false);
+  // Latest updater lifecycle status pushed from main (null until first event).
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -468,11 +508,33 @@ function UpdateCheckToggle(): React.JSX.Element {
     };
   }, []);
 
+  // Subscribe to the updater lifecycle so the inline status line reflects the
+  // current check/download state. Clean up the subscription on unmount.
+  useEffect(() => {
+    const unsubscribe = window.api.onUpdateStatus((s) => setStatus(s));
+    return unsubscribe;
+  }, []);
+
   const toggle = (): void => {
     const next = !enabled;
     setEnabled(next); // optimistic
     void window.api.setUpdateCheckEnabled(next).then(setEnabled);
   };
+
+  const checkNow = (): void => {
+    setHasChecked(true);
+    void window.api.checkForUpdates();
+  };
+
+  // Show the inline status line once the user has clicked, OR whenever a
+  // download is in progress / ready (so a background download begun before the
+  // user clicked is still surfaced here).
+  const showStatus =
+    hasChecked ||
+    status?.state === "available" ||
+    status?.state === "progress" ||
+    status?.state === "downloaded";
+  const statusLine = updateStatusLine(status);
 
   return (
     <>
@@ -536,6 +598,45 @@ function UpdateCheckToggle(): React.JSX.Element {
         click “Restart &amp; Update” — never a forced restart. Takes effect next
         launch.
       </p>
+
+      {/* Manual "Check for updates" — styled like the RE-SYNC ghost button.
+          Lets the user force a check immediately rather than waiting for the
+          launch/periodic check. Results stream in via onUpdateStatus and show
+          in the inline line below. */}
+      <button
+        className="sc-ghost-btn"
+        onClick={checkNow}
+        title="Check GitHub for a newer version now"
+        style={{
+          width: "100%",
+          padding: "9px 14px",
+          background: "transparent",
+          border: "1px solid var(--border-strong)",
+          color: "var(--text-bright)",
+          fontFamily: "var(--font-display)",
+          fontWeight: 700,
+          fontSize: 12,
+          letterSpacing: 1,
+          cursor: "pointer",
+          marginTop: 10,
+        }}
+      >
+        ⟳ CHECK FOR UPDATES
+      </button>
+
+      {showStatus && statusLine && (
+        <p
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 11,
+            lineHeight: 1.5,
+            color: statusLine.color,
+            margin: "8px 0 0",
+          }}
+        >
+          {statusLine.text}
+        </p>
+      )}
     </>
   );
 }

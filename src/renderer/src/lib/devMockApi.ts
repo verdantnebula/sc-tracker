@@ -615,6 +615,9 @@ function createMockApi(): ApiBridge {
     installUpdate: async (): Promise<void> => {
       /* dev no-op: no electron-updater in a plain browser tab */
     },
+    checkForUpdates: async (): Promise<void> => {
+      /* dev no-op: no electron-updater in a plain browser tab */
+    },
 
     // --- overlay window (dev stub — no second window in a plain browser tab) ---
     toggleOverlay: async () => {
@@ -786,7 +789,7 @@ export function installDevMockApi(): void {
   (window as unknown as { api: ApiBridge }).api = createMockApi();
   // eslint-disable-next-line no-console
   console.warn(
-    "[SC Cargo Tracker] DEV MOCK window.api installed (no preload bridge found). " +
+    "[SC Tracker] DEV MOCK window.api installed (no preload bridge found). " +
       "This is standalone-dev only and never ships.",
   );
 }

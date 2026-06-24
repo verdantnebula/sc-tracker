@@ -1,4 +1,4 @@
-# SC Cargo Tracker
+# SC Tracker
 
 A local desktop companion for **Star Citizen** cargo hauling that reconstructs your
 hauling missions automatically by reading the game's own `Game.log` — no OCR, no

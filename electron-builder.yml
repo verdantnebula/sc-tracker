@@ -25,7 +25,7 @@
 # ============================================================================
 
 appId: uk.verdantnebula.sctracker
-productName: SC Cargo Tracker
+productName: SC Tracker
 
 # Keep electron-builder output separate from the @electron/packager `release/`
 # dir so the two packaging paths never clobber each other.
@@ -59,7 +59,7 @@ asarUnpack:
 win:
   target:
     - nsis
-  artifactName: SC-Cargo-Tracker-Setup-${version}.${ext}
+  artifactName: SC-Tracker-Setup-${version}.${ext}
 
 nsis:
   # Per-user install: no admin elevation required (perMachine false).

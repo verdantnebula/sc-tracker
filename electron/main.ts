@@ -450,7 +450,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: "#04070a",
     autoHideMenuBar: true,
-    title: "SC Cargo Tracker",
+    title: "SC Tracker",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -564,7 +564,7 @@ function createOverlay(): void {
     minimizable: false,
     fullscreenable: false,
     show: false,
-    title: "SC Cargo Tracker — Next Stop",
+    title: "SC Tracker — Next Stop",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -870,6 +870,13 @@ function registerIpc(): void {
   // when nothing is downloaded or the updater never initialized.
   ipcMain.handle(IPC.UPDATE_INSTALL, (): void => {
     autoUpdate?.install();
+  });
+
+  // Manually trigger an update check (the gear's "Check for updates" button).
+  // Reuses the handle's guarded checkNow(); a no-op when the updater is gated
+  // off (dev/unpackaged or checks disabled). Results arrive via UPDATE_STATUS.
+  ipcMain.handle(IPC.UPDATE_CHECK_NOW, (): void => {
+    autoUpdate?.checkNow();
   });
 
   ipcMain.handle(
@@ -1324,7 +1331,7 @@ function handleTopLevelError(label: string, err: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     try {
       dialog.showErrorBox(
-        "SC Cargo Tracker — unexpected error",
+        "SC Tracker — unexpected error",
         `An unexpected error occurred (${label}). The app will keep running.\n\n` +
           String(err instanceof Error ? (err.stack ?? err.message) : err),
       );

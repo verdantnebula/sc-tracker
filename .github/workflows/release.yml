@@ -6,7 +6,7 @@
 # dev machine without Developer Mode, hence CI does the real packaging).
 #
 # Result: electron-builder publishes the NSIS installer
-# (SC-Cargo-Tracker-Setup-<version>.exe), its .blockmap, and latest.yml to the
+# (SC-Tracker-Setup-<version>.exe), its .blockmap, and latest.yml to the
 # GitHub Release for that tag. electron-updater in the app reads latest.yml to
 # offer the NON-FORCED, user-triggered update.
 #
@@ -74,6 +74,6 @@ jobs:
           name: ${{ github.ref_name }}
           draft: true
           files: |
-            dist-release/SC-Cargo-Tracker-Setup-*.exe
-            dist-release/SC-Cargo-Tracker-Setup-*.exe.blockmap
+            dist-release/SC-Tracker-Setup-*.exe
+            dist-release/SC-Tracker-Setup-*.exe.blockmap
             dist-release/latest.yml

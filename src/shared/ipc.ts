@@ -62,6 +62,9 @@ export const IPC = {
 
   // auto-update (electron-updater) — NON-FORCED. The user clicks to install.
   UPDATE_INSTALL: "update:install",
+  // Manually trigger an update check (the "Check for updates" button). Shares
+  // the same guarded, never-throwing path as the launch/periodic check.
+  UPDATE_CHECK_NOW: "update:checkNow",
 
   // EXPERIMENTAL OCR contract capture (Phase F) — capture the primary display
   // as a PNG data URL in main; main also runs tesseract.js (assets load from
@@ -174,6 +177,11 @@ export interface IpcRequestMap {
    * user clicks "Restart & Update". No-op (resolves) if nothing is downloaded.
    */
   [IPC.UPDATE_INSTALL]: { args: []; result: void };
+  /**
+   * Manually trigger an update check (the "Check for updates" button). Resolves
+   * immediately; results arrive asynchronously via the UPDATE_STATUS push.
+   */
+  [IPC.UPDATE_CHECK_NOW]: { args: []; result: void };
   /** Capture the primary display as a PNG data URL for OCR (Phase F). */
   [IPC.OCR_CAPTURE_SCREEN]: { args: []; result: OcrCaptureResult };
   /**
@@ -308,6 +316,8 @@ export interface ApiBridge {
   setUpdateCheckEnabled(enabled: boolean): Promise<boolean>;
   /** Install the downloaded update and restart (user-triggered only). */
   installUpdate(): Promise<void>;
+  /** Manually trigger an update check; results arrive via onUpdateStatus. */
+  checkForUpdates(): Promise<void>;
   /** Capture the primary display as a PNG data URL for the OCR pipeline. */
   captureScreenForOcr(): Promise<OcrCaptureResult>;
   /**

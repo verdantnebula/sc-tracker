@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { shouldRunAutoUpdate, clampPercent, versionFrom } from "./autoUpdate";
+import {
+  shouldRunAutoUpdate,
+  clampPercent,
+  versionFrom,
+  initAutoUpdate,
+} from "./autoUpdate";
 
 // Pure helpers for the NON-FORCED auto-updater. The electron-updater wiring
 // itself (events, quitAndInstall) needs a real packaged Electron app + a release
@@ -54,7 +59,7 @@ describe("clampPercent", () => {
 
 describe("versionFrom", () => {
   it("extracts a string version from an UpdateInfo-ish object", () => {
-    expect(versionFrom({ version: "2.3.0" })).toBe("2.3.0");
+    expect(versionFrom({ version: "1.2.3" })).toBe("1.2.3");
   });
 
   it("returns '' for a missing / non-string version", () => {
@@ -62,6 +67,23 @@ describe("versionFrom", () => {
     expect(versionFrom({ version: 23 })).toBe("");
     expect(versionFrom(null)).toBe("");
     expect(versionFrom(undefined)).toBe("");
-    expect(versionFrom("2.3.0")).toBe("");
+    expect(versionFrom("1.2.3")).toBe("");
+  });
+});
+
+describe("initAutoUpdate (gated-off NOOP handle)", () => {
+  it("returns a handle whose checkNow() is a callable no-op that never throws", async () => {
+    // Gated off (unpackaged) -> NOOP_HANDLE, returned WITHOUT importing
+    // electron-updater, so this is safe in the Node test runtime.
+    const handle = await initAutoUpdate({
+      isPackaged: false,
+      updateCheckEnabled: true,
+      emit: () => {},
+    });
+    expect(typeof handle.checkNow).toBe("function");
+    expect(handle.checkNow()).toBeUndefined();
+    // install() + dispose() on the no-op handle must also be safe.
+    expect(() => handle.install()).not.toThrow();
+    expect(() => handle.dispose()).not.toThrow();
   });
 });
