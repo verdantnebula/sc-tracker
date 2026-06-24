@@ -8,6 +8,7 @@
 // ============================================================================
 
 import type { MiningRock, MiningDeposit } from "@shared/types";
+import { depositInArea } from "@shared/miningArea";
 
 /** Number formatting used across the mining views. */
 export const fmt = (n: number): string =>
@@ -174,4 +175,52 @@ export function searchRocksByName(
     else if (n.includes(q)) contains.push(r);
   }
   return [...starts.sort(byRank), ...contains.sort(byRank)];
+}
+
+// ---------------------------------------------------------------------------
+// AREA SCANNABLE ROCKS — the "minerals near you" set for the Mining overlay.
+// Extracted from MiningRockValuesView's inline `isNear` predicate so the overlay
+// and the main table share ONE tested rule. A scannable rock counts as "near
+// you" when its deposit record (matched by name) is minable in the area regions
+// derived from the player's current body (see @shared/miningArea). Rocks with no
+// matching deposit row can't be located, so they are never "near".
+// ---------------------------------------------------------------------------
+
+/** A scan rock paired with its deposit (where it's found) for the area filter. */
+export interface AreaScannableRock {
+  /** The scannable rock (name, rarity, six scan-signature values). */
+  rock: MiningRock;
+  /** Its matched deposit record (the FoundAt regions that placed it in-area). */
+  deposit: MiningDeposit;
+}
+
+/**
+ * The set of scannable rocks minable in the player's current area: each rock
+ * whose deposit (matched by name) falls inside `areaRegions`. Returns [] when no
+ * body resolved (empty regions) — callers degrade gracefully to "show all" or a
+ * muted hint. Sorted rarest-first then by name so the most interesting rock to
+ * mine leads the compact overlay list. Pure: no DOM, no IPC.
+ *
+ *   areaScannableRocks(rocks, deposits, areaRegionsForBody("Hurston"))
+ *     -> [{ rock: Quantainium, deposit }, { rock: Gold, deposit }, …]
+ *   areaScannableRocks(rocks, deposits, [])  -> []
+ */
+export function areaScannableRocks(
+  rocks: MiningRock[],
+  deposits: MiningDeposit[],
+  areaRegions: string[],
+): AreaScannableRock[] {
+  if (areaRegions.length === 0) return [];
+  const out: AreaScannableRock[] = [];
+  for (const rock of rocks) {
+    const deposit = depositForRock(rock.name, deposits);
+    if (deposit && depositInArea(deposit, areaRegions)) {
+      out.push({ rock, deposit });
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      rarityRank(b.rock.rarity) - rarityRank(a.rock.rarity) ||
+      a.rock.name.localeCompare(b.rock.name),
+  );
 }

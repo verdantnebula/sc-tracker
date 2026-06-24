@@ -174,6 +174,7 @@ const api: ApiBridge = {
     subscribe<SalvageRun[]>(IPC.SALVAGE_RUNS_CHANGED, cb),
   onOverlayStateChanged: (cb) =>
     subscribe<OverlayState>(IPC.OVERLAY_STATE_CHANGED, cb),
+  onModeChanged: (cb) => subscribe<AppMode>(IPC.MODE_CHANGED, cb),
 };
 
 contextBridge.exposeInMainWorld("api", api);

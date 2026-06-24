@@ -407,6 +407,9 @@ function createMockApi(): ApiBridge {
   // In-memory experimental-OCR flag (Phase F) for standalone-dev of the toggle.
   let ocrEnabled = false;
   const overlayListeners = new Set<(s: { enabled: boolean }) => void>();
+  // In-memory mode-change listeners so the standalone overlay can swap content
+  // live when setMode is called (mirrors the real MODE_CHANGED broadcast).
+  const modeListeners = new Set<(m: AppMode) => void>();
   // In-memory salvage runs for standalone-dev of the salvage views.
   let salvageRuns: SalvageRun[] = [];
   const salvageListeners = new Set<(r: SalvageRun[]) => void>();
@@ -566,7 +569,11 @@ function createMockApi(): ApiBridge {
     }),
     getMode: async (): Promise<AppMode> => mode,
     setMode: async (next: AppMode): Promise<AppMode> => {
-      mode = next === "salvage" ? "salvage" : "cargo";
+      mode =
+        next === "salvage" || next === "mining" || next === "cargo"
+          ? next
+          : "cargo";
+      modeListeners.forEach((cb) => cb(mode));
       return mode;
     },
     getSelectedShip: async (): Promise<string | null> => selectedShipSlug,
@@ -740,6 +747,10 @@ function createMockApi(): ApiBridge {
     onOverlayStateChanged: (cb) => {
       overlayListeners.add(cb);
       return () => overlayListeners.delete(cb);
+    },
+    onModeChanged: (cb) => {
+      modeListeners.add(cb);
+      return () => modeListeners.delete(cb);
     },
   };
 }

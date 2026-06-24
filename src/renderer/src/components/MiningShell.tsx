@@ -56,15 +56,30 @@ export function MiningShell({
   // Whether ROCK VALUES + DEPOSITS hide everything that isn't minable near the
   // player. Off by default; ignored (forced to "show all") when no body resolves.
   const [onlyNearMe, setOnlyNearMe] = useState(false);
+  // Whether the shared always-on-top overlay window is open (Phase D). The same
+  // single overlay is shared across Cargo/Mining; its content follows the active
+  // mode. Read on mount + kept in sync via onOverlayStateChanged so the pin
+  // button reflects the overlay closing itself (or a toggle from the cargo bar).
+  const [overlayEnabled, setOverlayEnabled] = useState(false);
 
   // Load the bundled mining reference once, and subscribe to the SAME current-
   // location plumbing the cargo renderer uses. Read-only: no mutations.
   useEffect(() => {
     void window.api.getMiningReference().then(setReference);
     void window.api.getCurrentLocation().then(setCurrentLocation);
-    const unsub = window.api.onCurrentLocationChanged(setCurrentLocation);
-    return () => unsub();
+    void window.api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
+    const unsubs = [
+      window.api.onCurrentLocationChanged(setCurrentLocation),
+      window.api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
+    ];
+    return () => unsubs.forEach((u) => u());
   }, []);
+
+  // Toggle the shared overlay window open/closed (same IPC the cargo TopBar
+  // uses). Optimistic + confirmed by the broadcast.
+  const toggleOverlay = (): void => {
+    void window.api.toggleOverlay().then((s) => setOverlayEnabled(s.enabled));
+  };
 
   // Resolve location -> body -> the set of deposit regions that count as "near".
   const body = useMemo(() => resolveBody(currentLocation), [currentLocation]);
@@ -83,7 +98,12 @@ export function MiningShell({
         background: "var(--bg)",
       }}
     >
-      <MiningTopBar onToggleMode={onToggleMode} body={body} />
+      <MiningTopBar
+        onToggleMode={onToggleMode}
+        body={body}
+        overlayEnabled={overlayEnabled}
+        onToggleOverlay={toggleOverlay}
+      />
 
       {/* Hazard-stripe accent bar — cool azure industrial signature. */}
       <div

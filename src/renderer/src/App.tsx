@@ -76,11 +76,20 @@ export function App(): React.JSX.Element {
   const [mode, setMode] = useState<AppMode | null>(null);
 
   // Read the persisted mode once, then keep <html data-mode> in sync with it.
+  // Also subscribe to MODE_CHANGED so this window stays consistent if the mode
+  // is changed elsewhere (the broadcast is the same value we set locally, so
+  // this is a harmless echo for self-initiated switches and a correctness hook
+  // for any future cross-window switch).
   useEffect(() => {
     void window.api.getMode().then((m) => {
       setMode(m);
       applyTheme(m);
     });
+    const unsub = window.api.onModeChanged((m) => {
+      setMode(m);
+      applyTheme(m);
+    });
+    return () => unsub();
   }, []);
 
   const toggleMode = (): void => {

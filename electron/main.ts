@@ -788,6 +788,11 @@ function registerIpc(): void {
     // saveSettings normalizes an unknown/forged value back to 'cargo' and
     // merges onto disk so the liveFolder key is never dropped.
     settings = saveSettings({ mode });
+    // Broadcast so the always-on-top overlay window (a SEPARATE renderer) swaps
+    // its content + theme live when the user switches modes in the main window.
+    // The main window updates mode locally already, so this is a harmless echo
+    // there and the load-bearing signal for the overlay.
+    broadcast(IPC.MODE_CHANGED, settings.mode);
     return settings.mode;
   });
 

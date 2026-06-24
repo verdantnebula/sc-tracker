@@ -8,13 +8,12 @@
 
 import { useMemo, useState } from "react";
 import type { MiningReferenceData } from "@shared/types";
-import { depositInArea } from "@shared/miningArea";
 import {
   fmt,
   rarityColor,
   rarityRank,
   RARITY_ORDER,
-  depositForRock,
+  areaScannableRocks,
 } from "../../lib/miningSelectors";
 
 const inputStyle: React.CSSProperties = {
@@ -71,14 +70,26 @@ export function MiningRockValuesView({
   const [rarity, setRarity] = useState<string>("all");
 
   // A rock is "near you" if its deposit (matched by name) is in the area. Rocks
-  // with no deposit row can't be located, so they're never "near".
-  const isNear = useMemo(() => {
-    return (rockName: string): boolean => {
-      if (areaRegions.length === 0) return false;
-      const dep = depositForRock(rockName, reference.deposits);
-      return dep ? depositInArea(dep, areaRegions) : false;
-    };
-  }, [areaRegions, reference.deposits]);
+  // with no deposit row can't be located, so they're never "near". Reuses the
+  // shared areaScannableRocks selector (also used by the Mining overlay) so the
+  // table and overlay can never disagree on what's "near".
+  const nearNames = useMemo(
+    () =>
+      new Set(
+        areaScannableRocks(
+          reference.rocks,
+          reference.deposits,
+          areaRegions,
+        ).map((a) => a.rock.name),
+      ),
+    [reference.rocks, reference.deposits, areaRegions],
+  );
+  const isNear = useMemo(
+    () =>
+      (rockName: string): boolean =>
+        nearNames.has(rockName),
+    [nearNames],
+  );
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();

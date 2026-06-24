@@ -12,7 +12,9 @@ import {
   rarityRank,
   rarityColor,
   searchRocksByName,
+  areaScannableRocks,
 } from "./miningSelectors";
+import { areaRegionsForBody } from "@shared/miningArea";
 
 // A small, deterministic rock set mirroring the real data shape. Ice/Aluminum
 // are near each other (common); Quantainium is far away (legendary).
@@ -185,5 +187,84 @@ describe("searchRocksByName", () => {
     expect(searchRocksByName("  ice  ", ROCKS).map((r) => r.name)).toEqual([
       "Ice",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// areaScannableRocks — the Mining overlay's "minerals near you" set. Reuses
+// depositForRock + depositInArea (via @shared/miningArea regions), so these
+// tests pin the integration: only rocks whose deposit is in-area come back,
+// rarest-first, and an empty region set yields nothing.
+// ---------------------------------------------------------------------------
+
+describe("areaScannableRocks", () => {
+  // Scan rocks: Ice (common, Hurston moon), Gold (rare, system-wide belt),
+  // Quantainium (legendary, Hurston moon), Diamond (epic, microTech only — out
+  // of area for Hurston), Stileron (uncommon, no deposit row — never near).
+  const ROCKS_A: MiningRock[] = [
+    { name: "Ice", rarity: "Common", scanValues: [1, 2, 3, 4, 5, 6] },
+    { name: "Gold", rarity: "Rare", scanValues: [1, 2, 3, 4, 5, 6] },
+    {
+      name: "Quantainium",
+      rarity: "Legendary",
+      scanValues: [1, 2, 3, 4, 5, 6],
+    },
+    { name: "Diamond", rarity: "Epic", scanValues: [1, 2, 3, 4, 5, 6] },
+    { name: "Stileron", rarity: "Uncommon", scanValues: [1, 2, 3, 4, 5, 6] },
+  ];
+  const DEPS_A: MiningDeposit[] = [
+    { name: "Ice", type: "Ship Mineable", foundAt: ["Aberdeen"] }, // Hurston moon
+    { name: "Gold", type: "Ship Mineable", foundAt: ["Aaron Halo"] }, // Stanton belt
+    { name: "Quantainium", type: "Ship Mineable", foundAt: ["Magda"] }, // Hurston moon
+    { name: "Diamond", type: "Ship Mineable", foundAt: ["Calliope"] }, // microTech moon
+    // Stileron has NO deposit row -> not locatable -> never near.
+  ];
+
+  it("returns only rocks whose deposit is minable in the area", () => {
+    const regions = areaRegionsForBody("Hurston");
+    const names = areaScannableRocks(ROCKS_A, DEPS_A, regions).map(
+      (a) => a.rock.name,
+    );
+    // Ice + Quantainium (Hurston moons) + Gold (Aaron Halo, Stanton-wide). NOT
+    // Diamond (microTech moon) and NOT Stileron (no deposit).
+    expect(names).toContain("Ice");
+    expect(names).toContain("Gold");
+    expect(names).toContain("Quantainium");
+    expect(names).not.toContain("Diamond");
+    expect(names).not.toContain("Stileron");
+  });
+
+  it("sorts rarest-first then by name", () => {
+    const regions = areaRegionsForBody("Hurston");
+    const names = areaScannableRocks(ROCKS_A, DEPS_A, regions).map(
+      (a) => a.rock.name,
+    );
+    // Legendary > Rare > Common -> Quantainium, Gold, Ice.
+    expect(names).toEqual(["Quantainium", "Gold", "Ice"]);
+  });
+
+  it("pairs each rock with its matched deposit", () => {
+    const regions = areaRegionsForBody("Hurston");
+    const ice = areaScannableRocks(ROCKS_A, DEPS_A, regions).find(
+      (a) => a.rock.name === "Ice",
+    );
+    expect(ice?.deposit.foundAt).toEqual(["Aberdeen"]);
+  });
+
+  it("returns [] when no body resolved (empty region set)", () => {
+    expect(areaScannableRocks(ROCKS_A, DEPS_A, [])).toEqual([]);
+  });
+
+  it("includes microTech rocks only for the microTech area", () => {
+    const names = areaScannableRocks(
+      ROCKS_A,
+      DEPS_A,
+      areaRegionsForBody("microTech"),
+    ).map((a) => a.rock.name);
+    // Diamond (Calliope) + Gold (Aaron Halo, Stanton-wide). NOT the Hurston-only.
+    expect(names).toContain("Diamond");
+    expect(names).toContain("Gold");
+    expect(names).not.toContain("Ice");
+    expect(names).not.toContain("Quantainium");
   });
 });

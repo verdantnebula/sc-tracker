@@ -93,6 +93,10 @@ export const IPC = {
   CURRENT_LOCATION_CHANGED: "currentLocation:changed",
   SALVAGE_RUNS_CHANGED: "salvage:runs:changed",
   OVERLAY_STATE_CHANGED: "overlay:state:changed",
+  // App mode changed (cargo/salvage/mining). Broadcast on SETTINGS_SET_MODE so
+  // the always-on-top overlay window (a SEPARATE renderer) can swap its content
+  // + theme live when the user switches modes in the main window.
+  MODE_CHANGED: "mode:changed",
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -227,6 +231,7 @@ export interface IpcEventMap {
   [IPC.CURRENT_LOCATION_CHANGED]: { payload: string | null };
   [IPC.SALVAGE_RUNS_CHANGED]: { payload: SalvageRun[] };
   [IPC.OVERLAY_STATE_CHANGED]: { payload: OverlayState };
+  [IPC.MODE_CHANGED]: { payload: AppMode };
 }
 
 // ---------------------------------------------------------------------------
@@ -340,4 +345,6 @@ export interface ApiBridge {
   onSalvageRunsChanged(cb: (runs: SalvageRun[]) => void): () => void;
   /** Overlay open/closed state changed (e.g. overlay closed via its own control). */
   onOverlayStateChanged(cb: (state: OverlayState) => void): () => void;
+  /** App mode changed (cargo/salvage/mining) — lets the overlay swap content live. */
+  onModeChanged(cb: (mode: AppMode) => void): () => void;
 }
