@@ -32,7 +32,7 @@ import { applyTheme } from "../lib/theme";
 import { nextStops, type NextStop } from "../lib/nextStop";
 import { fmt as cargoFmt } from "../lib/selectors";
 import {
-  lookupScan,
+  searchRocks,
   rarityColor,
   fmt as miningFmt,
   areaScannableRocks,
@@ -416,8 +416,15 @@ function Footer({
 }
 
 // ===========================================================================
-// MINING panel — SCAN ID (radar value reverse-lookup) + minerals NEAR YOU.
+// MINING panel — unified SEARCH (radar value OR mineral name) + minerals NEAR
+// YOU. The single box auto-detects: a number runs the scan-value reverse-lookup
+// (lookupScan), text runs the mineral-name search (searchRocksByName). Both
+// flows are dispatched by the tested pure helper searchRocks(); the overlay just
+// renders the unified result list. NEAR YOU is unchanged.
 // ===========================================================================
+
+// How many search results the compact overlay lists before "+N more".
+const SEARCH_CAP = 4;
 
 function MiningOverlay({
   currentLocation,
@@ -429,26 +436,24 @@ function MiningOverlay({
   const [reference, setReference] = useState<MiningReferenceData>(
     EMPTY_MINING_REFERENCE,
   );
-  // The value the player reads off their mining scanner (free text so paste +
-  // partial input work; parsed to a number for lookupScan).
-  const [scanText, setScanText] = useState("");
+  // The single search box: EITHER a radar value the player reads off their
+  // scanner OR a mineral name (free text so paste + partial input work). The
+  // tested searchRocks() dispatcher decides which path to run.
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     void window.api.getMiningReference().then(setReference);
   }, []);
 
-  // SCAN ID: reverse-lookup the typed radar value against every rock's six
-  // scan-signature tiers (same tested helper the LOOKUP tab uses; default ±1%
-  // tolerance absorbs radar rounding). Empty/invalid input => no matches shown.
-  const scanValue = useMemo(() => {
-    const n = Number(scanText.replace(/[, ]/g, "").trim());
-    return Number.isFinite(n) && scanText.trim().length > 0 ? n : null;
-  }, [scanText]);
-
-  const matches: ScanMatch[] = useMemo(
-    () => (scanValue === null ? [] : lookupScan(scanValue, reference.rocks)),
-    [scanValue, reference.rocks],
+  // UNIFIED SEARCH: numeric query -> scan-value reverse-lookup (lookupScan);
+  // text query -> mineral-name search (searchRocksByName). Empty query yields
+  // the NAME path with all rocks, which we suppress in the UI (show a hint) so
+  // the compact overlay isn't flooded before the user types.
+  const result = useMemo(
+    () => searchRocks(query, reference.rocks),
+    [query, reference.rocks],
   );
+  const hasQuery = query.trim().length > 0;
 
   // NEAR YOU: resolve location -> body -> area regions -> the scannable rocks
   // whose deposit is minable here (shared tested selector). [] when no body
@@ -486,15 +491,15 @@ function MiningOverlay({
           WebkitAppRegion: "no-drag",
         }}
       >
-        {/* SCAN ID — type/paste the radar value -> matching rock(s). */}
+        {/* SEARCH — one box: a number runs the scan-value reverse-lookup, text
+            runs the mineral-name search. searchRocks() picks the path. */}
         <section style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <SectionLabel>SCAN ID</SectionLabel>
+          <SectionLabel>SEARCH</SectionLabel>
           <input
-            value={scanText}
-            onChange={(e) => setScanText(e.target.value)}
-            inputMode="numeric"
-            placeholder="Radar value…"
-            aria-label="Mining scanner value"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="scan value or mineral name…"
+            aria-label="Scan value or mineral name"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -507,19 +512,10 @@ function MiningOverlay({
               outline: "none",
             }}
           />
-          {scanValue === null ? (
-            <Hint>Type the value shown on your scanner.</Hint>
-          ) : matches.length === 0 ? (
-            <Hint>No rock matches {miningFmt(scanValue)}.</Hint>
+          {!hasQuery ? (
+            <Hint>Enter a scanner value or a mineral name.</Hint>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {matches.slice(0, 4).map((m) => (
-                <ScanMatchRow key={`${m.name}-${m.tier}`} match={m} />
-              ))}
-              {matches.length > 4 && (
-                <Hint>+{matches.length - 4} more match(es)</Hint>
-              )}
-            </div>
+            <SearchResults result={result} query={query} />
           )}
         </section>
 
@@ -572,6 +568,123 @@ function MiningOverlay({
 }
 
 // ---------------------------------------------------------------------------
+// SearchResults — the unified result list for the single SEARCH box. Renders
+// value-matches (with tier) or name-matches (with a compact scan-signature
+// hint) depending on which path searchRocks() took, capped with "+N more".
+// ---------------------------------------------------------------------------
+
+function SearchResults({
+  result,
+  query,
+}: {
+  result: ReturnType<typeof searchRocks>;
+  query: string;
+}): React.JSX.Element {
+  // Branch on the discriminant FIRST so `matches` narrows to the right element
+  // type in each arm (ScanMatch[] vs MiningRock[]).
+  if (result.mode === "value") {
+    if (result.matches.length === 0) {
+      return (
+        <Hint>
+          No rock matches {miningFmt(Number(query.replace(/[, ]/g, "")))}.
+        </Hint>
+      );
+    }
+    const shown = result.matches.slice(0, SEARCH_CAP);
+    const more = result.matches.length - shown.length;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {shown.map((m) => (
+          <ScanMatchRow key={`${m.name}-${m.tier}`} match={m} />
+        ))}
+        {more > 0 && <Hint>+{more} more</Hint>}
+      </div>
+    );
+  }
+
+  if (result.matches.length === 0) {
+    return <Hint>No mineral matches “{query.trim()}”.</Hint>;
+  }
+  const shown = result.matches.slice(0, SEARCH_CAP);
+  const more = result.matches.length - shown.length;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {shown.map((rock) => (
+        <NameMatchRow
+          key={rock.name}
+          name={rock.name}
+          rarity={rock.rarity}
+          baseValue={rock.scanValues[0] ?? 0}
+          topValue={rock.scanValues[rock.scanValues.length - 1] ?? 0}
+        />
+      ))}
+      {more > 0 && <Hint>+{more} more</Hint>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NameMatchRow — one name-search result: name + rarity + a compact scan-
+// signature hint (base value, and the base–top range when distinct). Mirrors
+// NearYouRow's shape so the value vs name result rows read consistently.
+// ---------------------------------------------------------------------------
+
+function NameMatchRow({
+  name,
+  rarity,
+  baseValue,
+  topValue,
+}: {
+  name: string;
+  rarity: string;
+  baseValue: number;
+  topValue: number;
+}): React.JSX.Element {
+  const sig =
+    topValue > baseValue
+      ? `${miningFmt(baseValue)}–${miningFmt(topValue)}`
+      : miningFmt(baseValue);
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 8px",
+        background: "rgba(52,224,224,0.05)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <span
+        style={{
+          flex: 1,
+          fontWeight: 700,
+          fontSize: 13,
+          color: "var(--text-bright)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {name}
+      </span>
+      <RarityPill rarity={rarity} />
+      <span
+        title="Scan signature (tier 1 – tier 6)"
+        style={{
+          flex: "none",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          color: "var(--text-2)",
+        }}
+      >
+        {sig}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ScanMatchRow — one matched rock: name + rarity (rarity-colored) + tier.
 // ---------------------------------------------------------------------------
 
@@ -602,7 +715,7 @@ function ScanMatchRow({ match }: { match: ScanMatch }): React.JSX.Element {
       </span>
       <RarityPill rarity={match.rarity} />
       <span
-        title="Matched scan tier (1-6)"
+        title={`Matched scan tier ${match.tier} (value ${miningFmt(match.tierValue)})`}
         style={{
           flex: "none",
           fontFamily: "var(--font-mono)",
@@ -610,7 +723,7 @@ function ScanMatchRow({ match }: { match: ScanMatch }): React.JSX.Element {
           color: "var(--muted)",
         }}
       >
-        T{match.tier}
+        T{match.tier} · {miningFmt(match.tierValue)}
       </span>
     </div>
   );

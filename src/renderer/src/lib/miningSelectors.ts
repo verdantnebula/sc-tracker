@@ -178,6 +178,67 @@ export function searchRocksByName(
 }
 
 // ---------------------------------------------------------------------------
+// UNIFIED SEARCH — one box that takes EITHER a radar scan value OR a mineral
+// name and routes to the right helper. Used by the compact Mining overlay so a
+// single input handles both flows. The numeric-vs-name decision is the only new
+// logic here; the actual matching reuses lookupScan / searchRocksByName so this
+// stays a thin dispatcher (no duplicated lookup logic). Pure: no DOM, no IPC.
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of {@link searchRocks}: a discriminated union on `mode` so callers can
+ * render value-matches (with tier info) vs name-matches (plain rocks) without
+ * re-sniffing the query.
+ *  - `mode: "value"` -> `matches` are ScanMatch[] (from lookupScan).
+ *  - `mode: "name"`  -> `matches` are MiningRock[] (from searchRocksByName).
+ */
+export type RockSearchResult =
+  | { mode: "value"; matches: ScanMatch[] }
+  | { mode: "name"; matches: MiningRock[] };
+
+/**
+ * Decide whether `query` looks like a radar scan VALUE (a number) or a mineral
+ * NAME (text) and dispatch accordingly:
+ *
+ *  - Numeric string (after stripping thousands separators / spaces, e.g. "4300"
+ *    or "4,300") -> VALUE path: lookupScan(value, rocks, tolerancePct).
+ *  - Any other non-empty string (e.g. "Gold", "qua") -> NAME path:
+ *    searchRocksByName(query, rocks).
+ *  - Empty / whitespace-only query -> NAME path with all rocks (matches the
+ *    existing searchRocksByName "empty => all" convention), so the overlay can
+ *    show the full pickable list before the user types.
+ *
+ * "Numeric" means the trimmed input parses to a finite number AND contains a
+ * digit, so a name like "Gold" never accidentally takes the value path even
+ * though Number("") is 0. Reuses the existing helpers internally.
+ *
+ *   searchRocks("4300", rocks) -> { mode: "value", matches: lookupScan(4300,…) }
+ *   searchRocks("Gold", rocks) -> { mode: "name",  matches: searchRocksByName(…) }
+ *   searchRocks("", rocks)     -> { mode: "name",  matches: all rocks }
+ *
+ * Pure: no DOM, no IPC.
+ */
+export function searchRocks(
+  query: string,
+  rocks: MiningRock[],
+  tolerancePct = 1,
+): RockSearchResult {
+  const cleaned = query.replace(/[, ]/g, "").trim();
+  const isNumeric =
+    cleaned.length > 0 &&
+    /\d/.test(cleaned) &&
+    Number.isFinite(Number(cleaned));
+
+  if (isNumeric) {
+    return {
+      mode: "value",
+      matches: lookupScan(Number(cleaned), rocks, tolerancePct),
+    };
+  }
+  return { mode: "name", matches: searchRocksByName(query, rocks) };
+}
+
+// ---------------------------------------------------------------------------
 // AREA SCANNABLE ROCKS — the "minerals near you" set for the Mining overlay.
 // Extracted from MiningRockValuesView's inline `isNear` predicate so the overlay
 // and the main table share ONE tested rule. A scannable rock counts as "near

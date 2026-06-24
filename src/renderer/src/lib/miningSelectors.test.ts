@@ -12,6 +12,7 @@ import {
   rarityRank,
   rarityColor,
   searchRocksByName,
+  searchRocks,
   areaScannableRocks,
 } from "./miningSelectors";
 import { areaRegionsForBody } from "@shared/miningArea";
@@ -187,6 +188,99 @@ describe("searchRocksByName", () => {
     expect(searchRocksByName("  ice  ", ROCKS).map((r) => r.name)).toEqual([
       "Ice",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// searchRocks — the unified-search dispatcher behind the Mining overlay's single
+// box. It only DECIDES numeric-vs-name and delegates to lookupScan /
+// searchRocksByName, so these tests pin the routing (mode) + that it forwards to
+// the right helper, not the helpers' internals (covered above).
+// ---------------------------------------------------------------------------
+
+describe("searchRocks (unified dispatcher)", () => {
+  it("routes a numeric string to the VALUE path (lookupScan)", () => {
+    const r = searchRocks("4300", ROCKS, 0);
+    expect(r.mode).toBe("value");
+    // Mirrors lookupScan(4300, ROCKS, 0): Ice tier 1.
+    if (r.mode === "value") {
+      expect(r.matches).toEqual(lookupScan(4300, ROCKS, 0));
+      expect(r.matches[0].name).toBe("Ice");
+      expect(r.matches[0].tier).toBe(1);
+    }
+  });
+
+  it("routes a non-numeric string to the NAME path (searchRocksByName)", () => {
+    const r = searchRocks("Gold", ROCKS);
+    expect(r.mode).toBe("name");
+    if (r.mode === "name") {
+      // "Gold" matches nothing in ROCKS, but it must take the NAME path (and
+      // forward to searchRocksByName) rather than the value path.
+      expect(r.matches).toEqual(searchRocksByName("Gold", ROCKS));
+    }
+  });
+
+  it("finds a rock by name via the NAME path", () => {
+    const r = searchRocks("qua", ROCKS);
+    expect(r.mode).toBe("name");
+    if (r.mode === "name") {
+      expect(r.matches.map((m) => m.name)).toEqual(["Quantainium"]);
+    }
+  });
+
+  it("treats an empty query as NAME with all rocks (existing convention)", () => {
+    const r = searchRocks("", ROCKS);
+    expect(r.mode).toBe("name");
+    if (r.mode === "name") {
+      expect(r.matches).toEqual(searchRocksByName("", ROCKS));
+      expect(r.matches).toHaveLength(ROCKS.length);
+    }
+  });
+
+  it("treats a whitespace-only query as NAME with all rocks", () => {
+    const r = searchRocks("   ", ROCKS);
+    expect(r.mode).toBe("name");
+    if (r.mode === "name") {
+      expect(r.matches).toHaveLength(ROCKS.length);
+    }
+  });
+
+  it("strips thousands separators / spaces before deciding numeric", () => {
+    const r = searchRocks("4,300", ROCKS, 0);
+    expect(r.mode).toBe("value");
+    if (r.mode === "value") {
+      expect(r.matches[0].name).toBe("Ice");
+      expect(r.matches[0].tier).toBe(1);
+    }
+  });
+
+  it("does NOT take the value path for a name without digits", () => {
+    // Number("") is 0, so guard on 'contains a digit' — "Ice" must be NAME.
+    const r = searchRocks("Ice", ROCKS);
+    expect(r.mode).toBe("name");
+    if (r.mode === "name") {
+      expect(r.matches.map((m) => m.name)).toEqual(["Ice"]);
+    }
+  });
+
+  it("honors the tolerance argument on the value path", () => {
+    // 8590 is ~0.12% off Ice t2 (8600): in-tolerance at 1%, out at 0%.
+    const loose = searchRocks("8590", ROCKS, 1);
+    const tight = searchRocks("8590", ROCKS, 0);
+    if (loose.mode === "value") {
+      expect(loose.matches.some((m) => m.name === "Ice")).toBe(true);
+    }
+    if (tight.mode === "value") {
+      expect(tight.matches.some((m) => m.name === "Ice")).toBe(false);
+    }
+  });
+
+  it("defaults to a ±1% tolerance on the value path", () => {
+    const r = searchRocks("8540", ROCKS); // ~0.7% off Ice t2
+    expect(r.mode).toBe("value");
+    if (r.mode === "value") {
+      expect(r.matches.some((m) => m.name === "Ice")).toBe(true);
+    }
   });
 });
 
