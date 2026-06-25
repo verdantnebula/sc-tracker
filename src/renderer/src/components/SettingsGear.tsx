@@ -314,56 +314,6 @@ function LogFolderPanel({
           ⌫ RESET DATA
         </button>
 
-        {/* Divider + Report a Problem ("Collect Logs") */}
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            margin: "16px 0 12px",
-          }}
-        />
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: 1.5,
-            color: "var(--muted)",
-            marginBottom: 8,
-          }}
-        >
-          SOMETHING WRONG?
-        </div>
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 11,
-            lineHeight: 1.5,
-            color: "var(--text-2)",
-            margin: "0 0 10px",
-          }}
-        >
-          Collect the logs the developer needs into one file on your Desktop
-          (your username + in-game name are removed automatically).
-        </p>
-        <button
-          className="sc-ghost-btn"
-          onClick={onCollectLogs}
-          style={{
-            width: "100%",
-            padding: "9px 14px",
-            background: "transparent",
-            border: "1px solid var(--border-strong)",
-            color: "var(--text-bright)",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: 1,
-            cursor: "pointer",
-          }}
-        >
-          🛟 COLLECT LOGS…
-        </button>
-
         {/* Divider + UPDATES toggle (auto-update) — app-wide, shown in every
             mode. Self-contained: reads/writes the updateCheckEnabled setting via
             window.api so no prop threading through the three top bars is needed.
@@ -440,6 +390,57 @@ function LogFolderPanel({
             </p>
           </>
         )}
+
+        {/* Divider + Report a Problem ("Collect Logs") — kept at the BOTTOM of
+            the popover, below Data / Updates / Experimental. */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            margin: "16px 0 12px",
+          }}
+        />
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: 1.5,
+            color: "var(--muted)",
+            marginBottom: 8,
+          }}
+        >
+          SOMETHING WRONG?
+        </div>
+        <p
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 11,
+            lineHeight: 1.5,
+            color: "var(--text-2)",
+            margin: "0 0 10px",
+          }}
+        >
+          Collect the logs the developer needs into one file on your Desktop
+          (your username + in-game name are removed automatically).
+        </p>
+        <button
+          className="sc-ghost-btn"
+          onClick={onCollectLogs}
+          style={{
+            width: "100%",
+            padding: "9px 14px",
+            background: "transparent",
+            border: "1px solid var(--border-strong)",
+            color: "var(--text-bright)",
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: 1,
+            cursor: "pointer",
+          }}
+        >
+          🛟 COLLECT LOGS…
+        </button>
       </div>
     </>
   );
