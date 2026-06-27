@@ -165,6 +165,84 @@ describe("isolateObjectivesColumn", () => {
     expect(isolateObjectivesColumn([], 1000, 700)).toBe("");
   });
 
+  // ---- Header band is two-column too (the real CRU-L4 capture bug) ----
+  //
+  // The mobiGlas header band itself has TWO columns: a LEFT title (wrapping to a
+  // 2nd line) and a RIGHT reward block (Reward / Deadline / Contracted By) on the
+  // SAME y-rows. Reconstructing the header band FLAT merges left-title words and
+  // right-reward words into one line ("Senior … Reward H 345,500"), truncating the
+  // title and burying the reward. The header band must be split at the SAME column
+  // boundary (colX) as the body: LEFT title rows and RIGHT reward rows on separate
+  // lines.
+  function cruL4TwoColumnHeaderWords(): OcrWord[] {
+    const colX = 560; // left edge of the PRIMARY OBJECTIVES column (and the gutter)
+    return [
+      // --- HEADER BAND, LEFT column: the title, wrapping across TWO rows ---
+      w("Senior", 60, 20, 90),
+      w("|", 160, 20, 12),
+      w("Medium", 185, 20, 100),
+      w("Haul", 295, 20, 60),
+      w("|", 365, 20, 12),
+      // wrapped 2nd title line (same low-x column, next row down)
+      w("from", 60, 60, 60),
+      w("CRU-L4", 130, 60, 100),
+      w("Shallow", 240, 60, 100),
+      w("Fields", 350, 60, 80),
+      w("Station", 440, 60, 90),
+
+      // --- HEADER BAND, RIGHT column: the reward block (high x), SAME y-rows ---
+      w("Reward", colX + 40, 20, 90),
+      w("H", colX + 150, 20, 16), // the aUEC glyph OCR'd as a stray glyph
+      w("345,500", colX + 180, 20, 120),
+      w("Contract", colX + 40, 60, 110),
+      w("Deadline", colX + 160, 60, 110),
+      w("N/A", colX + 290, 60, 50),
+      w("Contracted", colX + 40, 100, 130),
+      w("By", colX + 180, 100, 30),
+      w("Covalex", colX + 220, 100, 100),
+
+      // --- COLUMN HEADER ROW (PRIMARY OBJECTIVES anchor) ---
+      w("PRIMARY", colX, 160, 110),
+      w("OBJECTIVES", colX + 130, 160, 150),
+
+      // --- a couple of BODY objective words in the right column ---
+      w("Deliver", colX, 210, 80),
+      w("91", colX + 90, 210, 40),
+      w("SCU", colX + 140, 210, 50),
+      w("of", colX + 200, 210, 30),
+      w("Aluminum", colX + 240, 210, 110),
+    ];
+  }
+
+  it("splits the header band at the column boundary: title and reward on SEPARATE lines", () => {
+    const out = isolateObjectivesColumn(cruL4TwoColumnHeaderWords(), 1000, 700);
+    const lines = out.split("\n");
+
+    // The LEFT title rows must be present and must NOT contain the right-column
+    // reward words (no "Reward", no "345").
+    const titleLine = lines.find((l) => /Senior/.test(l));
+    expect(titleLine).toBeDefined();
+    expect(titleLine).not.toMatch(/Reward/);
+    expect(titleLine).not.toMatch(/345/);
+    // The wrapped 2nd title row ("from CRU-L4 …") is rejoined onto the SAME line
+    // as the 1st (the title is one logical field), so extractTitle can read the
+    // haul-keyword/pipes AND the "from" clause together.
+    expect(titleLine).toMatch(/Senior \| Medium Haul \|/);
+    expect(titleLine).toMatch(/from CRU-L4 Shallow Fields Station/);
+
+    // The RIGHT reward row must be present as its OWN line carrying the number,
+    // and must NOT contain the left-column title words.
+    const rewardLine = lines.find((l) => /Reward/.test(l));
+    expect(rewardLine).toBeDefined();
+    expect(rewardLine).toMatch(/345,500/);
+    expect(rewardLine).not.toMatch(/Senior/);
+    expect(rewardLine).not.toMatch(/Haul/);
+
+    // The body objective survives.
+    expect(out).toMatch(/Deliver/);
+    expect(out).toMatch(/Aluminum/);
+  });
+
   it("tolerates a garbled PRIMARY OBJECTIVES header (fuzzy anchor match)", () => {
     // OCR sometimes garbles the header slightly: "PRIMARY OBJECTlVES".
     const words = quartzContractWords().map((word) =>

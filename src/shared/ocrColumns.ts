@@ -154,6 +154,117 @@ export function reconstructLines(words: OcrWord[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// Header-band reconstruction (column-aware)
+// ---------------------------------------------------------------------------
+
+/**
+ * Words that, when they OPEN the LEFT side of a header row, mark that row as a
+ * single FULL-WIDTH header line (a label whose value sits far to the right on the
+ * SAME row, e.g. "Reward            314,000"). Such a row must NOT be column-split
+ * — its label and value belong on one reconstructed line so the reward regex can
+ * read them together. A TITLE row, by contrast, opens with title words (Senior,
+ * from, …) on the left and a SEPARATE reward cluster on the right, and MUST be
+ * split. Matched loosely (letters-only, OCR-confusion-tolerant) on the row's
+ * leftmost word. Conservative: only true header LABELS, never place/title words.
+ */
+const HEADER_FULL_WIDTH_LABELS = [
+  "REWARD",
+  "PAYOUT",
+  "PAY",
+  "CONTRACT",
+  "CONTRACTED",
+  "DEADLINE",
+  "BONUS",
+];
+
+function opensFullWidthHeaderRow(leftmost: OcrWord): boolean {
+  return HEADER_FULL_WIDTH_LABELS.some((label) =>
+    looseEquals(leftmost.text, label),
+  );
+}
+
+/**
+ * Reconstruct the HEADER BAND column-aware. The band has a LEFT title column
+ * (which may wrap to a 2nd row) and a RIGHT reward block on the SAME y-rows. We
+ * bucket the band into rows (same row logic as reconstructLines), then for each
+ * row decide:
+ *   - if the row straddles `colX` AND does NOT open with a full-width header
+ *     label (i.e. it's a TITLE row with a reward cluster bled onto it), SPLIT it
+ *     at colX into a LEFT piece and a RIGHT piece;
+ *   - otherwise keep the row whole (a full-width "Reward … 314,000" label line, or
+ *     a row that doesn't straddle the boundary).
+ * Then emit ALL left pieces (the title, including its wrapped lines) first, then
+ * all right pieces (the reward / deadline / contracted-by block) — so left-title
+ * words and right-reward words never merge across the gutter, while a genuine
+ * full-width label line stays intact. PURE.
+ */
+function reconstructHeaderBand(words: OcrWord[], colX: number): string {
+  if (words.length === 0) return "";
+  const heights = words.map((word) => word.y1 - word.y0).filter((h) => h > 0);
+  const rowTol = Math.max(1, median(heights) * ROW_TOLERANCE_FRACTION);
+
+  const byY = [...words].sort((a, b) => cy(a) - cy(b));
+  const rows: OcrWord[][] = [];
+  for (const word of byY) {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(cy(word) - cy(last[0])) <= rowTol) {
+      last.push(word);
+    } else {
+      rows.push([word]);
+    }
+  }
+
+  const joinRow = (row: OcrWord[]): string =>
+    [...row]
+      .sort((a, b) => a.x0 - b.x0)
+      .map((word) => word.text)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  // TITLE FRAGMENTS are the left-column pieces of genuine title rows (a split
+  // row's left piece, or a pure-left non-label row). The title is ONE logical
+  // field that WRAPS across these rows, so we rejoin the fragments into a SINGLE
+  // line — otherwise extractTitle (which needs the haul-keyword/pipes AND the
+  // "from" clause on ONE line) can't recognize a wrapped title. Full-width LABEL
+  // lines (e.g. "Reward … 314,000") are NOT title fragments and stay their own
+  // line so the reward regex reads label+value together.
+  const titleFragments: string[] = [];
+  const labelLines: string[] = []; // left-side full-width label lines, kept apart
+  const rightLines: string[] = [];
+  for (const row of rows) {
+    const left = row.filter((word) => cx(word) < colX);
+    const right = row.filter((word) => cx(word) >= colX);
+    const straddles = left.length > 0 && right.length > 0;
+    const leftmost = [...row].sort((a, b) => a.x0 - b.x0)[0];
+
+    if (straddles && !opensFullWidthHeaderRow(leftmost)) {
+      // TITLE row with a reward cluster bled onto it → split at the boundary.
+      const l = joinRow(left);
+      const r = joinRow(right);
+      if (l.length > 0) titleFragments.push(l);
+      if (r.length > 0) rightLines.push(r);
+    } else if (cx(leftmost) < colX) {
+      // Row sitting on the LEFT. A full-width LABEL line ("Reward … N") is kept
+      // whole as its own line; an ordinary left row is a wrapped title fragment.
+      const whole = joinRow(row);
+      if (whole.length === 0) continue;
+      if (opensFullWidthHeaderRow(leftmost)) labelLines.push(whole);
+      else titleFragments.push(whole);
+    } else {
+      // Row entirely on the RIGHT (the reward / deadline / contracted-by block).
+      const whole = joinRow(row);
+      if (whole.length > 0) rightLines.push(whole);
+    }
+  }
+
+  const titleLine = titleFragments.join(" ").replace(/\s+/g, " ").trim();
+  return [titleLine, ...labelLines, ...rightLines]
+    .filter((l) => l.length > 0)
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Path 1 — header-anchor isolation
 // ---------------------------------------------------------------------------
 
@@ -281,13 +392,22 @@ export function isolateObjectivesColumn(
   const anchor = findObjectivesAnchor(clean);
   if (anchor) {
     const leftMargin = imgW * COL_LEFT_MARGIN_FRACTION;
-    const kept = clean.filter((word) => {
-      // Header band: anything above the column header row stays as-is.
-      if (cy(word) < anchor.headerY) return true;
-      // Body: keep only words in the objectives column (x-center >= colX-margin).
-      return cx(word) >= anchor.colX - leftMargin;
-    });
-    return reconstructLines(kept);
+    // The HEADER BAND (words above the column header row) is ITSELF two-column on
+    // the real screen: a LEFT title (which wraps to a 2nd row) and a RIGHT reward
+    // block (Reward / Deadline / Contracted By) on the SAME y-rows. Reconstructing
+    // it FLAT merges left-title words with right-reward words into one line
+    // ("Senior … Reward H 345,500"), truncating the title AND burying the reward
+    // (the merged line is consumed by title extraction). The body is column-split
+    // exactly as before; the header band is reconstructed COLUMN-AWARE.
+    const header = clean.filter((word) => cy(word) < anchor.headerY);
+    const body = clean.filter(
+      (word) =>
+        cy(word) >= anchor.headerY && cx(word) >= anchor.colX - leftMargin,
+    );
+
+    return [reconstructHeaderBand(header, anchor.colX), reconstructLines(body)]
+      .filter((block) => block.length > 0)
+      .join("\n");
   }
 
   // --- Path 2: x-gutter split (no anchor) ---

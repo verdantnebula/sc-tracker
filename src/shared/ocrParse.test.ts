@@ -768,6 +768,73 @@ describe("parseContractOcr — prose over-capture rejection (Bug #57)", () => {
   });
 });
 
+// =============================================================================
+// CRU-L4 two-column header capture — the reconstructed text after the header band
+// is split column-aware (title on its own line(s), reward block on its own
+// line(s)). This is what isolateObjectivesColumn now produces for the CRU-L4
+// Shallow Fields contract; the parser must read a CLEAN title (no reward bleed)
+// AND the reward 345500, plus the 4 Aluminum/Tungsten deliveries.
+// (SANITIZED + SYNTHETIC; game contract data only, no personal data.)
+// =============================================================================
+
+describe("parseContractOcr — CRU-L4 two-column header (clean title + reward)", () => {
+  const cleanedColumn = [
+    // LEFT title column (reconstructed as its own line — no reward bleed):
+    "Senior | Medium Haul | from CRU-L4 Shallow Fields Station [BP]*",
+    // RIGHT reward block (its own separate lines):
+    "Reward H 345,500",
+    "Contract Deadline N/A",
+    "Contracted By Covalex Independent Contractors",
+    "PRIMARY OBJECTIVES",
+    "Deliver 0/91 SCU of Aluminum to Everus Harbor above Hurston.",
+    "Deliver 0/77 SCU of Aluminum to Port Tressler above microTech.",
+    "Deliver 0/88 SCU of Tungsten to Baijini Point above ArcCorp.",
+    "Deliver 0/71 SCU of Tungsten to Everus Harbor above Hurston.",
+  ].join("\n");
+
+  it("reads the CLEAN title with no reward bleed", () => {
+    expect(parseContractOcr(cleanedColumn).title).toBe(
+      "Senior | Medium Haul | from CRU-L4 Shallow Fields Station",
+    );
+  });
+
+  it("extracts the reward 345500 from the now-separate reward line", () => {
+    expect(parseContractOcr(cleanedColumn).reward).toBe(345500);
+  });
+
+  it("recovers exactly 4 deliveries with the right SCU / commodity / dest", () => {
+    const out = parseContractOcr(cleanedColumn);
+    const dropoffs = out.objectives.filter((o) => o.kind === "dropoff");
+    expect(dropoffs).toHaveLength(4);
+    expect(dropoffs).toEqual([
+      {
+        kind: "dropoff",
+        scu: 91,
+        commodity: "Aluminum",
+        location: "Everus Harbor",
+      },
+      {
+        kind: "dropoff",
+        scu: 77,
+        commodity: "Aluminum",
+        location: "Port Tressler",
+      },
+      {
+        kind: "dropoff",
+        scu: 88,
+        commodity: "Tungsten",
+        location: "Baijini Point",
+      },
+      {
+        kind: "dropoff",
+        scu: 71,
+        commodity: "Tungsten",
+        location: "Everus Harbor",
+      },
+    ]);
+  });
+});
+
 describe("parseContractOcr — multi-objective contract", () => {
   it("parses several objectives and the reward from one screen", () => {
     const text = [
