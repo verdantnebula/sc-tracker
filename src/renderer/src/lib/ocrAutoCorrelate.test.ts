@@ -1,12 +1,14 @@
 // ============================================================================
 // ocrAutoCorrelate.test.ts — the PURE Auto OCR Capture correlation reducer.
 // ----------------------------------------------------------------------------
-// Covers the leg-arrival race policy end to end:
-//   - direct missionId resolve (with legs -> apply immediately);
-//   - settle-debounce gating (correlated but legless: wait, then apply);
-//   - idempotent re-apply within the TTL on later ticks;
-//   - expiry after the TTL (applied or not);
-//   - time+name fallback match (and NON-match when title differs / ts too far).
+// REVIEW-FIRST policy (Phase-3 rework): the reducer's outcome is "surface this
+// capture for human review", NOT "apply it". Coverage:
+//   - direct missionId resolve -> ready now, with a CONFIDENT pre-target;
+//   - fallback (time+name) match -> ready now, but NO pre-target (empty target);
+//   - settle-debounce gating (un-correlated: wait, then surface with empty target);
+//   - surface ONCE (reviewedOnce) — never re-open a second review for one entry;
+//   - expiry after the TTL (surfaced or not);
+//   - fallback NON-match when title differs / ts too far.
 // All inputs are explicit (pending + missions + now), so timing is deterministic.
 // ============================================================================
 
@@ -15,6 +17,7 @@ import type { Mission, Leg, OcrApplyObjective } from "@shared/types";
 import {
   reconcilePending,
   resolvePending,
+  resolveConfident,
   AUTO_OCR_DEFAULTS,
   type PendingApply,
 } from "./ocrAutoCorrelate";
@@ -64,12 +67,31 @@ function pending(over: Partial<PendingApply> = {}): PendingApply {
     ts: over.ts ?? 1_000,
     objectives: over.objectives ?? OBJS,
     enqueuedAt: over.enqueuedAt ?? 0,
-    appliedOnce: over.appliedOnce ?? false,
-    cueShown: over.cueShown,
+    reviewedOnce: over.reviewedOnce ?? false,
   };
 }
 
-// --- resolvePending (direct + fallback) -------------------------------------
+// --- resolveConfident (direct-only) -----------------------------------------
+
+describe("resolveConfident", () => {
+  it("resolves a DIRECT missionId match (confident)", () => {
+    const missions = [mission({ id: "m1" }), mission({ id: "m2" })];
+    expect(resolveConfident(pending({ missionId: "m2" }), missions)?.id).toBe(
+      "m2",
+    );
+  });
+
+  it("returns null when the missionId is absent (a fallback isn't confident)", () => {
+    const missions = [
+      mission({ id: "other", title: "Medium Cargo Haul", acceptedAt: 1_000 }),
+    ];
+    expect(
+      resolveConfident(pending({ missionId: "missing" }), missions),
+    ).toBeNull();
+  });
+});
+
+// --- resolvePending (direct + fallback readiness) ---------------------------
 
 describe("resolvePending", () => {
   const win = AUTO_OCR_DEFAULTS.fallbackWindowMs;
@@ -146,82 +168,32 @@ describe("resolvePending", () => {
   });
 });
 
-// --- reconcilePending (gating, re-apply, expiry) ----------------------------
+// --- reconcilePending (surface gating, pre-target, once-only, expiry) --------
 
 describe("reconcilePending", () => {
-  it("applies immediately when the direct mission already has legs", () => {
+  it("surfaces immediately with a CONFIDENT pre-target on a direct match", () => {
     const p = pending({ missionId: "m1", enqueuedAt: 0 });
     const missions = [mission({ id: "m1", legs: [leg("L1", "m1")] })];
     const res = reconcilePending([p], missions, 10);
-    expect(res.apply).toHaveLength(1);
-    expect(res.apply[0].missionId).toBe("m1");
-    expect(res.apply[0].objectives).toEqual(OBJS);
-    expect(res.apply[0].pending.appliedOnce).toBe(true);
+    expect(res.review).toHaveLength(1);
+    expect(res.review[0].preselectMissionId).toBe("m1");
+    expect(res.review[0].objectives).toEqual(OBJS);
+    expect(res.review[0].pending.reviewedOnce).toBe(true);
     expect(res.keep).toHaveLength(1);
     expect(res.expired).toHaveLength(0);
   });
 
-  it("holds a correlated-but-legless mission until the settle debounce", () => {
+  it("surfaces immediately even when the direct mission has NO legs yet", () => {
+    // Review-first doesn't need legs — the human reviews; applyOcr (on Apply)
+    // fills placeholders or inserts. A confident id is enough to surface + target.
     const p = pending({ missionId: "m1", enqueuedAt: 0 });
     const legless = [mission({ id: "m1", legs: [] })];
-
-    // Before settle: correlated but legless -> keep, no apply.
-    const early = reconcilePending(
-      [p],
-      legless,
-      AUTO_OCR_DEFAULTS.settleMs - 1,
-    );
-    expect(early.apply).toHaveLength(0);
-    expect(early.keep).toHaveLength(1);
-    expect(early.keep[0].appliedOnce).toBe(false);
-
-    // At/after settle: apply even though still legless (markers suppressed).
-    const late = reconcilePending([p], legless, AUTO_OCR_DEFAULTS.settleMs);
-    expect(late.apply).toHaveLength(1);
-    expect(late.apply[0].missionId).toBe("m1");
-    expect(late.keep[0].appliedOnce).toBe(true);
+    const res = reconcilePending([p], legless, 10);
+    expect(res.review).toHaveLength(1);
+    expect(res.review[0].preselectMissionId).toBe("m1");
   });
 
-  it("keeps (no apply) while the mission is not correlatable yet", () => {
-    const p = pending({ missionId: "m1", title: "No Match", enqueuedAt: 0 });
-    // A mission exists but neither id nor title matches.
-    const missions = [mission({ id: "zzz", title: "Other" })];
-    const res = reconcilePending([p], missions, 10);
-    expect(res.apply).toHaveLength(0);
-    expect(res.keep).toHaveLength(1);
-    expect(res.expired).toHaveLength(0);
-  });
-
-  it("re-applies (idempotent) on a later tick within the TTL once appliedOnce", () => {
-    const applied = pending({
-      missionId: "m1",
-      enqueuedAt: 0,
-      appliedOnce: true,
-    });
-    // Even legless + before settle, an already-applied entry re-applies so late
-    // markers get reconciled (applyOcr is idempotent).
-    const missions = [mission({ id: "m1", legs: [] })];
-    const res = reconcilePending([applied], missions, 500);
-    expect(res.apply).toHaveLength(1);
-    expect(res.apply[0].pending.appliedOnce).toBe(true);
-    expect(res.keep).toHaveLength(1);
-  });
-
-  it("expires an entry once the TTL elapses (and does not apply it)", () => {
-    const p = pending({
-      missionId: "m1",
-      enqueuedAt: 0,
-      appliedOnce: true,
-    });
-    const missions = [mission({ id: "m1", legs: [leg("L1", "m1")] })];
-    const res = reconcilePending([p], missions, AUTO_OCR_DEFAULTS.ttlMs);
-    expect(res.apply).toHaveLength(0);
-    expect(res.keep).toHaveLength(0);
-    expect(res.expired).toHaveLength(1);
-    expect(res.expired[0].missionId).toBe("m1");
-  });
-
-  it("applies a fallback-resolved entry to the matched mission id", () => {
+  it("surfaces a fallback-correlated entry but with NO pre-target (empty)", () => {
     const p = pending({
       missionId: "missing",
       title: "Cargo Haul",
@@ -229,61 +201,109 @@ describe("reconcilePending", () => {
       enqueuedAt: 0,
     });
     const missions = [
-      mission({
-        id: "real",
-        title: "Cargo Haul",
-        acceptedAt: 1_100,
-        legs: [leg("L1", "real")],
-      }),
+      mission({ id: "real", title: "Cargo Haul", acceptedAt: 1_100 }),
     ];
     const res = reconcilePending([p], missions, 10);
-    expect(res.apply).toHaveLength(1);
-    expect(res.apply[0].missionId).toBe("real");
+    expect(res.review).toHaveLength(1);
+    // Ready (the mission exists) but a fallback isn't confident -> empty target.
+    expect(res.review[0].preselectMissionId).toBeNull();
   });
 
-  it("processes a mixed queue: apply one, hold one, expire one", () => {
-    const applyMe = pending({ missionId: "a", enqueuedAt: 100 });
-    const holdMe = pending({ missionId: "b", enqueuedAt: 100 }); // legless, pre-settle
-    const expireMe = pending({ missionId: "c", enqueuedAt: 0 });
-    const now = 100 + AUTO_OCR_DEFAULTS.settleMs - 1; // < settle for the @100 ones
-    // expireMe enqueued at 0 -> now >= ttl only if now>=ttl; ensure that:
-    const nowExpire = AUTO_OCR_DEFAULTS.ttlMs + 50;
+  it("holds an un-correlated entry until the settle debounce, then surfaces empty", () => {
+    // No mission matches by id or title -> can't pre-target. Wait for settle so
+    // the mission can appear; if it never does, surface anyway (user picks).
+    const p = pending({ missionId: "m1", title: "No Match", enqueuedAt: 0 });
+    const missions = [mission({ id: "zzz", title: "Other" })];
 
-    // Use a `now` past the TTL for expireMe but the @100 entries are then also
-    // past settle; give 'a' legs (apply) and 'b' no legs but appliedOnce false
-    // and well past settle (so it ALSO applies). To keep 'b' held, give it a
-    // distinct enqueuedAt close to nowExpire.
-    const holdMe2 = pending({
+    const early = reconcilePending(
+      [p],
+      missions,
+      AUTO_OCR_DEFAULTS.settleMs - 1,
+    );
+    expect(early.review).toHaveLength(0);
+    expect(early.keep).toHaveLength(1);
+    expect(early.keep[0].reviewedOnce).toBe(false);
+
+    const late = reconcilePending([p], missions, AUTO_OCR_DEFAULTS.settleMs);
+    expect(late.review).toHaveLength(1);
+    expect(late.review[0].preselectMissionId).toBeNull();
+    expect(late.keep[0].reviewedOnce).toBe(true);
+  });
+
+  it("surfaces an entry ONCE — a later tick does not re-open a review", () => {
+    const surfaced = pending({
+      missionId: "m1",
+      enqueuedAt: 0,
+      reviewedOnce: true,
+    });
+    const missions = [mission({ id: "m1", legs: [leg("L1", "m1")] })];
+    const res = reconcilePending([surfaced], missions, 500);
+    expect(res.review).toHaveLength(0); // never re-surface
+    expect(res.keep).toHaveLength(1); // kept within TTL (dedupe re-emits)
+    expect(res.expired).toHaveLength(0);
+  });
+
+  it("expires an entry once the TTL elapses (and does not surface it)", () => {
+    const p = pending({ missionId: "m1", enqueuedAt: 0, reviewedOnce: true });
+    const missions = [mission({ id: "m1", legs: [leg("L1", "m1")] })];
+    const res = reconcilePending([p], missions, AUTO_OCR_DEFAULTS.ttlMs);
+    expect(res.review).toHaveLength(0);
+    expect(res.keep).toHaveLength(0);
+    expect(res.expired).toHaveLength(1);
+    expect(res.expired[0].missionId).toBe("m1");
+  });
+
+  it("DEFERS a ready entry while a review is open, then surfaces it once after close", () => {
+    // Regression: a confident entry becomes ready while a dialog is already open.
+    // It must NOT be consumed/stamped/lost on the deferred tick — it stays ready in
+    // keep[] — and a later reconcile with reviewOpen=false MUST surface it exactly
+    // once (not silently routed to keep by a premature reviewedOnce stamp).
+    const p = pending({ missionId: "m1", enqueuedAt: 0 });
+    const missions = [mission({ id: "m1", legs: [leg("L1", "m1")] })];
+
+    // Review open -> defer: nothing surfaces, entry retained UNSTAMPED + un-lost.
+    const deferred = reconcilePending([p], missions, 10, true);
+    expect(deferred.review).toHaveLength(0);
+    expect(deferred.keep).toHaveLength(1);
+    expect(deferred.keep[0].reviewedOnce).toBe(false);
+    expect(deferred.expired).toHaveLength(0);
+
+    // Dialog closed -> the deferred entry surfaces exactly once, with its pre-target.
+    const after = reconcilePending(deferred.keep, missions, 20, false);
+    expect(after.review).toHaveLength(1);
+    expect(after.review[0].pending.missionId).toBe("m1");
+    expect(after.review[0].preselectMissionId).toBe("m1");
+    expect(after.keep).toHaveLength(1);
+    expect(after.keep[0].reviewedOnce).toBe(true);
+
+    // And it never re-surfaces on a subsequent tick.
+    const next = reconcilePending(after.keep, missions, 30, false);
+    expect(next.review).toHaveLength(0);
+  });
+
+  it("processes a mixed queue: surface one, hold one, expire one", () => {
+    const surfaceMe = pending({ missionId: "a", enqueuedAt: 100 }); // direct match
+    const expireMe = pending({ missionId: "c", enqueuedAt: 0 }); // past TTL
+    const nowExpire = AUTO_OCR_DEFAULTS.ttlMs + 50;
+    // holdMe: no id/title match AND just enqueued (pre-settle) -> held.
+    const holdMe = pending({
       missionId: "b",
-      enqueuedAt: nowExpire - 1, // just enqueued -> pre-settle, legless -> hold
+      title: "No Match",
+      enqueuedAt: nowExpire - 1,
     });
     const missions = [
       mission({ id: "a", legs: [leg("L1", "a")] }),
-      mission({ id: "b", legs: [] }),
+      mission({ id: "zzz", title: "Other" }),
       mission({ id: "c", legs: [leg("L1", "c")] }),
     ];
     const res = reconcilePending(
-      [applyMe, holdMe2, expireMe],
+      [surfaceMe, holdMe, expireMe],
       missions,
       nowExpire,
     );
-    expect(res.apply.map((a) => a.missionId).sort()).toEqual(["a"]);
+    expect(res.review.map((r) => r.pending.missionId)).toEqual(["a"]);
+    expect(res.review[0].preselectMissionId).toBe("a");
     expect(res.keep.map((k) => k.missionId).sort()).toEqual(["a", "b"]);
     expect(res.expired.map((e) => e.missionId)).toEqual(["c"]);
-    // Silence the unused-binding warning for the illustrative `holdMe`.
-    expect(holdMe.missionId).toBe("b");
-    expect(now).toBeGreaterThan(0);
-  });
-
-  it("carries cueShown through untouched (host-owned field)", () => {
-    const p = pending({
-      missionId: "m1",
-      enqueuedAt: 0,
-      appliedOnce: true,
-      cueShown: true,
-    });
-    const missions = [mission({ id: "m1", legs: [leg("L1", "m1")] })];
-    const res = reconcilePending([p], missions, 10);
-    expect(res.apply[0].pending.cueShown).toBe(true);
   });
 });

@@ -51,7 +51,6 @@ import {
   cropRectFromRegion,
   type Rect,
 } from "@shared/ocrPreprocess";
-import { pickDefaultTarget } from "../lib/selectors";
 import { recognizeContract } from "../lib/ocrRunner";
 import {
   reviewObjectivesFrom,
@@ -59,6 +58,23 @@ import {
   preprocessCrop,
   type ReviewObjective,
 } from "../lib/ocrPipeline";
+
+/**
+ * A pre-filled review handed to the dialog by the AUTO path (Phase 3). When set,
+ * the dialog SKIPS its capture/OCR flow and opens straight in the review state
+ * with these values — so an auto-capture on cargo-accept surfaces for human
+ * review-and-Apply instead of writing silently. `preselectMissionId` pre-targets
+ * the dropdown ONLY when correlation was confident (else null -> user picks).
+ * Nothing is written until the user clicks Apply, exactly like a manual review.
+ */
+export interface OcrPrefill {
+  objectives: ReviewObjective[];
+  reward: number | null;
+  confidence: number;
+  rawText: string;
+  /** Confident correlated mission id, or null when correlation was uncertain. */
+  preselectMissionId: string | null;
+}
 
 type Phase =
   | { kind: "idle" }
@@ -85,24 +101,41 @@ type Phase =
 export function OcrCaptureDialog({
   missions,
   reference,
-  initialMissionId,
+  prefill,
   onClose,
 }: {
   /** Active missions the result can be applied to. */
   missions: Mission[];
   /** Bundled reference (fuzzy-match candidates for commodity/location). */
   reference: ReferenceData;
-  /** Preselect this mission as the apply target (e.g. the suppressed one). */
-  initialMissionId?: string | null;
+  /**
+   * AUTO path (Phase 3): when set, open straight into review pre-filled with this
+   * OCR result instead of running the capture flow. Undefined = the manual path
+   * (capture on mount). See {@link OcrPrefill}.
+   */
+  prefill?: OcrPrefill;
   onClose: () => void;
 }): React.JSX.Element {
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const [objectives, setObjectives] = useState<ReviewObjective[]>([]);
-  const [reward, setReward] = useState<number | null>(null);
-  // Auto-select the mission that needs OCR (most-recent "details missing"),
-  // unless the caller preselected one. The user can still change it.
-  const [targetId, setTargetId] = useState<string | null>(() =>
-    pickDefaultTarget(missions, initialMissionId),
+  const [phase, setPhase] = useState<Phase>(
+    // Auto (prefilled): land directly in review. Manual: start idle -> capture.
+    prefill
+      ? {
+          kind: "review",
+          confidence: prefill.confidence,
+          rawText: prefill.rawText,
+        }
+      : { kind: "idle" },
+  );
+  const [objectives, setObjectives] = useState<ReviewObjective[]>(
+    prefill?.objectives ?? [],
+  );
+  const [reward, setReward] = useState<number | null>(prefill?.reward ?? null);
+  // Apply target. MANUAL opens with NO default (empty placeholder) so the APPLY
+  // button stays disabled until the user deliberately picks a mission. The AUTO
+  // path may pre-target a CONFIDENT correlated mission so it's a one-click apply;
+  // an uncertain auto correlation also starts empty (never guess a target).
+  const [targetId, setTargetId] = useState<string | null>(
+    prefill?.preselectMissionId ?? null,
   );
   const [showRaw, setShowRaw] = useState(false);
   // The user's calibrated capture region (proportions 0..1), or null until the
@@ -121,6 +154,11 @@ export function OcrCaptureDialog({
   // capture. The user already opted in by opening the dialog. (No auto-apply;
   // this only READS the screen.) We pass the freshly-read region directly into
   // the first capture so it branches correctly without waiting for a re-render.
+  //
+  // AUTO path (prefill set): the OCR pass already ran headless, so we do NOT
+  // capture again — we open straight in review with the prefilled values. We
+  // still read the region so the Recapture/Re-draw controls work if the user
+  // wants to re-OCR from the dialog.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -133,6 +171,8 @@ export function OcrCaptureDialog({
       if (cancelled) return;
       setRegion(initialRegion);
       setRegionLoaded(true);
+      // Prefilled (auto): stay in the review phase set at init; don't re-capture.
+      if (prefill) return;
       await runCapture(initialRegion);
     })();
     return () => {
@@ -615,40 +655,22 @@ export function OcrCaptureDialog({
               {phase.kind === "applied" ? "Close" : "Cancel"}
             </button>
             {phase.kind === "review" && (
-              <>
-                {/* Mission selector mirrored at the bottom (matches the mockup) so
-                    the apply target is chosen right beside the button. Bound to the
-                    SAME targetId state as the top selector. */}
-                <select
-                  value={targetId ?? ""}
-                  onChange={(e) => setTargetId(e.target.value || null)}
-                  aria-label="Apply to mission"
-                  title="Choose the mission to apply these objectives to"
-                  style={{ ...selectStyle, maxWidth: 260, marginBottom: 0 }}
-                >
-                  {missions.length === 0 && (
-                    <option value="">No active missions</option>
-                  )}
-                  {missions.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.title || m.id}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="sc-primary-btn"
-                  onClick={apply}
-                  disabled={!canApply}
-                  style={primaryBtn(canApply)}
-                  title={
-                    canApply
-                      ? "Apply the reviewed objectives to the selected mission"
-                      : "Select a mission first"
-                  }
-                >
-                  APPLY TO MISSION
-                </button>
-              </>
+              // The single mission selector lives in ReviewBody (after the
+              // objectives). The footer keeps only the APPLY button, which stays
+              // disabled until a mission is chosen there.
+              <button
+                className="sc-primary-btn"
+                onClick={apply}
+                disabled={!canApply}
+                style={primaryBtn(canApply)}
+                title={
+                  canApply
+                    ? "Apply the reviewed objectives to the selected mission"
+                    : "Select a mission first"
+                }
+              >
+                APPLY TO MISSION
+              </button>
             )}
           </div>
         </div>
@@ -865,27 +887,51 @@ function ReviewBody({
   onUpdateObjective: (i: number, p: Partial<ReviewObjective>) => void;
   onRemoveObjective: (i: number) => void;
 }): React.JSX.Element {
+  // Count objectives whose SCU came back unreadable (parser's fillable
+  // placeholder: scu === null). We surface this as a banner so the user fills the
+  // amount BEFORE applying instead of writing a misleading 0. Each such row also
+  // highlights its empty SCU field (see ObjectiveRow).
+  const unreadableScuCount = objectives.filter((o) => o.scu == null).length;
+
   return (
     <>
-      {/* target mission selector */}
-      <label style={fieldLabel}>APPLY TO</label>
-      <select
-        value={targetId ?? ""}
-        onChange={(e) => setTargetId(e.target.value || null)}
-        style={selectStyle}
-      >
-        {missions.length === 0 && <option value="">No active missions</option>}
-        {missions.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.title || m.id}
-          </option>
-        ))}
-      </select>
+      {/* reward — moved to the TOP (was below the objectives) */}
+      <label style={fieldLabel}>REWARD (aUEC)</label>
+      <input
+        type="number"
+        value={reward ?? ""}
+        placeholder="not detected"
+        onChange={(e) =>
+          setReward(e.target.value === "" ? null : Number(e.target.value))
+        }
+        style={inputStyle}
+      />
 
       <div style={{ ...metaRow, marginTop: 12 }}>
         <span>OCR confidence (overall)</span>
         <ConfidenceChip score={confidence} />
       </div>
+
+      {unreadableScuCount > 0 && (
+        <div
+          role="status"
+          style={{
+            padding: "10px 12px",
+            margin: "12px 0 0",
+            border: "1px solid rgba(224,160,52,0.5)",
+            background: "rgba(224,160,52,0.08)",
+            color: "var(--warning, #e0a034)",
+            fontFamily: "var(--font-display)",
+            fontSize: 11.5,
+            lineHeight: 1.5,
+          }}
+        >
+          {unreadableScuCount === 1
+            ? "1 objective’s SCU couldn’t be read"
+            : `${unreadableScuCount} objectives’ SCU couldn’t be read`}{" "}
+          — fill the highlighted amount before applying so it isn’t saved as 0.
+        </div>
+      )}
 
       {objectives.length === 0 ? (
         <div
@@ -916,17 +962,27 @@ function ReviewBody({
         </div>
       )}
 
-      {/* reward */}
-      <label style={fieldLabel}>REWARD (aUEC)</label>
-      <input
-        type="number"
-        value={reward ?? ""}
-        placeholder="not detected"
-        onChange={(e) =>
-          setReward(e.target.value === "" ? null : Number(e.target.value))
-        }
-        style={inputStyle}
-      />
+      {/* target mission selector — the SINGLE dropdown, after the objectives.
+          Defaults to an empty placeholder so the APPLY button stays disabled
+          until the user deliberately picks a mission (or an auto pre-target). */}
+      <label style={fieldLabel}>APPLY TO</label>
+      <select
+        value={targetId ?? ""}
+        onChange={(e) => setTargetId(e.target.value || null)}
+        aria-label="Apply to mission"
+        style={selectStyle}
+      >
+        {missions.length === 0 ? (
+          <option value="">No active missions</option>
+        ) : (
+          <option value="">Select a mission…</option>
+        )}
+        {missions.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.title || m.id}
+          </option>
+        ))}
+      </select>
 
       {/* raw-text disclosure */}
       <button
@@ -995,16 +1051,35 @@ function ObjectiveRow({
           <option value="dropoff">Deliver</option>
           <option value="pickup">Collect</option>
         </select>
+        {/* SCU. When unreadable (parser placeholder: scu === null) we show an
+            EMPTY, highlighted field — never a misleading 0 — so the user fills
+            the real amount before applying. */}
         <input
           type="number"
           value={objective.scu ?? ""}
-          placeholder="SCU"
+          placeholder={objective.scu == null ? "SCU?" : "SCU"}
           onChange={(e) =>
             onChange({
               scu: e.target.value === "" ? null : Number(e.target.value),
             })
           }
-          style={{ ...inputStyle, width: 90, marginBottom: 0 }}
+          aria-invalid={objective.scu == null}
+          title={
+            objective.scu == null
+              ? "SCU couldn’t be read — enter the amount before applying"
+              : undefined
+          }
+          style={{
+            ...inputStyle,
+            width: 90,
+            marginBottom: 0,
+            ...(objective.scu == null
+              ? {
+                  borderColor: "var(--warning, #e0a034)",
+                  background: "rgba(224,160,52,0.1)",
+                }
+              : null),
+          }}
         />
         <span style={{ flex: 1 }} />
         <button

@@ -1,5 +1,5 @@
 // ============================================================================
-// AutoOcrCapture — EXPERIMENTAL Auto OCR Capture host (Phase 3)
+// AutoOcrCapture — EXPERIMENTAL Auto OCR Capture host (Phase 3, REVIEW-FIRST)
 // ----------------------------------------------------------------------------
 // A headless host mounted in CargoApp (active in cargo mode) that listens for
 // the OCR_AUTO_REQUEST push main broadcasts when a cargo contract is accepted
@@ -7,24 +7,31 @@
 //   1. reads the calibrated capture region — if NULL (uncalibrated), shows a
 //      one-time non-blocking notice and STOPS (auto-capture needs a region);
 //   2. else runs the shared runOcrPipeline() headless -> objectives[]; if zero
-//      objectives, silently discards (defensive — never write garbage);
+//      objectives, silently discards (defensive — never surface garbage);
 //   3. enqueues a PendingApply and lets the pure ocrAutoCorrelate reducer decide
-//      WHEN (and to WHICH mission) to apply — handling the leg-arrival race:
-//        - apply once the mission exists AND has legs, or after a settle debounce;
-//        - re-apply (idempotent) on later missions:changed within the TTL so
-//          late-arriving markers still get reconciled; drop after the TTL.
-//   4. on apply, calls window.api.applyOcr() and surfaces a transient, non-
-//      blocking "review the legs" banner.
+//      WHEN the capture is ready to SURFACE and WHETHER it can confidently pre-
+//      target a mission (handling the leg-arrival race):
+//        - surface once a confident (direct) mission correlation exists, or after
+//          a settle debounce (un-id'd / log-suppressed missions still get a
+//          review, with an empty target the user picks); drop after the TTL.
+//   4. on "ready", calls onAutoReview() with the pre-filled OCR result so the
+//      parent OPENS the OcrCaptureDialog in review state. NOTHING IS WRITTEN until
+//      the user clicks Apply (the old silent applyOcr auto-path is GONE).
+//
+// DON'T CLOBBER AN OPEN REVIEW: when a review dialog is already open (`reviewOpen`,
+// manual or a prior auto), we do NOT surface — the ready entry stays pending and
+// a small "review waiting" badge shows; the next reconcile (after the open dialog
+// closes) surfaces it. One review at a time; no elaborate queue UI.
 //
 // EVERYTHING is guarded: any throw is caught and ignored so the app never breaks.
-// Session-transient only — no DB schema change. The auto path NEVER opens the
-// review modal; it fills tentatively and nudges the user to review.
+// Session-transient only — no DB schema change.
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react";
 import type { Mission, ReferenceData } from "@shared/types";
 import { runOcrPipeline, type ReviewObjective } from "../lib/ocrPipeline";
 import { reconcilePending, type PendingApply } from "../lib/ocrAutoCorrelate";
+import type { OcrPrefill } from "./OcrCaptureDialog";
 
 /** Map reviewed objectives to the applyOcr payload (drop blank locations). */
 function toApplyObjectives(
@@ -38,23 +45,16 @@ function toApplyObjectives(
   }));
 }
 
-/** A transient review cue shown after an auto-fill (auto-dismisses). */
-interface ReviewCue {
-  id: number;
-  title: string;
-}
-
 /** How often the host re-runs the reconcile loop (settle/TTL progress) when no
  *  missions:changed event arrives. Cheap — the reducer is pure + O(pending). */
 const TICK_MS = 1_000;
-
-/** How long a review cue stays on screen before auto-dismissing. */
-const CUE_LINGER_MS = 9_000;
 
 export function AutoOcrCapture({
   enabled,
   missions,
   reference,
+  reviewOpen,
+  onAutoReview,
 }: {
   /** Whether Auto OCR Capture is enabled (host is inert when false). */
   enabled: boolean;
@@ -62,71 +62,103 @@ export function AutoOcrCapture({
   missions: Mission[];
   /** Bundled reference (fuzzy-match candidates for the pipeline). */
   reference: ReferenceData;
+  /** True when a review dialog is already open — defer surfacing if so. */
+  reviewOpen: boolean;
+  /** Open the review dialog pre-filled with this auto-capture OCR result. */
+  onAutoReview: (prefill: OcrPrefill) => void;
 }): React.JSX.Element | null {
-  // Pending auto-applies awaiting correlation. A ref is the source of truth (so
-  // async request handlers + the tick loop see the latest without stale closures);
-  // a state mirror is unused for render but the ref drives everything.
+  // Pending auto-captures awaiting correlation/surfacing. A ref is the source of
+  // truth (so async request handlers + the tick loop see the latest without stale
+  // closures). The OCR result for each is held alongside so we can build the
+  // prefill when the reducer says the entry is ready to surface.
   const pendingRef = useRef<PendingApply[]>([]);
-  // Latest missions, mirrored to a ref so the interval callback (set up once)
-  // always reconciles against the current list without re-subscribing.
+  // missionId -> the full pipeline result, so a ready entry can be turned into an
+  // OcrPrefill (objectives + reward + confidence + rawText) at surface time.
+  const resultsRef = useRef<Map<string, OcrPrefill>>(new Map());
+  // Latest props mirrored to refs so the interval callback (set up once) always
+  // reconciles against the current values without re-subscribing.
   const missionsRef = useRef<Mission[]>(missions);
   missionsRef.current = missions;
   const referenceRef = useRef<ReferenceData>(reference);
   referenceRef.current = reference;
+  const reviewOpenRef = useRef<boolean>(reviewOpen);
+  reviewOpenRef.current = reviewOpen;
+  const onAutoReviewRef = useRef(onAutoReview);
+  onAutoReviewRef.current = onAutoReview;
 
   // One-time "calibrate first" notice (shown once per session when an auto
   // request arrives with no calibrated region). Dismissible.
   const [showCalibrateNotice, setShowCalibrateNotice] = useState(false);
   const calibrateNoticeShownRef = useRef(false);
-  // Transient review cues (one per successful auto-fill).
-  const [cues, setCues] = useState<ReviewCue[]>([]);
-  const cueSeqRef = useRef(0);
+  // True when a capture is ready to review but a dialog is already open, so we
+  // show a small "waiting" badge until the open dialog closes.
+  const [deferred, setDeferred] = useState(false);
 
-  const pushCue = (title: string): void => {
-    const id = ++cueSeqRef.current;
-    setCues((prev) => [...prev, { id, title }]);
-    window.setTimeout(() => {
-      setCues((prev) => prev.filter((c) => c.id !== id));
-    }, CUE_LINGER_MS);
-  };
-
-  // Run the pure reducer against the current pending + missions, apply what it
-  // says, and replace the pending list with what it says to keep. Guarded.
+  // Run the pure reducer against the current pending + missions; surface AT MOST
+  // ONE ready entry (only when no review is open), update bookkeeping, prune the
+  // dropped/surfaced results. Guarded.
   const reconcileNow = (): void => {
     const pending = pendingRef.current;
-    if (pending.length === 0) return;
+    if (pending.length === 0) {
+      if (deferred) setDeferred(false);
+      return;
+    }
     try {
-      const { apply, keep } = reconcilePending(
+      // Pass reviewOpen so the reducer is DEFER-AWARE: while a dialog is open it
+      // holds ready entries UNSTAMPED in keep[] (and reports them in deferred[])
+      // instead of stamping+routing them to review[] — which previously lost them
+      // (stamped on defer, then short-circuited to keep on the next tick, never
+      // surfacing). The entry surfaces on a later reconcile once reviewOpen flips
+      // false (the [missions, reviewOpen, enabled] effect re-runs on close).
+      const reviewOpenNow = reviewOpenRef.current;
+      const {
+        review,
+        keep,
+        expired,
+        deferred: deferredEntries,
+      } = reconcilePending(
         pending,
         missionsRef.current,
         Date.now(),
+        reviewOpenNow,
       );
-      // Replace pending FIRST so a re-entrant tick sees the post-apply state.
+      // Replace pending FIRST so a re-entrant tick sees post-reconcile state.
       pendingRef.current = keep;
-      for (const inst of apply) {
-        void window.api
-          .applyOcr(inst.missionId, inst.objectives)
-          .then(() => {
-            // Surface the review cue only on the FIRST apply for this entry, so
-            // an idempotent re-apply for late markers doesn't re-toast.
-            if (!inst.pending.cueShown) {
-              inst.pending.cueShown = true;
-              pushCue(inst.pending.title);
-            }
-          })
-          .catch((err: unknown) => {
-            // A failed apply is non-fatal: the entry stays pending (within TTL)
-            // and a later tick retries. Never throw into the app.
-            console.error("[auto-ocr] applyOcr failed:", err);
-          });
+      // Drop OCR results for expired entries (free memory; they'll never surface).
+      for (const e of expired) resultsRef.current.delete(e.missionId);
+
+      // A review is already open -> the reducer deferred any ready entry (held
+      // unstamped). Show the badge while something waits; surface after it closes.
+      if (reviewOpenNow) {
+        const want = deferredEntries.length > 0;
+        if (want !== deferred) setDeferred(want);
+        return;
+      }
+
+      if (review.length === 0) {
+        if (deferred) setDeferred(false);
+        return;
+      }
+
+      // Surface exactly ONE ready capture (one review at a time). Build its
+      // prefill from the stored OCR result; carry the confident pre-target.
+      const inst = review[0];
+      const base = resultsRef.current.get(inst.pending.missionId);
+      if (base) {
+        resultsRef.current.delete(inst.pending.missionId);
+        onAutoReviewRef.current({
+          ...base,
+          preselectMissionId: inst.preselectMissionId,
+        });
+        if (deferred) setDeferred(false);
       }
     } catch (err) {
       console.error("[auto-ocr] reconcile failed:", err);
     }
   };
 
-  // Subscribe to the auto-capture signal once. Each request runs the pipeline
-  // and enqueues a pending entry (or shows the calibrate notice). Fully guarded.
+  // Subscribe to the auto-capture signal once. Each request runs the pipeline and
+  // enqueues a pending entry (or shows the calibrate notice). Fully guarded.
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
@@ -157,25 +189,33 @@ export function AutoOcrCapture({
         const result = await runOcrPipeline(region, referenceRef.current);
         if (cancelled) return;
         const objectives = toApplyObjectives(result.objectives);
-        // 3. Zero objectives -> silently discard (don't write garbage).
+        // 3. Zero objectives -> silently discard (don't surface garbage).
         if (objectives.length === 0) return;
 
-        // 4. Enqueue for correlated, race-safe apply. Skip if an entry for this
-        // missionId is already queued (a duplicate live re-emit of the same
-        // accept) — applyOcr is idempotent, but this avoids a second review cue.
+        // 4. Enqueue for correlated, race-safe SURFACING. Skip if an entry for
+        // this missionId is already queued (a duplicate live re-emit of the same
+        // accept) so we don't open two reviews for one mission.
         if (pendingRef.current.some((p) => p.missionId === request.missionId)) {
           return;
         }
+        // Stash the full OCR result so we can build the prefill at surface time.
+        resultsRef.current.set(request.missionId, {
+          objectives: result.objectives,
+          reward: result.reward,
+          confidence: result.confidence,
+          rawText: result.rawText,
+          preselectMissionId: null, // filled from the reducer at surface time
+        });
         const entry: PendingApply = {
           missionId: request.missionId,
           title: request.title,
           ts: request.ts,
           objectives,
           enqueuedAt: Date.now(),
-          appliedOnce: false,
+          reviewedOnce: false,
         };
         pendingRef.current = [...pendingRef.current, entry];
-        // Try to apply right away (it'll hold if the mission isn't ready yet).
+        // Try to surface right away (it'll hold if not ready or a review is open).
         reconcileNow();
       } catch (err) {
         // Any failure in the auto path is swallowed — the manual dialog remains.
@@ -193,17 +233,18 @@ export function AutoOcrCapture({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
-  // Re-reconcile whenever the mission list changes (markers arriving) — this is
-  // the load-bearing hook for the leg-arrival race (re-apply within TTL).
+  // Re-reconcile whenever the mission list changes (markers arriving) OR the open
+  // review closes (reviewOpen flips false) — both can make a pending entry ready
+  // to surface. Load-bearing for the leg-arrival race + the deferral release.
   useEffect(() => {
     if (!enabled) return;
     reconcileNow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missions, enabled]);
+  }, [missions, reviewOpen, enabled]);
 
   // A slow tick advances settle/TTL even when no missions:changed arrives (e.g.
-  // a log-suppressed mission whose markers never come — settle debounce applies,
-  // TTL eventually drops it). Cleared on unmount / disable.
+  // a log-suppressed mission whose markers never come — settle surfaces it, TTL
+  // eventually drops it). Cleared on unmount / disable.
   useEffect(() => {
     if (!enabled) return;
     const t = window.setInterval(reconcileNow, TICK_MS);
@@ -215,12 +256,13 @@ export function AutoOcrCapture({
   useEffect(() => {
     if (enabled) return;
     pendingRef.current = [];
-    setCues([]);
+    resultsRef.current.clear();
+    setDeferred(false);
     setShowCalibrateNotice(false);
   }, [enabled]);
 
   if (!enabled) return null;
-  if (!showCalibrateNotice && cues.length === 0) return null;
+  if (!showCalibrateNotice && !deferred) return null;
 
   return (
     <div
@@ -253,30 +295,28 @@ export function AutoOcrCapture({
         >
           Auto-capture is on, but the OCR capture region isn’t calibrated yet.
           Calibrate it first (open Contract Capture once), then accepting a
-          cargo haul will auto-fill its details. (Click to dismiss.)
+          cargo haul will auto-capture its details for review. (Click to
+          dismiss.)
         </div>
       )}
-      {cues.map((cue) => (
+      {deferred && (
         <div
-          key={cue.id}
           role="status"
-          onClick={() => setCues((prev) => prev.filter((c) => c.id !== cue.id))}
           style={{
             padding: "12px 14px",
-            background: "rgba(9,20,16,0.98)",
-            border: "1px solid rgba(84,224,138,0.45)",
-            color: "var(--success, #54e08a)",
+            background: "rgba(9,16,28,0.98)",
+            border: "1px solid rgba(0,200,220,0.45)",
+            color: "var(--primary)",
             fontFamily: "var(--font-display)",
             fontSize: 12,
             lineHeight: 1.5,
             boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-            cursor: "pointer",
           }}
         >
-          ✓ Auto-filled contract details for “{cue.title}” from the contract
-          screen — review the legs. (Click to dismiss.)
+          An auto-captured contract is waiting to review — close the open dialog
+          and it’ll pop up for you to check and apply.
         </div>
-      ))}
+      )}
     </div>
   );
 }

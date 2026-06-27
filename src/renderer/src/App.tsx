@@ -37,7 +37,10 @@ import { ManualEntryForm } from "./components/ManualEntryForm";
 import { BackfillOverlay } from "./components/BackfillOverlay";
 import { EmptyState } from "./components/EmptyState";
 import { CollectLogsDialog } from "./components/CollectLogsDialog";
-import { OcrCaptureDialog } from "./components/OcrCaptureDialog";
+import {
+  OcrCaptureDialog,
+  type OcrPrefill,
+} from "./components/OcrCaptureDialog";
 import { AutoOcrCapture } from "./components/AutoOcrCapture";
 
 import {
@@ -239,11 +242,15 @@ function CargoApp({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showCollectLogs, setShowCollectLogs] = useState(false);
-  // When set, the OCR capture/review dialog is open targeting this mission id
-  // (null = no preselection; the dialog defaults to the first active mission).
+  // When set, the MANUAL OCR capture/review dialog is open. The dialog now opens
+  // its target dropdown EMPTY (no preselect) and self-captures on mount.
   const [ocrCaptureFor, setOcrCaptureFor] = useState<{
     missionId: string | null;
   } | null>(null);
+  // When set, the AUTO path (Phase 3) has a pre-filled OCR result awaiting human
+  // review. Opens the SAME OcrCaptureDialog pre-filled (no silent write). Only one
+  // review dialog is shown at a time; the auto host defers if one is already open.
+  const [autoOcrReview, setAutoOcrReview] = useState<OcrPrefill | null>(null);
   const [density, setDensity] = useState<"comfortable" | "compact">(
     "comfortable",
   );
@@ -483,7 +490,10 @@ function CargoApp({
   const toggleOcr = (): void => {
     const next = !ocrEnabled;
     setOcrEnabled(next);
-    if (!next) setOcrCaptureFor(null);
+    if (!next) {
+      setOcrCaptureFor(null);
+      setAutoOcrReview(null);
+    }
     void window.api.setOcrEnabled(next).then(setOcrEnabled);
   };
 
@@ -746,24 +756,40 @@ function CargoApp({
 
         {/* EXPERIMENTAL OCR contract capture + review dialog (Phase F). Only
             reachable when ocrEnabled (the entry points are gated), and it never
-            writes to a mission until the user confirms in its review step. */}
+            writes to a mission until the user confirms in its review step. The
+            MANUAL dialog self-captures on mount and opens with an EMPTY target. */}
         {ocrEnabled && ocrCaptureFor && (
           <OcrCaptureDialog
             missions={activeMissions}
             reference={reference}
-            initialMissionId={ocrCaptureFor.missionId}
             onClose={() => setOcrCaptureFor(null)}
+          />
+        )}
+
+        {/* AUTO review dialog (Phase 3): the SAME dialog, pre-filled with the
+            headless auto-capture result, opened for review. Suppressed while a
+            manual dialog is open so the auto host's deferral guard holds (one
+            review at a time). Nothing is written until the user clicks Apply. */}
+        {ocrEnabled && autoOcrReview && !ocrCaptureFor && (
+          <OcrCaptureDialog
+            missions={activeMissions}
+            reference={reference}
+            prefill={autoOcrReview}
+            onClose={() => setAutoOcrReview(null)}
           />
         )}
 
         {/* EXPERIMENTAL Auto OCR Capture host (Phase 3). Headless except for its
             transient notices/cues. Active only when both OCR + auto are on; it
-            subscribes to the OCR_AUTO_REQUEST push and runs the calibrated
-            pipeline, applying with the leg-arrival race handled. Fully guarded. */}
+            subscribes to the OCR_AUTO_REQUEST push, runs the calibrated pipeline,
+            and OPENS the review dialog (no silent write). `reviewOpen` tells it a
+            dialog is already up so it defers the new result. Fully guarded. */}
         <AutoOcrCapture
           enabled={ocrEnabled && autoOcrCapture}
           missions={activeMissions}
           reference={reference}
+          reviewOpen={Boolean(ocrCaptureFor) || autoOcrReview !== null}
+          onAutoReview={setAutoOcrReview}
         />
 
         {/* backfill overlay */}

@@ -80,30 +80,6 @@ export const isLegIncomplete = (l: Mission["legs"][number]): boolean =>
 export const isMissionIncomplete = (m: Mission): boolean =>
   m.legs.some(isLegIncomplete);
 
-/**
- * Choose the apply-target mission to preselect in the OCR capture dialog. Honors
- * an explicit caller choice (`initialMissionId`) when it still exists; otherwise
- * auto-selects the mission that NEEDS OCR — the most-recent "details missing"
- * mission (a log-suppressed dropoff leg). `missions` is expected newest-first
- * (the active list is ordered created_seq DESC), so the first incomplete one is
- * the freshest. Falls back to the first mission; null only when the list empty.
- *
- * PURE — string/array in, id out — so the dialog can default the dropdown to the
- * mission the user most likely opened the dialog for, while still letting them
- * change it.
- */
-export function pickDefaultTarget(
-  missions: Mission[],
-  initialMissionId: string | null | undefined,
-): string | null {
-  if (initialMissionId && missions.some((m) => m.id === initialMissionId)) {
-    return initialMissionId;
-  }
-  const incomplete = missions.find(isMissionIncomplete);
-  if (incomplete) return incomplete.id;
-  return missions[0]?.id ?? null;
-}
-
 /** Remaining SCU for a leg (0 when completed). */
 const legRemaining = (
   scuTotal: number,

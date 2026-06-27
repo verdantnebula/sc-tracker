@@ -9,7 +9,6 @@ import {
   missionTotals,
   dropoffGroups,
   pickupGroups,
-  pickDefaultTarget,
   routeEdges,
   routeStopCount,
   shouldShowLogBanner,
@@ -104,49 +103,6 @@ describe("isMissionIncomplete", () => {
       leg({ id: "d0", commodity: "Ice", scuTotal: 10, location: "A" }),
     ]);
     expect(isMissionIncomplete(m)).toBe(false);
-  });
-});
-
-describe("pickDefaultTarget (OCR dialog apply-target preselect)", () => {
-  // Build a mission with a chosen id + legs (the base fixture fixes id to "m1").
-  const withId = (id: string, legs: Leg[]): Mission => ({
-    ...mission(legs),
-    id,
-  });
-  const complete: Leg[] = [
-    leg({ id: "d0", commodity: "Ice", scuTotal: 10, location: "A" }),
-  ];
-  const suppressed: Leg[] = [
-    leg({ id: "d0", commodity: "", scuTotal: 0, location: null }),
-  ];
-
-  it("honors an explicit initialMissionId when it exists", () => {
-    const missions = [withId("a", complete), withId("b", suppressed)];
-    expect(pickDefaultTarget(missions, "b")).toBe("b");
-  });
-
-  it("ignores an initialMissionId that no longer exists and auto-selects", () => {
-    const missions = [withId("a", suppressed)];
-    expect(pickDefaultTarget(missions, "gone")).toBe("a");
-  });
-
-  it("auto-selects the most-recent incomplete mission (list is newest-first)", () => {
-    // Newest-first: 'b' is newer than 'c'; both incomplete -> pick 'b'.
-    const missions = [
-      withId("a", complete),
-      withId("b", suppressed),
-      withId("c", suppressed),
-    ];
-    expect(pickDefaultTarget(missions, null)).toBe("b");
-  });
-
-  it("falls back to the first mission when none are incomplete", () => {
-    const missions = [withId("a", complete), withId("b", complete)];
-    expect(pickDefaultTarget(missions, undefined)).toBe("a");
-  });
-
-  it("returns null for an empty mission list", () => {
-    expect(pickDefaultTarget([], null)).toBeNull();
   });
 });
 
