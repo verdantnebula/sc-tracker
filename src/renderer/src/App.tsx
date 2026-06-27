@@ -466,6 +466,14 @@ function CargoApp({
     void window.api.abandonMission(missionId);
     setSelectedId(null);
   };
+  // Manual "Mark complete" escape hatch. Reuses the existing updateMission status
+  // path (no new IPC); the store stamps terminal_source='manual' so a later leg
+  // recompute can't silently downgrade it. Moving to 'complete' also slides the
+  // mission from the Active list into History (status drives both views).
+  const markComplete = (missionId: string): void => {
+    void window.api.updateMission(missionId, { status: "complete" });
+    setSelectedId(null);
+  };
   const saveManual = (input: ManualMissionInput): void => {
     void window.api.addMission(input);
     setShowForm(false);
@@ -736,6 +744,7 @@ function CargoApp({
             onSetReward={(reward) => setReward(selected.id, reward)}
             onSetNotes={(notes) => setNotes(selected.id, notes)}
             onAbandon={() => abandon(selected.id)}
+            onMarkComplete={() => markComplete(selected.id)}
           />
         )}
 

@@ -15,7 +15,7 @@ import Database from "better-sqlite3";
 import type { Database as DB } from "better-sqlite3";
 
 /** Current schema version. Bump + add a migration block when the shape changes. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS missions (
@@ -45,7 +45,15 @@ CREATE TABLE IF NOT EXISTS missions (
   -- PAST session (logbackups backfill); 'live' = the current session (the live
   -- Game.log read on startup + the ongoing tail). Only live + non-terminal
   -- missions are "active" in the Mission List; historical ones belong in History.
-  session              TEXT NOT NULL DEFAULT 'historical'
+  session              TEXT NOT NULL DEFAULT 'historical',
+  -- How a mission reached a terminal status, when that terminal is AUTHORITATIVE
+  -- (must not be silently downgraded by a later leg recompute):
+  --   'game'   = the game's EndMission event (onMissionEnded) set complete/abandoned.
+  --   'manual' = the user explicitly forced it via "Mark complete" / abandon.
+  -- NULL = either not terminal, OR a terminal that was DERIVED from legs (all legs
+  -- completed). A leg-derived complete is REACTIVE: un-checking a leg or adding an
+  -- incomplete leg reverts it. A 'game'/'manual' terminal is sticky. (v7)
+  terminal_source      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS legs (
@@ -233,5 +241,20 @@ function migrate(db: DB): void {
   // NULL is correct (the estimate simply isn't shown until the user enters one).
   if (!cols.some((c) => c.name === "reward")) {
     db.exec(`ALTER TABLE missions ADD COLUMN reward INTEGER`);
+  }
+
+  // v7: add missions.terminal_source (nullable; 'game' | 'manual' | NULL). It
+  // marks whether a terminal status is AUTHORITATIVE (game EndMission / explicit
+  // user action) and so must survive a later leg recompute, vs a leg-DERIVED
+  // complete (all legs done) which is reactive and may revert. Pre-existing
+  // terminal rows were all set by the game EndMission path (the only path that
+  // produced a terminal before v7), so backfill them to 'game' — that preserves
+  // their stickiness exactly as before this change. Non-terminal rows stay NULL.
+  if (!cols.some((c) => c.name === "terminal_source")) {
+    db.exec(`ALTER TABLE missions ADD COLUMN terminal_source TEXT`);
+    db.exec(
+      `UPDATE missions SET terminal_source = 'game'
+         WHERE status IN ('complete', 'abandoned')`,
+    );
   }
 }

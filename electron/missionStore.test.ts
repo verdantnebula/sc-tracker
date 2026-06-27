@@ -302,8 +302,148 @@ describe("state machine", () => {
     store.applyEvent(completedObj("m1", "d0", 2000));
     store.applyEvent(accepted("m1", "Haul", 1000));
     const m = store.getMission("m1")!;
-    expect(m.status).toBe("in_progress");
+    // d0 is the only leg and it's completed -> A1 rolls the mission up to
+    // 'complete' (all legs done). (Pre-A1 this asserted 'in_progress', before the
+    // completion roll-up existed.) The leg state still reconciles either way.
+    expect(m.status).toBe("complete");
     expect(m.legs.find((l) => l.id === "d0")!.completed).toBe(true);
+  });
+});
+
+// =============================================================================
+// A1 — leg-derived completion roll-up + reactivity (the completion bug fix)
+// =============================================================================
+
+describe("completion roll-up (A1)", () => {
+  it("ALL legs done -> status 'complete' + completed_at set (leg-derived)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.applyEvent(declared("m1", "d1", "Ice", 5, "B"));
+    expect(store.getMission("m1")!.status).toBe("accepted");
+
+    store.toggleLeg("m1", "d0", true);
+    expect(store.getMission("m1")!.status).toBe("in_progress");
+
+    store.toggleLeg("m1", "d1", true);
+    const m = store.getMission("m1")!;
+    expect(m.status).toBe("complete");
+    expect(m.completedAt).not.toBeNull();
+  });
+
+  it("un-checking a leg reverts a leg-derived complete back to in_progress", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.applyEvent(declared("m1", "d1", "Ice", 5, "B"));
+    store.toggleLeg("m1", "d0", true);
+    store.toggleLeg("m1", "d1", true);
+    expect(store.getMission("m1")!.status).toBe("complete");
+
+    // Un-check one leg: a leg-derived complete is REACTIVE -> reverts.
+    const reverted = store.toggleLeg("m1", "d1", false);
+    expect(reverted.status).toBe("in_progress");
+    expect(reverted.completedAt).toBeNull();
+  });
+
+  it("adding an incomplete leg reverts a leg-derived complete", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.toggleLeg("m1", "d0", true);
+    expect(store.getMission("m1")!.status).toBe("complete");
+
+    // A fresh incomplete leg means the mission is no longer all-done.
+    const m = store.updateMission("m1", {
+      addLegs: [{ kind: "dropoff", commodity: "Gold", scuTotal: 4 }],
+    });
+    expect(m.status).toBe("in_progress");
+    expect(m.completedAt).toBeNull();
+  });
+
+  it("a GAME EndMission complete stays complete even if a leg looks incomplete", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.applyEvent(declared("m1", "d1", "Ice", 5, "B"));
+    store.toggleLeg("m1", "d0", true); // only one of two legs done
+    store.applyEvent(ended("m1", "complete", 3000));
+    expect(store.getMission("m1")!.status).toBe("complete");
+
+    // Toggling/adding legs must NOT downgrade a game-authoritative terminal.
+    store.toggleLeg("m1", "d0", false);
+    expect(store.getMission("m1")!.status).toBe("complete");
+    const m = store.updateMission("m1", {
+      addLegs: [{ kind: "dropoff", commodity: "Gold", scuTotal: 4 }],
+    });
+    expect(m.status).toBe("complete");
+  });
+
+  it("abandoned (game) is never resurrected by a later leg recompute", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.applyEvent(ended("m1", "abandon", 3000));
+    expect(store.getMission("m1")!.status).toBe("abandoned");
+    // Completing the leg must not pull it out of abandoned.
+    store.toggleLeg("m1", "d0", true);
+    expect(store.getMission("m1")!.status).toBe("abandoned");
+  });
+
+  it("a zero-leg mission is NEVER force-completed", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    // No legs at all -> stays accepted, not complete.
+    expect(store.getMission("m1")!.status).toBe("accepted");
+  });
+});
+
+// =============================================================================
+// A2 — manual "Mark complete" / status escape hatch (authoritative terminal)
+// =============================================================================
+
+describe("manual mark-complete (A2)", () => {
+  it("updateMission({status:'complete'}) completes + sets completed_at", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A")); // still incomplete
+    const m = store.updateMission("m1", { status: "complete" });
+    expect(m.status).toBe("complete");
+    expect(m.completedAt).not.toBeNull();
+  });
+
+  it("a manually-completed mission is NOT downgraded by a later leg recompute", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.applyEvent(declared("m1", "d1", "Ice", 5, "B"));
+    store.updateMission("m1", { status: "complete" }); // forced while incomplete
+    expect(store.getMission("m1")!.status).toBe("complete");
+
+    // Adding / toggling legs must not silently revert a manual terminal.
+    store.toggleLeg("m1", "d0", true);
+    expect(store.getMission("m1")!.status).toBe("complete");
+    const m = store.updateMission("m1", {
+      addLegs: [{ kind: "dropoff", commodity: "Gold", scuTotal: 4 }],
+    });
+    expect(m.status).toBe("complete");
+  });
+
+  it("manually completed -> leaves Active list, appears in History", () => {
+    store.applyEvent(accepted("m1", "Live Haul", 1000), "live");
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A", 1000), "live");
+    expect(store.activeMissions().map((m) => m.id)).toContain("m1");
+
+    store.updateMission("m1", { status: "complete" });
+    expect(store.activeMissions().map((m) => m.id)).not.toContain("m1");
+    expect(store.history().map((m) => m.id)).toContain("m1");
+  });
+
+  it("re-opening a completed mission (status->in_progress) clears the terminal", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.updateMission("m1", { status: "complete" });
+    expect(store.getMission("m1")!.status).toBe("complete");
+
+    // Explicitly re-open: terminal_source cleared -> reactive to legs again.
+    store.updateMission("m1", { status: "in_progress" });
+    // Now un-completing/checking a leg drives status from legs (proves reactive):
+    store.toggleLeg("m1", "d0", true);
+    expect(store.getMission("m1")!.status).toBe("complete"); // leg-derived now
+    store.toggleLeg("m1", "d0", false);
+    expect(store.getMission("m1")!.status).toBe("accepted");
   });
 });
 
@@ -824,9 +964,12 @@ describe("totals, history, manual CRUD", () => {
   it("toggleLeg marks delivered + recomputes status", () => {
     store.applyEvent(accepted("m1", "Haul", 1000));
     store.applyEvent(declared("m1", "d0", "Ice", 10, "A"));
+    store.applyEvent(declared("m1", "d1", "Ice", 5, "B"));
     const updated = store.toggleLeg("m1", "d0", true);
     expect(updated.legs[0].completed).toBe(true);
     expect(updated.legs[0].scuDelivered).toBe(10);
+    // One of two legs done -> in_progress (all-legs-done would now roll up to
+    // 'complete'; see the A1 roll-up suite, which covers the single-leg case).
     expect(updated.status).toBe("in_progress");
   });
 
@@ -987,6 +1130,15 @@ describe("leg toggle — bidirectional + manual override", () => {
 
   it("un-completing drops the leg back into by-dropoff todo (remaining restored)", () => {
     seedLeg();
+    // A second leg at a DIFFERENT location keeps the mission non-terminal when
+    // only d0 is delivered (so it stays in the active by-dropoff view — A1 would
+    // otherwise roll a fully-delivered single-leg mission to 'complete', removing
+    // it from dropoffGroups entirely). The HDPC-Cassillo assertions below are
+    // unaffected by this Teasa leg.
+    store.applyEvent(
+      declared("m1", "d1", "Food", 5, "Teasa Spaceport", 1000),
+      "live",
+    );
     store.toggleLeg("m1", "d0", true);
     // Delivered -> not in todo.
     let g = store
@@ -1385,10 +1537,19 @@ describe("partial turn-in", () => {
 
   it("checking the box from a partial fills to full (completed, scuDelivered = scuTotal)", () => {
     seed(100);
+    // A second, still-open leg elsewhere keeps the mission non-terminal after d0
+    // is fully delivered, so it stays in the active by-dropoff view (A1 would
+    // otherwise roll a fully-delivered single-leg mission to 'complete' and
+    // exclude it from dropoffGroups). It doesn't touch the Cassillo group below.
+    store.applyEvent(
+      declared("m1", "d1", "Food", 5, "Teasa Spaceport", 1000),
+      "live",
+    );
     store.updateMission("m1", { legs: [{ legId: "d0", scuDelivered: 60 }] });
     const m = store.toggleLeg("m1", "d0", true);
-    expect(m.legs[0].completed).toBe(true);
-    expect(m.legs[0].scuDelivered).toBe(100);
+    const d0 = m.legs.find((l) => l.id === "d0")!;
+    expect(d0.completed).toBe(true);
+    expect(d0.scuDelivered).toBe(100);
     const g = store
       .dropoffGroups(null)
       .find((x) => x.location === "HDPC-Cassillo")!;

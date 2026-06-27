@@ -36,11 +36,11 @@ afterEach(() => {
 });
 
 describe("schema version", () => {
-  it("is 6", () => {
-    expect(SCHEMA_VERSION).toBe(6);
+  it("is 7", () => {
+    expect(SCHEMA_VERSION).toBe(7);
   });
 
-  it("a fresh db reports user_version === SCHEMA_VERSION and has missions.reward", () => {
+  it("a fresh db reports user_version === SCHEMA_VERSION and has missions.reward + terminal_source", () => {
     const db = createDb(":memory:");
     try {
       expect(db.pragma("user_version", { simple: true })).toBe(SCHEMA_VERSION);
@@ -50,6 +50,7 @@ describe("schema version", () => {
         }>
       ).map((c) => c.name);
       expect(cols).toContain("reward");
+      expect(cols).toContain("terminal_source");
     } finally {
       db.close();
     }
@@ -127,6 +128,83 @@ describe("v6 migration: missions.reward", () => {
       expect(row.title).toBe("Pre-v6 haul");
       expect(row.payout).toBe(50000);
       expect(row.reward).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe("v7 migration: missions.terminal_source", () => {
+  it("adds terminal_source; backfills existing terminal rows to 'game', leaves others NULL", () => {
+    const path = tmpDbPath("migrate-v7");
+
+    // Build a pre-v7 cargo db (has reward from v6, but NOT terminal_source), with
+    // a mix of terminal + non-terminal rows. Before v7, the only path that
+    // produced a terminal status was the game's EndMission, so backfilling those
+    // rows to 'game' preserves their stickiness exactly.
+    const old = new Database(path);
+    old.exec(`
+      CREATE TABLE missions (
+        id                TEXT PRIMARY KEY,
+        title             TEXT NOT NULL DEFAULT '',
+        giver             TEXT NOT NULL DEFAULT '',
+        variant           TEXT NOT NULL DEFAULT 'MANUAL',
+        grade             TEXT NOT NULL DEFAULT 'UNKNOWN',
+        contract_template TEXT,
+        contract_definition_id TEXT,
+        status            TEXT NOT NULL DEFAULT 'accepted',
+        payout            INTEGER,
+        payout_confidence TEXT NOT NULL DEFAULT 'unknown',
+        reward            INTEGER,
+        source            TEXT NOT NULL DEFAULT 'log',
+        accepted_at       INTEGER,
+        completed_at      INTEGER,
+        notes             TEXT NOT NULL DEFAULT '',
+        created_seq       INTEGER,
+        title_pickup      TEXT,
+        title_dropoff     TEXT,
+        session           TEXT NOT NULL DEFAULT 'historical'
+      );
+    `);
+    old
+      .prepare(`INSERT INTO missions (id, status) VALUES (@id, @s)`)
+      .run({ id: "done-1", s: "complete" });
+    old
+      .prepare(`INSERT INTO missions (id, status) VALUES (@id, @s)`)
+      .run({ id: "gone-1", s: "abandoned" });
+    old
+      .prepare(`INSERT INTO missions (id, status) VALUES (@id, @s)`)
+      .run({ id: "live-1", s: "in_progress" });
+    const oldCols = (
+      old.prepare("PRAGMA table_info(missions)").all() as Array<{
+        name: string;
+      }>
+    ).map((c) => c.name);
+    expect(oldCols).not.toContain("terminal_source");
+    old.pragma("user_version = 6");
+    old.close();
+
+    const db = createDb(path);
+    try {
+      const cols = (
+        db.prepare("PRAGMA table_info(missions)").all() as Array<{
+          name: string;
+        }>
+      ).map((c) => c.name);
+      expect(cols).toContain("terminal_source");
+      expect(db.pragma("user_version", { simple: true })).toBe(SCHEMA_VERSION);
+
+      const get = (id: string): string | null =>
+        (
+          db
+            .prepare("SELECT terminal_source AS t FROM missions WHERE id = @id")
+            .get({ id }) as { t: string | null }
+        ).t;
+      // Terminal rows backfilled to 'game' (authoritative, sticky).
+      expect(get("done-1")).toBe("game");
+      expect(get("gone-1")).toBe("game");
+      // Non-terminal rows stay NULL (still reactive to legs).
+      expect(get("live-1")).toBeNull();
     } finally {
       db.close();
     }

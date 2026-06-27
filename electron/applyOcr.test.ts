@@ -99,12 +99,15 @@ describe("applyOcrObjectives — fills suppressed placeholders in place", () => 
     ]);
 
     const m = store.getMission("m1")!;
-    // dropoff placeholder UNMATCHED -> pruned; pickup placeholder filled.
-    expect(m.legs.length).toBe(1);
-    const leg = m.legs[0];
-    expect(leg.kind).toBe("pickup");
-    expect(leg.id).toBe("pickup_a_0");
-    expect(leg.commodity).toBe("Iron");
+    // Bug B fix: the pickup placeholder is filled; the UNMATCHED dropoff
+    // placeholder is a REAL game id, so it is KEPT (never pruned) — the game's
+    // ObjectiveComplete for dropoff_a_0 must still find its leg.
+    expect(m.legs.length).toBe(2);
+    const pk = m.legs.find((l) => l.kind === "pickup")!;
+    expect(pk.id).toBe("pickup_a_0");
+    expect(pk.commodity).toBe("Iron");
+    const dp = m.legs.find((l) => l.kind === "dropoff")!;
+    expect(dp.id).toBe("dropoff_a_0"); // real-id placeholder preserved
   });
 
   it("multiplicity: 4 same-commodity dropoff placeholders + 4 OCR objs fill all 4", () => {
@@ -156,6 +159,57 @@ describe("applyOcrObjectives — fills suppressed placeholders in place", () => 
     expect(totalScu).toBe(46 + 94 + 116 + 53);
   });
 
+  it("Bug B: fills real-id placeholders (no synthetic insert, ids preserved, none pruned)", () => {
+    // The core Bug B scenario: N real-id dropoff placeholders + N OCR objectives.
+    // Each OCR obj must FILL a real-id placeholder (preserving its game id) rather
+    // than insert a synthetic manual_* leg, and no real-id placeholder is pruned.
+    seedPlaceholders("m1", [
+      { kind: "dropoff", objectiveId: "dropoff_a_0" },
+      { kind: "dropoff", objectiveId: "dropoff_b_0" },
+    ]);
+
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Titanium", scu: 32, location: "Area18" },
+      { kind: "dropoff", commodity: "Gold", scu: 16, location: "Lorville" },
+    ]);
+
+    const m = store.getMission("m1")!;
+    // Two legs, both REAL game ids — no synthetic (`manual_*`) leg was inserted.
+    expect(m.legs.length).toBe(2);
+    expect(m.legs.every((l) => !l.id.startsWith("manual_"))).toBe(true);
+    expect(m.legs.map((l) => l.id).sort()).toEqual([
+      "dropoff_a_0",
+      "dropoff_b_0",
+    ]);
+    const commodities = m.legs.map((l) => l.commodity).sort();
+    expect(commodities).toEqual(["Gold", "Titanium"]);
+  });
+
+  it("Bug B: commodity disambiguates which real-id placeholder an OCR obj fills", () => {
+    // Two real-id placeholders pre-seeded with distinct commodities (via a first
+    // fill pass that leaves them fillable). A later single OCR obj for "gold" must
+    // land on the gold-commodity placeholder, preserving its id.
+    seedPlaceholders("m1", [
+      { kind: "dropoff", objectiveId: "dropoff_a_0" },
+      { kind: "dropoff", objectiveId: "dropoff_b_0" },
+    ]);
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 5, location: "Area18" },
+      { kind: "dropoff", commodity: "Gold", scu: 7, location: "Area18" },
+    ]);
+    // a -> Iron, b -> Gold. Now a single "gold" obj must re-fill dropoff_b_0.
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "gold", scu: 9, location: "Lorville" },
+    ]);
+    const m = store.getMission("m1")!;
+    expect(m.legs.length).toBe(2); // both real-id legs kept
+    const b = m.legs.find((l) => l.id === "dropoff_b_0")!;
+    expect(b.commodity).toBe("gold");
+    expect(b.scuTotal).toBe(9);
+    const a = m.legs.find((l) => l.id === "dropoff_a_0")!;
+    expect(a.commodity).toBe("Iron"); // untouched
+  });
+
   it("prefers a case-insensitive exact commodity match over an arbitrary candidate", () => {
     // Three dropoff placeholders. We seed a commodity onto dropoff_b_0 via a
     // FIRST applyOcr pass (which does NOT stamp manual_override, so it stays a
@@ -182,12 +236,18 @@ describe("applyOcrObjectives — fills suppressed placeholders in place", () => 
     ]);
 
     const m = store.getMission("m1")!;
-    // a + c were leftover candidates -> pruned; only the matched b survives.
-    expect(m.legs.length).toBe(1);
-    const filled = m.legs[0];
-    expect(filled.id).toBe("dropoff_b_0"); // exact (CI) commodity match wins
-    expect(filled.commodity).toBe("titanium"); // OCR commodity overwrites
+    // Bug B fix: a + c are REAL game-id placeholders -> KEPT (not pruned), so all
+    // three legs survive. Only dropoff_b_0 was matched + re-filled by pass 2.
+    expect(m.legs.length).toBe(3);
+    const filled = m.legs.find((l) => l.id === "dropoff_b_0")!;
+    expect(filled.commodity).toBe("titanium"); // exact (CI) commodity match wins
     expect(filled.scuTotal).toBe(5);
+    expect(filled.location).toBe("Lorville");
+    // The unmatched real-id placeholders keep their pass-1 values, untouched.
+    const a = m.legs.find((l) => l.id === "dropoff_a_0")!;
+    expect(a.commodity).toBe("Iron");
+    const c = m.legs.find((l) => l.id === "dropoff_c_0")!;
+    expect(c.commodity).toBe("Gold");
   });
 });
 
@@ -276,7 +336,10 @@ describe("applyOcrObjectives — insert unmatched, prune leftovers", () => {
     expect(m.legs.find((l) => l.kind === "dropoff")!.id).toBe("dropoff_a_0");
   });
 
-  it("PRUNES leftover fillable placeholders not matched by any OCR obj", () => {
+  it("KEEPS leftover REAL-game-id placeholders not matched by any OCR obj (Bug B)", () => {
+    // Bug B root cause: pruning real-id placeholders orphaned the game's
+    // ObjectiveComplete (which carries the real objectiveId), so OCR-added
+    // deliveries never crossed off. The fix: NEVER prune a real-game-id leg.
     seedPlaceholders("m1", [
       { kind: "dropoff", objectiveId: "dropoff_a_0" },
       { kind: "dropoff", objectiveId: "dropoff_b_0" },
@@ -288,8 +351,51 @@ describe("applyOcrObjectives — insert unmatched, prune leftovers", () => {
     ]);
 
     const m = store.getMission("m1")!;
-    expect(m.legs.length).toBe(1); // two leftover placeholders pruned
-    expect(m.legs[0].commodity).toBe("Titanium");
+    // All three real-id legs survive: one filled, two kept untouched.
+    expect(m.legs.length).toBe(3);
+    const ids = m.legs.map((l) => l.id).sort();
+    expect(ids).toEqual(["dropoff_a_0", "dropoff_b_0", "dropoff_c_0"]);
+    // Exactly one leg carries the OCR'd commodity; the matched real id is intact.
+    const filled = m.legs.filter((l) => l.commodity === "Titanium");
+    expect(filled.length).toBe(1);
+  });
+
+  it("PRUNES leftover SYNTHETIC (manual_*) placeholders not matched (Bug B guard)", () => {
+    // Synthetic legs have no real objectiveId the game will complete, so an
+    // unmatched leftover synthetic leg IS pruned (it's a stale OCR-minted dup).
+    store.applyEvent(accepted("m1"), "live");
+    // Seed two synthetic placeholders via the addLegs path (manual_* ids).
+    store.updateMission("m1", {
+      addLegs: [
+        { kind: "dropoff", commodity: "", scuTotal: 0 },
+        { kind: "dropoff", commodity: "", scuTotal: 0 },
+      ],
+    });
+    // addLegs stamps manual_override -> protected -> not even a candidate. To get
+    // unprotected synthetic candidates, mint them via a prior applyOcr INSERT
+    // (no real placeholder of this kind exists), which leaves manual_override
+    // NULL for the known-scu... actually a known-scu insert stamps it. Use the
+    // null-scu insert path which leaves manual_override NULL (fillable synthetic).
+    store.applyOcrObjectives("m1", [
+      { kind: "pickup", commodity: "Iron", scu: null, location: "Lorville" },
+      { kind: "pickup", commodity: "Gold", scu: null, location: "Area18" },
+    ]);
+    // Two fillable synthetic pickup legs now exist. Re-apply with a SINGLE pickup
+    // obj: one is re-filled, the OTHER (leftover synthetic) must be pruned.
+    const before = store
+      .getMission("m1")!
+      .legs.filter((l) => l.kind === "pickup");
+    expect(before.length).toBe(2);
+    expect(before.every((l) => l.id.startsWith("manual_"))).toBe(true);
+
+    store.applyOcrObjectives("m1", [
+      { kind: "pickup", commodity: "Iron", scu: 12, location: "Lorville" },
+    ]);
+    const after = store
+      .getMission("m1")!
+      .legs.filter((l) => l.kind === "pickup");
+    expect(after.length).toBe(1); // leftover synthetic pruned
+    expect(after[0].id.startsWith("manual_")).toBe(true);
   });
 
   it("is IDEMPOTENT: applying the same OCR set twice yields the same legs", () => {
@@ -599,16 +705,19 @@ describe("applyOcrObjectives — on-disk persistence (restart)", () => {
     disk.applyOcrObjectives("MV1", [
       { kind: "dropoff", commodity: "Titanium", scu: 32, location: "Area18" },
     ]);
-    // One filled, one leftover pruned.
-    expect(disk.getMission("MV1")!.legs.length).toBe(1);
+    // Bug B fix: one real-id placeholder is filled; the leftover real-id
+    // placeholder (dropoff_b_0) is KEPT, not pruned — both legs survive.
+    expect(disk.getMission("MV1")!.legs.length).toBe(2);
 
     disk.close();
     disk = openMissionStore({ dbPath, payoutWindowMs: 2000 });
     const m = disk.getMission("MV1")!;
-    expect(m.legs.length).toBe(1);
-    expect(m.legs[0].id).toBe("dropoff_a_0");
-    expect(m.legs[0].commodity).toBe("Titanium");
-    expect(m.legs[0].scuTotal).toBe(32);
+    expect(m.legs.length).toBe(2);
+    const filled = m.legs.find((l) => l.id === "dropoff_a_0")!;
+    expect(filled.commodity).toBe("Titanium");
+    expect(filled.scuTotal).toBe(32);
+    // The unmatched real-id placeholder persisted across the restart.
+    expect(m.legs.some((l) => l.id === "dropoff_b_0")).toBe(true);
     disk.close();
   });
 });

@@ -312,6 +312,8 @@ interface MissionRow {
   session: string;
   title_pickup: string | null;
   title_dropoff: string | null;
+  /** 'game' | 'manual' | null — authoritative-terminal marker (see schema v7). */
+  terminal_source: string | null;
 }
 
 interface LegRow {
@@ -729,11 +731,22 @@ class SqliteMissionStore implements MissionStore {
     this.ensureMission(e.missionId, { status: "accepted", source: "log" });
     const status: MissionStatus =
       e.completionType === "complete" ? "complete" : "abandoned";
+    // terminal_source='game': this terminal is AUTHORITATIVE and must survive a
+    // later leg recompute (a late/partial objective event must not downgrade a
+    // game-completed mission). See recomputeStatus.
+    //
+    // completed_at: the game's EndMission timestamp is authoritative, so we use
+    // @ts directly rather than COALESCE. A leg-DERIVED complete (A1) may have set
+    // completed_at to a wall-clock Date.now() just before this event fired (e.g.
+    // the last objectiveCompleted arrived microseconds earlier); keeping that
+    // stale value would put completed_at outside the payout-correlation window.
+    // The game's ts is the real completion time, so it wins.
     this.db
       .prepare(
         `UPDATE missions
            SET status = @status,
-               completed_at = COALESCE(completed_at, @ts)
+               completed_at = @ts,
+               terminal_source = 'game'
          WHERE id = @id`,
       )
       .run({ id: e.missionId, status, ts: e.ts });
@@ -924,20 +937,67 @@ class SqliteMissionStore implements MissionStore {
       });
   }
 
-  /** accepted -> in_progress once any leg is done; terminal set only by ended. */
+  /**
+   * Derive a mission's lifecycle status from its legs (SPEC §5, §7.4).
+   *
+   * Roll-up rules (reactive — recomputed on every leg mutation / completion):
+   *   - ≥1 leg AND ALL legs completed -> "complete" (set completed_at if unset).
+   *   - some-but-not-all legs completed -> "in_progress".
+   *   - no legs completed (or zero legs) -> "accepted". A zero-leg mission is
+   *     therefore NEVER force-completed: "all of zero" is vacuously true but a
+   *     mission with nothing to deliver hasn't been delivered.
+   *
+   * Reactivity: a LEG-DERIVED "complete" is NOT a hard terminal. Un-checking a
+   * leg, or adding a fresh incomplete leg, reverts it to in_progress/accepted —
+   * so we must NOT early-return on a current complete/abandoned status here.
+   *
+   * AUTHORITATIVE terminals are preserved: a mission whose terminal was set by
+   * the game's EndMission event (terminal_source='game', see onMissionEnded) or
+   * forced by the user ("Mark complete"/abandon, terminal_source='manual') is
+   * sticky — recompute leaves it exactly as-is, even if a leg looks incomplete.
+   * That marker is the single distinction between a reactive leg-derived complete
+   * and a hard terminal; without it a late/partial leg event could silently
+   * downgrade a game-completed mission. abandoned is likewise never resurrected.
+   */
   private recomputeStatus(missionId: string): void {
     const m = this.rawMission(missionId);
     if (!m) return;
-    if (m.status === "complete" || m.status === "abandoned") return; // terminal
-    const done = this.db
+    // Authoritative terminal (game EndMission or explicit user action): sticky.
+    if (m.terminal_source === "game" || m.terminal_source === "manual") return;
+
+    const counts = this.db
       .prepare(
-        `SELECT COUNT(*) AS c FROM legs WHERE mission_id = @m AND completed = 1`,
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS done
+           FROM legs WHERE mission_id = @m`,
       )
-      .get({ m: missionId }) as { c: number };
-    const next: MissionStatus = done.c > 0 ? "in_progress" : "accepted";
-    if (next !== m.status) {
+      .get({ m: missionId }) as { total: number; done: number | null };
+    const total = counts.total;
+    const done = counts.done ?? 0;
+
+    let next: MissionStatus;
+    if (total > 0 && done === total) next = "complete";
+    else if (done > 0) next = "in_progress";
+    else next = "accepted";
+
+    if (next === m.status) return;
+    if (next === "complete") {
+      // Leg-derived complete: stamp completed_at if not already set, but DO NOT
+      // set terminal_source — this remains a reactive terminal that can revert.
       this.db
-        .prepare(`UPDATE missions SET status = @s WHERE id = @id`)
+        .prepare(
+          `UPDATE missions SET status = @s,
+             completed_at = COALESCE(completed_at, @ts) WHERE id = @id`,
+        )
+        .run({ s: next, ts: Date.now(), id: missionId });
+    } else {
+      // Reverting away from complete (a leg got un-checked or an incomplete leg
+      // was added): clear the leg-derived completed_at so the mission reads as
+      // genuinely active again. (terminal_source is already NULL here.)
+      this.db
+        .prepare(
+          `UPDATE missions SET status = @s, completed_at = NULL WHERE id = @id`,
+        )
         .run({ s: next, id: missionId });
     }
   }
@@ -1018,14 +1078,29 @@ class SqliteMissionStore implements MissionStore {
         patch.status === "complete" || patch.status === "abandoned"
           ? Date.now()
           : null;
+      // An explicit status set from the UI is an AUTHORITATIVE user action. A
+      // terminal status -> terminal_source='manual' so a later leg recompute can
+      // never silently downgrade it (mirrors the game EndMission path). Setting a
+      // NON-terminal status clears the marker so the mission becomes reactive to
+      // legs again (e.g. re-opening a completed mission).
+      const terminalSource =
+        patch.status === "complete" || patch.status === "abandoned"
+          ? "manual"
+          : null;
       this.db
         .prepare(
           `UPDATE missions SET status = @s,
              completed_at = CASE WHEN @s IN ('complete','abandoned')
-                                 THEN COALESCE(completed_at, @ca) ELSE NULL END
+                                 THEN COALESCE(completed_at, @ca) ELSE NULL END,
+             terminal_source = @tsrc
            WHERE id = @id`,
         )
-        .run({ s: patch.status, ca: completedAt, id: missionId });
+        .run({
+          s: patch.status,
+          ca: completedAt,
+          tsrc: terminalSource,
+          id: missionId,
+        });
     }
     if (patch.legs) {
       for (const lp of patch.legs) {
@@ -1195,6 +1270,14 @@ class SqliteMissionStore implements MissionStore {
       manual_override: number | null;
     }>;
 
+    // A synthetic/manual leg id (vs a REAL game objectiveId). Synthetic ids are
+    // minted by insertLeg / updateMission.addLegs as `manual_<kind>_<ts>_<seq>`
+    // and by addManualMission as `manual_leg_<i>`. A real game id (e.g.
+    // `dropoff_<phase>_<n>`) is the one the game's ObjectiveComplete event keys
+    // on, so it MUST be preserved — never pruned, and preferred when filling.
+    const isManualId = (objectiveId: string): boolean =>
+      objectiveId.startsWith("manual_");
+
     // Rule 1: protected legs (completed OR user-edited) are never candidates.
     // Rule 2: everything else is a fillable candidate, tracked as consumed.
     interface Candidate {
@@ -1202,6 +1285,8 @@ class SqliteMissionStore implements MissionStore {
       kind: string;
       commodity: string;
       consumed: boolean;
+      /** True for synthetic `manual_*` ids; false for real game objectiveIds. */
+      isManual: boolean;
     }
     const candidates: Candidate[] = rows
       .filter((r) => r.completed !== 1 && r.manual_override === null)
@@ -1210,6 +1295,7 @@ class SqliteMissionStore implements MissionStore {
         kind: r.kind,
         commodity: r.commodity,
         consumed: false,
+        isManual: isManualId(r.objective_id),
       }));
 
     // C1: count objectives whose SCU could not be applied (null/rejected), so the
@@ -1323,15 +1409,36 @@ class SqliteMissionStore implements MissionStore {
     };
 
     // Rule 3: greedily match each OCR objective in order.
+    //
+    // FILL-PREFERRED-OVER-INSERT (Bug B): a real-game-id placeholder represents a
+    // real objective the game WILL complete (its ObjectiveComplete event carries
+    // that objectiveId). Filling it in place PRESERVES that id so completion
+    // crosses the leg off; inserting a synthetic `manual_*` leg instead would
+    // orphan it. So among same-kind fillable candidates we pick in this order,
+    // biasing toward preserving a real id and using commodity to disambiguate
+    // when several placeholders exist:
+    //   1. real-id, exact commodity match
+    //   2. real-id, blank commodity (an as-yet-unnamed suppressed placeholder)
+    //   3. real-id, any
+    //   4. synthetic (manual_*), exact commodity match
+    //   5. synthetic, any
+    // Only when NO same-kind candidate exists at all do we insertLeg.
     for (const o of objectives) {
       const sameKind = candidates.filter(
         (c) => !c.consumed && c.kind === o.kind,
       );
-      // Prefer a case-insensitive exact commodity match, else any same-kind.
-      const exact = sameKind.find(
-        (c) => c.commodity.toLowerCase() === o.commodity.toLowerCase(),
-      );
-      const pick = exact ?? sameKind[0];
+      const exact = (c: Candidate): boolean =>
+        c.commodity.toLowerCase() === o.commodity.toLowerCase();
+      const blank = (c: Candidate): boolean => c.commodity.trim() === "";
+      const real = (c: Candidate): boolean => !c.isManual;
+
+      const pick =
+        sameKind.find((c) => real(c) && exact(c)) ??
+        sameKind.find((c) => real(c) && blank(c)) ??
+        sameKind.find((c) => real(c)) ??
+        sameKind.find((c) => exact(c)) ??
+        sameKind[0];
+
       if (pick) {
         pick.consumed = true;
         fillLeg(pick.objectiveId, o);
@@ -1340,12 +1447,18 @@ class SqliteMissionStore implements MissionStore {
       }
     }
 
-    // Rule 5: prune leftover fillable candidates no OCR objective matched.
+    // Rule 5: prune leftover fillable candidates no OCR objective matched —
+    // but ONLY synthetic `manual_*` legs. A real-game-id placeholder must NEVER
+    // be pruned: it is a real objective the game will complete (the orphaning
+    // root cause of Bug B). Leaving an unmatched real-id placeholder in place is
+    // harmless (it stays a fillable/openable leg) and keeps its id alive for the
+    // game's completion event.
     const del = this.db.prepare(
       `DELETE FROM legs WHERE mission_id = @m AND objective_id = @o`,
     );
     for (const c of candidates) {
-      if (!c.consumed) del.run({ m: missionId, o: c.objectiveId });
+      if (!c.consumed && c.isManual)
+        del.run({ m: missionId, o: c.objectiveId });
     }
 
     // C1: surface unreadable/rejected amounts so the host can cue "N legs need an
@@ -1374,10 +1487,13 @@ class SqliteMissionStore implements MissionStore {
   abandon(missionId: string): Mission {
     const m = this.rawMission(missionId);
     if (!m) throw new Error(`mission not found: ${missionId}`);
+    // Explicit user abandon is an AUTHORITATIVE terminal -> terminal_source
+    // 'manual' so a later leg recompute can never resurrect it.
     this.db
       .prepare(
         `UPDATE missions SET status = 'abandoned',
-           completed_at = COALESCE(completed_at, @ts) WHERE id = @id`,
+           completed_at = COALESCE(completed_at, @ts),
+           terminal_source = 'manual' WHERE id = @id`,
       )
       .run({ ts: Date.now(), id: missionId });
     return this.getMission(missionId)!;

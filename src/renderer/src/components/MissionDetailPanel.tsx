@@ -27,6 +27,7 @@ export function MissionDetailPanel({
   onSetReward,
   onSetNotes,
   onAbandon,
+  onMarkComplete,
 }: {
   mission: Mission;
   reference: ReferenceData;
@@ -45,6 +46,8 @@ export function MissionDetailPanel({
   onSetReward: (reward: number | null) => void;
   onSetNotes: (notes: string) => void;
   onAbandon: () => void;
+  /** Force the whole mission to "complete" (manual escape hatch). */
+  onMarkComplete: () => void;
 }): React.JSX.Element {
   const t = missionTotals(mission);
   const incomplete = isMissionIncomplete(mission);
@@ -564,8 +567,47 @@ export function MissionDetailPanel({
 
         {/* Footer */}
         <div
-          style={{ padding: "16px 18px", borderTop: "1px solid var(--border)" }}
+          style={{
+            padding: "16px 18px",
+            borderTop: "1px solid var(--border)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
         >
+          {/* Manual "Mark complete" escape hatch — for any non-complete mission.
+              Reuses the existing updateMission({status:'complete'}) path; if any
+              leg is still undelivered we confirm first so it isn't an accident. */}
+          {mission.status !== "complete" && (
+            <button
+              className="sc-primary-btn"
+              onClick={() => {
+                if (
+                  incomplete &&
+                  !window.confirm(
+                    "Some deliveries aren't marked delivered. Mark the whole mission complete anyway?",
+                  )
+                ) {
+                  return;
+                }
+                onMarkComplete();
+              }}
+              style={{
+                width: "100%",
+                padding: 11,
+                background: "transparent",
+                border: "1px solid var(--primary)",
+                color: "var(--primary)",
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+                fontSize: 12,
+                letterSpacing: 1,
+                cursor: "pointer",
+              }}
+            >
+              MARK COMPLETE
+            </button>
+          )}
           <button
             className="sc-danger-btn"
             onClick={onAbandon}
