@@ -75,6 +75,8 @@ describe("loadSettings / saveSettings", () => {
       overlayEnabled: false,
       overlayBounds: null,
       ocrEnabled: false,
+      ocrCaptureRegion: null,
+      autoOcrCapture: false,
       updateCheckEnabled: true,
     });
   });
@@ -199,6 +201,8 @@ describe("mergeSettings", () => {
     overlayEnabled: false,
     overlayBounds: null,
     ocrEnabled: false,
+    ocrCaptureRegion: null,
+    autoOcrCapture: false,
     updateCheckEnabled: true,
   };
 
@@ -221,6 +225,8 @@ describe("mergeSettings", () => {
       overlayEnabled: false,
       overlayBounds: null,
       ocrEnabled: false,
+      ocrCaptureRegion: null,
+      autoOcrCapture: false,
       updateCheckEnabled: true,
     });
   });
@@ -231,6 +237,23 @@ describe("mergeSettings", () => {
       mergeSettings(base, {
         ocrEnabled: "yes",
       } as unknown as Partial<AppSettings>).ocrEnabled,
+    ).toBe(false);
+  });
+
+  it("round-trips autoOcrCapture and coerces a non-boolean to false (Phase 3)", () => {
+    expect(DEFAULT_SETTINGS.autoOcrCapture).toBe(false);
+    expect(mergeSettings(base, { autoOcrCapture: true }).autoOcrCapture).toBe(
+      true,
+    );
+    // Opt-IN flag: anything non-true coerces to false.
+    expect(
+      mergeSettings(base, {
+        autoOcrCapture: "sure",
+      } as unknown as Partial<AppSettings>).autoOcrCapture,
+    ).toBe(false);
+    // Absent in a legacy file -> defaults to false (off for existing users).
+    expect(
+      normalizeSettings({ liveFolder: null, mode: "cargo" }).autoOcrCapture,
     ).toBe(false);
   });
 
@@ -319,6 +342,94 @@ describe("normalizeSettings", () => {
 });
 
 // ---------------------------------------------------------------------------
+// ocrCaptureRegion (Phase 2 calibrated capture) — proportions, clamp, invalid→null
+// ---------------------------------------------------------------------------
+
+describe("ocr capture region persistence", () => {
+  const region = { x: 0.1, y: 0.05, w: 0.6, h: 0.9 };
+
+  it("defaults to null when the file does not exist", () => {
+    expect(DEFAULT_SETTINGS.ocrCaptureRegion).toBeNull();
+    expect(loadSettings(file).ocrCaptureRegion).toBeNull();
+  });
+
+  it("round-trips a saved region across a (simulated) restart", () => {
+    const saved = saveSettings({ ocrCaptureRegion: region }, file);
+    expect(saved.ocrCaptureRegion).toEqual(region);
+    expect(loadSettings(file).ocrCaptureRegion).toEqual(region);
+  });
+
+  it("can clear a previously-set region by saving null (Reset region)", () => {
+    saveSettings({ ocrCaptureRegion: region }, file);
+    const cleared = saveSettings({ ocrCaptureRegion: null }, file);
+    expect(cleared.ocrCaptureRegion).toBeNull();
+    expect(loadSettings(file).ocrCaptureRegion).toBeNull();
+  });
+
+  it("clamps each proportion into [0,1]", () => {
+    const merged = mergeSettings(DEFAULT_SETTINGS, {
+      ocrCaptureRegion: { x: -0.2, y: 1.5, w: 0.5, h: 0.4 },
+    });
+    expect(merged.ocrCaptureRegion).toEqual({ x: 0, y: 1, w: 0.5, h: 0.4 });
+  });
+
+  it("clamps an over-1 width down to 1 (the whole screen)", () => {
+    const merged = mergeSettings(DEFAULT_SETTINGS, {
+      ocrCaptureRegion: { x: 0, y: 0, w: 2, h: 3 },
+    });
+    expect(merged.ocrCaptureRegion).toEqual({ x: 0, y: 0, w: 1, h: 1 });
+  });
+
+  it("drops a degenerate region (w<=0 or h<=0) to null", () => {
+    expect(
+      mergeSettings(DEFAULT_SETTINGS, {
+        ocrCaptureRegion: { x: 0.1, y: 0.1, w: 0, h: 0.5 },
+      }).ocrCaptureRegion,
+    ).toBeNull();
+    expect(
+      mergeSettings(DEFAULT_SETTINGS, {
+        ocrCaptureRegion: { x: 0.1, y: 0.1, w: 0.5, h: -0.3 },
+      }).ocrCaptureRegion,
+    ).toBeNull();
+  });
+
+  it("drops a partially-corrupt / non-numeric region from a file to null", () => {
+    writeFileSync(
+      file,
+      JSON.stringify({ ocrCaptureRegion: { x: 0.1, y: 0.1, w: 0.5 } }),
+      "utf-8",
+    );
+    expect(loadSettings(file).ocrCaptureRegion).toBeNull();
+    writeFileSync(
+      file,
+      JSON.stringify({ ocrCaptureRegion: { x: "a", y: 0, w: 0.5, h: 0.5 } }),
+      "utf-8",
+    );
+    expect(loadSettings(file).ocrCaptureRegion).toBeNull();
+  });
+
+  it("drops a non-finite (NaN/Infinity) field to null", () => {
+    // JSON can't carry NaN; exercise the normalizer directly via mergeSettings.
+    expect(
+      mergeSettings(DEFAULT_SETTINGS, {
+        ocrCaptureRegion: {
+          x: Number.NaN,
+          y: 0,
+          w: 0.5,
+          h: 0.5,
+        } as unknown as { x: number; y: number; w: number; h: number },
+      }).ocrCaptureRegion,
+    ).toBeNull();
+  });
+
+  it("preserves the region when an unrelated key is saved", () => {
+    saveSettings({ ocrCaptureRegion: region }, file);
+    const merged = saveSettings({ liveFolder: "D:/SC/LIVE" }, file);
+    expect(merged.ocrCaptureRegion).toEqual(region);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // folderHasGameLog (the picker's validate gate)
 // ---------------------------------------------------------------------------
 
@@ -359,6 +470,8 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          ocrCaptureRegion: null,
+          autoOcrCapture: false,
           updateCheckEnabled: true,
         },
         exists,
@@ -376,6 +489,8 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          ocrCaptureRegion: null,
+          autoOcrCapture: false,
           updateCheckEnabled: true,
         },
         () => false,
@@ -395,6 +510,8 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          ocrCaptureRegion: null,
+          autoOcrCapture: false,
           updateCheckEnabled: true,
         },
         () => true,
@@ -413,6 +530,8 @@ describe("resolveGameLogPath", () => {
           overlayEnabled: false,
           overlayBounds: null,
           ocrEnabled: false,
+          ocrCaptureRegion: null,
+          autoOcrCapture: false,
           updateCheckEnabled: true,
         },
         () => true,

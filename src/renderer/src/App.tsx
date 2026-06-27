@@ -38,6 +38,7 @@ import { BackfillOverlay } from "./components/BackfillOverlay";
 import { EmptyState } from "./components/EmptyState";
 import { CollectLogsDialog } from "./components/CollectLogsDialog";
 import { OcrCaptureDialog } from "./components/OcrCaptureDialog";
+import { AutoOcrCapture } from "./components/AutoOcrCapture";
 
 import {
   dropoffGroups,
@@ -228,6 +229,10 @@ function CargoApp({
   // EXPERIMENTAL OCR contract capture (Phase F). Opt-in; default false. When off
   // the capture entry point is hidden. Read on mount; toggled from the gear panel.
   const [ocrEnabled, setOcrEnabled] = useState(false);
+  // EXPERIMENTAL Auto OCR Capture (Phase 3). Opt-in; default false; meaningful
+  // only when ocrEnabled. Read on mount; toggled from the gear panel. Drives the
+  // AutoOcrCapture host (subscribes to OCR_AUTO_REQUEST from main).
+  const [autoOcrCapture, setAutoOcrCapture] = useState(false);
 
   // --- local UI state ---
   const [tab, setTab] = useState<TabKey>("dropoff");
@@ -260,6 +265,7 @@ function CargoApp({
     void api.getSelectedShip().then(setSelectedShipSlug);
     void api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
     void api.getOcrEnabled().then(setOcrEnabled);
+    void api.getAutoOcrCapture().then(setAutoOcrCapture);
 
     const unsubs = [
       api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
@@ -481,6 +487,15 @@ function CargoApp({
     void window.api.setOcrEnabled(next).then(setOcrEnabled);
   };
 
+  // Toggle EXPERIMENTAL Auto OCR Capture (Phase 3). Persists via settings. The
+  // host is gated on (ocrEnabled && autoOcrCapture), so turning OCR off neutralizes
+  // it without changing this flag. Optimistic + confirmed by the saved value.
+  const toggleAutoOcr = (): void => {
+    const next = !autoOcrCapture;
+    setAutoOcrCapture(next);
+    void window.api.setAutoOcrCapture(next).then(setAutoOcrCapture);
+  };
+
   const clearActive = (): void => {
     const n = activeMissions.length;
     const ok = window.confirm(
@@ -545,6 +560,8 @@ function CargoApp({
         ocrEnabled={ocrEnabled}
         onToggleOcr={toggleOcr}
         onOcrCapture={() => setOcrCaptureFor({ missionId: null })}
+        autoOcrCapture={autoOcrCapture}
+        onToggleAutoOcr={toggleAutoOcr}
       />
 
       {/* Log-not-found warning strip — full width, directly under the TopBar and
@@ -738,6 +755,16 @@ function CargoApp({
             onClose={() => setOcrCaptureFor(null)}
           />
         )}
+
+        {/* EXPERIMENTAL Auto OCR Capture host (Phase 3). Headless except for its
+            transient notices/cues. Active only when both OCR + auto are on; it
+            subscribes to the OCR_AUTO_REQUEST push and runs the calibrated
+            pipeline, applying with the leg-arrival race handled. Fully guarded. */}
+        <AutoOcrCapture
+          enabled={ocrEnabled && autoOcrCapture}
+          missions={activeMissions}
+          reference={reference}
+        />
 
         {/* backfill overlay */}
         {backfill && <BackfillOverlay progress={backfill} />}

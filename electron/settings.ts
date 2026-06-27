@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { app } from "electron";
 
-import type { AppMode } from "@shared/types";
+import type { AppMode, OcrCaptureRegion } from "@shared/types";
 
 import { DEFAULT_GAME_LOG_PATH } from "./logWatcher";
 
@@ -76,6 +76,27 @@ export interface AppSettings {
    */
   ocrEnabled: boolean;
   /**
+   * EXPERIMENTAL (Phase 2): the user's CALIBRATED OCR capture region, stored as
+   * PROPORTIONS (each field a fraction 0..1 of the captured screen) so it works
+   * across resolutions / display scales. null when unset -> the first OCR capture
+   * shows the draw-a-box UI, saves the drawn box here as proportions, and every
+   * subsequent capture auto-crops to it (one-button). The region's job is to
+   * EXCLUDE the DETAILS column so flavor text can't bleed into parsed locations;
+   * the user defines the exact box, so no layout numbers are hardcoded. Persisted
+   * so the calibration survives a restart; "Reset region" clears it back to null.
+   */
+  ocrCaptureRegion: OcrCaptureRegion | null;
+  /**
+   * EXPERIMENTAL (Phase 3): when true, accepting a CARGO contract auto-runs the
+   * OCR capture pipeline against the calibrated region and TENTATIVELY fills that
+   * mission's details (with a visible "review" cue). Strictly opt-in and gated on
+   * ocrEnabled — it is meaningless without the OCR fallback, and requires a
+   * calibrated ocrCaptureRegion (no region -> a one-time "calibrate first" notice,
+   * no capture). Default false. Persisted so the choice survives a restart. The
+   * apply still merges idempotently via applyOcr; nothing is appended blindly.
+   */
+  autoOcrCapture: boolean;
+  /**
    * Whether the app checks for updates on launch (electron-updater). Default
    * true: on a packaged launch the app quietly checks GitHub Releases and, if a
    * newer version exists, downloads it in the BACKGROUND and shows a dismissible
@@ -102,6 +123,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlayEnabled: false,
   overlayBounds: null,
   ocrEnabled: false,
+  ocrCaptureRegion: null,
+  autoOcrCapture: false,
   updateCheckEnabled: true,
 };
 
@@ -172,6 +195,45 @@ function normalizeOverlayBounds(value: unknown): OverlayBounds | null {
   };
 }
 
+/**
+ * Coerce arbitrary parsed JSON into an OcrCaptureRegion or null (Phase 2). Each
+ * field must be a finite number; it is CLAMPED to [0,1] (the region is stored as
+ * proportions of the screen, so a value outside the unit interval is meaningless
+ * and almost certainly corrupt). After clamping, a degenerate box (w<=0 or h<=0)
+ * is dropped to null — an empty crop is unusable, so we fall back to "uncalibrated"
+ * (the next capture re-draws) rather than persisting a zero-area region.
+ */
+function normalizeCaptureRegion(value: unknown): OcrCaptureRegion | null {
+  if (value === null || typeof value !== "object") return null;
+  const r = value as Record<string, unknown>;
+  const { x, y, w, h } = r;
+  if (
+    typeof x !== "number" ||
+    typeof y !== "number" ||
+    typeof w !== "number" ||
+    typeof h !== "number" ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(w) ||
+    !Number.isFinite(h)
+  ) {
+    return null;
+  }
+  const cx = clamp01(x);
+  const cy = clamp01(y);
+  const cw = clamp01(w);
+  const ch = clamp01(h);
+  if (cw <= 0 || ch <= 0) return null;
+  return { x: cx, y: cy, w: cw, h: ch };
+}
+
+/** Clamp a number into [0,1]. */
+function clamp01(n: number): number {
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit testing — no real fs unless you pass it one)
 // ---------------------------------------------------------------------------
@@ -209,6 +271,8 @@ export function mergeSettings(
   next.overlayEnabled = normalizeBool(next.overlayEnabled);
   next.overlayBounds = normalizeOverlayBounds(next.overlayBounds);
   next.ocrEnabled = normalizeBool(next.ocrEnabled);
+  next.ocrCaptureRegion = normalizeCaptureRegion(next.ocrCaptureRegion);
+  next.autoOcrCapture = normalizeBool(next.autoOcrCapture);
   next.updateCheckEnabled = normalizeBoolDefaultTrue(next.updateCheckEnabled);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
@@ -228,6 +292,12 @@ export function mergeSettings(
   }
   if ("ocrEnabled" in patch) {
     next.ocrEnabled = normalizeBool(patch.ocrEnabled);
+  }
+  if ("ocrCaptureRegion" in patch) {
+    next.ocrCaptureRegion = normalizeCaptureRegion(patch.ocrCaptureRegion);
+  }
+  if ("autoOcrCapture" in patch) {
+    next.autoOcrCapture = normalizeBool(patch.autoOcrCapture);
   }
   if ("updateCheckEnabled" in patch) {
     next.updateCheckEnabled = normalizeBoolDefaultTrue(
@@ -257,6 +327,8 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     overlayEnabled: normalizeBool(raw.overlayEnabled),
     overlayBounds: normalizeOverlayBounds(raw.overlayBounds),
     ocrEnabled: normalizeBool(raw.ocrEnabled),
+    ocrCaptureRegion: normalizeCaptureRegion(raw.ocrCaptureRegion),
+    autoOcrCapture: normalizeBool(raw.autoOcrCapture),
     updateCheckEnabled: normalizeBoolDefaultTrue(raw.updateCheckEnabled),
   };
 }

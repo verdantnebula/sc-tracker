@@ -10,6 +10,7 @@
 import type {
   Mission,
   MissionPatch,
+  OcrApplyObjective,
   ManualMissionInput,
   ReferenceData,
   LogStatus,
@@ -19,6 +20,8 @@ import type {
   ExportReportResult,
   OcrCaptureResult,
   OcrRecognizeResult,
+  OcrCaptureRegion,
+  OcrAutoRequest,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -41,6 +44,9 @@ export const IPC = {
   MISSION_ACTIVE: "mission:active",
   MISSION_ADD: "mission:add",
   MISSION_UPDATE: "mission:update",
+  // Apply OCR-recovered objectives via a semantic MERGE into the mission's legs
+  // (fills suppressed placeholders in place instead of appending duplicates).
+  MISSION_APPLY_OCR: "mission:applyOcr",
   MISSION_ABANDON: "mission:abandon",
   MISSION_CLEAR_ACTIVE: "mission:clearActive",
   DATA_RESET: "data:reset",
@@ -57,6 +63,10 @@ export const IPC = {
   SETTINGS_SET_SHIP: "settings:setShip",
   SETTINGS_GET_OCR_ENABLED: "settings:getOcrEnabled",
   SETTINGS_SET_OCR_ENABLED: "settings:setOcrEnabled",
+  SETTINGS_GET_OCR_REGION: "settings:getOcrCaptureRegion",
+  SETTINGS_SET_OCR_REGION: "settings:setOcrCaptureRegion",
+  SETTINGS_GET_AUTO_OCR: "settings:getAutoOcrCapture",
+  SETTINGS_SET_AUTO_OCR: "settings:setAutoOcrCapture",
   SETTINGS_GET_UPDATE_CHECK_ENABLED: "settings:getUpdateCheckEnabled",
   SETTINGS_SET_UPDATE_CHECK_ENABLED: "settings:setUpdateCheckEnabled",
 
@@ -71,6 +81,13 @@ export const IPC = {
   // disk there, unconstrained by the renderer's CSP/sandbox) and returns text.
   OCR_CAPTURE_SCREEN: "ocr:captureScreen",
   OCR_RECOGNIZE: "ocr:recognize",
+  // EXPERIMENTAL Auto OCR Capture (Phase 3) — a PUSH signal main broadcasts when
+  // a CARGO contract is accepted AND both autoOcrCapture + ocrEnabled are on. It
+  // carries only the just-accepted mission's identity; main does NOT capture or
+  // OCR (the renderer owns the desktopCapturer pipeline). The renderer's
+  // AutoOcrCapture host runs the calibrated pipeline and applies the result with
+  // the leg-arrival race handled. Declared as a push event below (IpcEventMap).
+  OCR_AUTO_REQUEST: "ocr:autoRequest",
 
   // always-on-top "next stop" overlay window (Phase D)
   OVERLAY_TOGGLE: "overlay:toggle",
@@ -127,6 +144,15 @@ export interface IpcRequestMap {
     args: [missionId: string, patch: MissionPatch];
     result: Mission;
   };
+  /**
+   * Apply OCR-recovered objectives via a semantic MERGE into the mission's legs
+   * (fills suppressed placeholders in place, prunes leftovers — never appends
+   * duplicates). Returns the updated mission.
+   */
+  [IPC.MISSION_APPLY_OCR]: {
+    args: [missionId: string, objectives: OcrApplyObjective[]];
+    result: Mission;
+  };
   [IPC.MISSION_ABANDON]: { args: [missionId: string]; result: void };
   /** Clear the active Mission List (delete live, non-terminal missions). Returns count removed. */
   [IPC.MISSION_CLEAR_ACTIVE]: { args: []; result: number };
@@ -160,6 +186,26 @@ export interface IpcRequestMap {
   [IPC.SETTINGS_GET_OCR_ENABLED]: { args: []; result: boolean };
   /** Persist the OCR-enabled flag; returns the saved value. */
   [IPC.SETTINGS_SET_OCR_ENABLED]: {
+    args: [enabled: boolean];
+    result: boolean;
+  };
+  /**
+   * The user's CALIBRATED OCR capture region (Phase 2), stored as proportions
+   * 0..1 of the screen, or null when uncalibrated (first run draws the box).
+   */
+  [IPC.SETTINGS_GET_OCR_REGION]: { args: []; result: OcrCaptureRegion | null };
+  /**
+   * Persist the OCR capture region (proportions 0..1; null clears it to
+   * uncalibrated). Returns the saved (normalized/clamped) value.
+   */
+  [IPC.SETTINGS_SET_OCR_REGION]: {
+    args: [region: OcrCaptureRegion | null];
+    result: OcrCaptureRegion | null;
+  };
+  /** Whether EXPERIMENTAL Auto OCR Capture is enabled (Phase 3; default false). */
+  [IPC.SETTINGS_GET_AUTO_OCR]: { args: []; result: boolean };
+  /** Persist the auto-OCR-capture flag; returns the saved value. */
+  [IPC.SETTINGS_SET_AUTO_OCR]: {
     args: [enabled: boolean];
     result: boolean;
   };
@@ -265,6 +311,7 @@ export interface IpcEventMap {
   [IPC.OVERLAY_STATE_CHANGED]: { payload: OverlayState };
   [IPC.MODE_CHANGED]: { payload: AppMode };
   [IPC.UPDATE_STATUS]: { payload: UpdateStatus };
+  [IPC.OCR_AUTO_REQUEST]: { payload: OcrAutoRequest };
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +326,15 @@ export interface ApiBridge {
   listActiveMissions(): Promise<Mission[]>;
   addMission(input: ManualMissionInput): Promise<Mission>;
   updateMission(missionId: string, patch: MissionPatch): Promise<Mission>;
+  /**
+   * Apply OCR-recovered objectives via a semantic MERGE (fills suppressed
+   * placeholder legs in place instead of appending duplicates). Resolves to the
+   * updated mission.
+   */
+  applyOcr(
+    missionId: string,
+    objectives: OcrApplyObjective[],
+  ): Promise<Mission>;
   abandonMission(missionId: string): Promise<void>;
   /** Clear the active Mission List. Resolves to the number of missions removed. */
   clearActiveMissions(): Promise<number>;
@@ -308,6 +364,22 @@ export interface ApiBridge {
   getOcrEnabled(): Promise<boolean>;
   /** Persist the OCR-enabled flag; resolves to the saved value. */
   setOcrEnabled(enabled: boolean): Promise<boolean>;
+  /**
+   * Read the user's calibrated OCR capture region (proportions 0..1), or null
+   * when uncalibrated (the first capture draws + saves it).
+   */
+  getOcrCaptureRegion(): Promise<OcrCaptureRegion | null>;
+  /**
+   * Persist the OCR capture region (proportions 0..1; null clears it). Resolves
+   * to the saved (normalized) value.
+   */
+  setOcrCaptureRegion(
+    region: OcrCaptureRegion | null,
+  ): Promise<OcrCaptureRegion | null>;
+  /** Read whether EXPERIMENTAL Auto OCR Capture is enabled (default false). */
+  getAutoOcrCapture(): Promise<boolean>;
+  /** Persist the auto-OCR-capture flag; resolves to the saved value. */
+  setAutoOcrCapture(enabled: boolean): Promise<boolean>;
 
   // --- auto-update (electron-updater) ---
   /** Read whether automatic update checks are enabled (default true). */
@@ -392,4 +464,10 @@ export interface ApiBridge {
   onModeChanged(cb: (mode: AppMode) => void): () => void;
   /** Auto-update lifecycle push — drives the non-blocking update banner. */
   onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
+  /**
+   * EXPERIMENTAL Auto OCR Capture push — fires when main observes an accepted
+   * cargo contract while the feature is on. The renderer's AutoOcrCapture host
+   * runs the calibrated OCR pipeline and applies the result to that mission.
+   */
+  onOcrAutoRequest(cb: (request: OcrAutoRequest) => void): () => void;
 }

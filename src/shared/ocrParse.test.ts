@@ -440,3 +440,49 @@ describe("parseContractOcr — multi-objective contract", () => {
     expect(out.boxSize).toBe(2);
   });
 });
+
+// =============================================================================
+// Bug 1b — location bleed: full-screen captures let the DETAILS column bleed
+// into the location span (the span runs until the next verb). trimDestination
+// must cut an " above <body>" qualifier and conservative prose lead-ins, WITHOUT
+// over-cutting legitimate multi-word station names.
+// =============================================================================
+
+describe("parseContractOcr — location bleed (trimDestination hardening)", () => {
+  it("strips a trailing ' above <body>' qualifier from a destination", () => {
+    const out = parseContractOcr(
+      "Deliver 12 SCU of Titanium to Everus Harbor above Hurston",
+    );
+    expect(out.objectives).toHaveLength(1);
+    expect(out.objectives[0].location).toBe("Everus Harbor");
+  });
+
+  it("strips ' above <body>' even when prose bleeds in after it", () => {
+    const out = parseContractOcr(
+      "Deliver 12 SCU of Titanium to Everus Harbor above j The refinery at Shallow Fields Stat",
+    );
+    expect(out.objectives[0].location).toBe("Everus Harbor");
+  });
+
+  it("cuts a prose lead-in ('are looking') that bled into the location", () => {
+    const out = parseContractOcr(
+      "Deliver 1 SCU of Quantum Fuel to CRU-L4 Shallow Fields are looking to get the containers 1",
+    );
+    expect(out.objectives[0].location).toBe("CRU-L4 Shallow Fields");
+  });
+
+  it("does NOT over-cut a legitimate multi-word station name", () => {
+    // None of the terminator tokens appear, so the full name must survive.
+    const cases: Array<[string, string]> = [
+      [
+        "Deliver 5 SCU of Iron to Thundering Express Station",
+        "Thundering Express Station",
+      ],
+      ["Deliver 5 SCU of Iron to Green Glade Station", "Green Glade Station"],
+      ["Deliver 5 SCU of Iron to Port Tressler", "Port Tressler"],
+    ];
+    for (const [text, expected] of cases) {
+      expect(parseContractOcr(text).objectives[0].location).toBe(expected);
+    }
+  });
+});

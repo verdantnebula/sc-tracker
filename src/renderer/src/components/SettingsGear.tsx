@@ -17,6 +17,10 @@ import type { LogPathInfo, UpdateStatus } from "@shared/types";
 type OcrControls = {
   ocrEnabled: boolean;
   onToggleOcr: () => void;
+  /** Auto OCR Capture (Phase 3): auto-OCR on accepting a cargo haul. */
+  autoOcrCapture: boolean;
+  /** Toggle Auto OCR Capture (gated on ocrEnabled — disabled when OCR is off). */
+  onToggleAutoOcr: () => void;
 };
 
 export function SettingsGear({
@@ -387,6 +391,65 @@ function LogFolderPanel({
               destination / reward when the game doesn’t log them. Accuracy
               varies — you review and confirm every field before anything is
               applied.
+            </p>
+
+            {/* Auto OCR Capture (Phase 3) — DEPENDENT on the OCR toggle above:
+                disabled + greyed unless ocrEnabled, since it has nothing to run
+                without the OCR fallback. Auto-OCRs the contract screen when you
+                accept a cargo haul; requires a calibrated capture region. */}
+            <label
+              title={
+                ocr.ocrEnabled
+                  ? "Auto-OCR the contract screen when you accept a cargo haul"
+                  : "Enable OCR contract capture first"
+              }
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: ocr.ocrEnabled ? "pointer" : "not-allowed",
+                padding: "8px 10px",
+                marginTop: 10,
+                border: "1px solid var(--border-strong)",
+                background:
+                  ocr.ocrEnabled && ocr.autoOcrCapture
+                    ? "rgba(52,224,224,0.06)"
+                    : "transparent",
+                opacity: ocr.ocrEnabled ? 1 : 0.5,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={ocr.ocrEnabled && ocr.autoOcrCapture}
+                disabled={!ocr.ocrEnabled}
+                onChange={ocr.onToggleAutoOcr}
+                aria-label="Experimental: auto-capture contract details"
+                style={{ flex: "none", accentColor: "var(--primary)" }}
+              />
+              <span
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: ocr.ocrEnabled ? "var(--text-bright)" : "var(--muted)",
+                }}
+              >
+                Auto-capture contract details (experimental)
+              </span>
+            </label>
+            <p
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 10,
+                lineHeight: 1.5,
+                color: "var(--text-2)",
+                margin: "8px 0 0",
+              }}
+            >
+              When you accept a cargo haul, this auto-OCRs the contract screen
+              and tentatively fills the mission’s legs (you’ll see a “review”
+              cue). Requires a calibrated capture region — open Contract Capture
+              once to set it.
             </p>
           </>
         )}

@@ -33,10 +33,13 @@ import type {
   LogStatus,
   ManualMissionInput,
   MissionPatch,
+  OcrApplyObjective,
   LogPathInfo,
   PickLogFolderResult,
   OcrCaptureResult,
   OcrRecognizeResult,
+  OcrCaptureRegion,
+  OcrAutoRequest,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -48,6 +51,7 @@ import type {
   MiningReferenceData,
 } from "@shared/types";
 import type { DomainEvent } from "@shared/events";
+import { isCargoHaulTitle } from "@shared/cargoTitle";
 import {
   openMissionStore,
   DatabaseRecoveredError,
@@ -275,6 +279,36 @@ function logStoreCapture(entry: CaptureEntry): void {
   }
 }
 
+/**
+ * EXPERIMENTAL Auto OCR Capture trigger (Phase 3). Broadcast OCR_AUTO_REQUEST to
+ * renderers when a LIVE cargo contract is accepted AND both autoOcrCapture and
+ * ocrEnabled are enabled AND the title looks like a cargo haul. The renderer owns
+ * the actual capture/OCR/apply; this is only the signal. Fully guarded so a throw
+ * here (e.g. a broadcast hiccup) can never break the event tail.
+ */
+function maybeRequestAutoOcr(event: DomainEvent, source: EventSource): void {
+  try {
+    if (event.type !== "missionAccepted") return;
+    // Only LIVE accepts trigger a capture. A 'historical' accept is a re-read of
+    // logbackups during backfill — firing then would spam captures for old hauls.
+    if (source !== "live") return;
+    if (!settings.autoOcrCapture || !settings.ocrEnabled) return;
+    if (!isCargoHaulTitle(event.title)) return;
+    const payload: OcrAutoRequest = {
+      missionId: event.missionId,
+      title: event.title,
+      ts: event.ts,
+    };
+    console.log(
+      `[capture] auto-ocr request for mission ${event.missionId} "${event.title}"`,
+    );
+    broadcast(IPC.OCR_AUTO_REQUEST, payload);
+  } catch (err) {
+    // A signal must never break the tail. Log and move on.
+    console.error("[main] maybeRequestAutoOcr failed:", err);
+  }
+}
+
 function onDomainEvent(event: DomainEvent, source: EventSource): void {
   if (event.type === "locationInventory") {
     // Only LIVE observations update the current location; historical backfill
@@ -297,6 +331,14 @@ function onDomainEvent(event: DomainEvent, source: EventSource): void {
     // bubbling to a fatal uncaughtException dialog.
     store.guard(() => store!.applyEvent(event, source));
     markMissionsChanged();
+    // EXPERIMENTAL Auto OCR Capture (Phase 3): when a LIVE cargo contract is
+    // accepted AND the feature + OCR fallback are both on, broadcast a signal so
+    // the renderer's AutoOcrCapture host runs the calibrated OCR pipeline and
+    // tentatively fills this mission's details. PURELY a signal — main never
+    // captures or OCRs. Backfill ('historical') accepts are ignored: re-reading
+    // logbackups must not fire a flurry of captures. Fully guarded so a failure
+    // here can never break the event tail.
+    maybeRequestAutoOcr(event, source);
   } catch (err) {
     if (err instanceof DatabaseRecoveredError) {
       // The db was corrupt and has been rebuilt fresh. Repopulate from logs.
@@ -679,6 +721,16 @@ function registerIpc(): void {
     },
   );
 
+  ipcMain.handle(
+    IPC.MISSION_APPLY_OCR,
+    (_e, id: string, objectives: OcrApplyObjective[]): Mission => {
+      if (!store) throw new Error("store not ready");
+      const mission = store.applyOcrObjectives(id, objectives);
+      markMissionsChanged();
+      return mission;
+    },
+  );
+
   ipcMain.handle(IPC.MISSION_ABANDON, (_e, id: string): void => {
     if (!store) return;
     // The renderer's "abandon" action is a hard delete per the store contract
@@ -844,6 +896,38 @@ function registerIpc(): void {
       return settings.ocrEnabled;
     },
   );
+
+  // The per-user CALIBRATED capture region (Phase 2 one-button capture), stored
+  // as proportions 0..1 of the screen. null = uncalibrated (the first capture
+  // draws the box and saves it here). saveSettings normalizes/clamps the region
+  // and merges onto disk so unrelated keys are never dropped.
+  ipcMain.handle(
+    IPC.SETTINGS_GET_OCR_REGION,
+    (): OcrCaptureRegion | null => settings.ocrCaptureRegion,
+  );
+
+  ipcMain.handle(
+    IPC.SETTINGS_SET_OCR_REGION,
+    (_e, region: OcrCaptureRegion | null): OcrCaptureRegion | null => {
+      settings = saveSettings({ ocrCaptureRegion: region });
+      return settings.ocrCaptureRegion;
+    },
+  );
+
+  // EXPERIMENTAL Auto OCR Capture (Phase 3). Opt-in flag (default false) that —
+  // together with ocrEnabled — gates whether main broadcasts OCR_AUTO_REQUEST on
+  // an accepted cargo contract. Pure persistence here; the trigger lives in the
+  // onDomainEvent missionAccepted path. saveSettings normalizes + merges so no
+  // unrelated key is dropped.
+  ipcMain.handle(
+    IPC.SETTINGS_GET_AUTO_OCR,
+    (): boolean => settings.autoOcrCapture,
+  );
+
+  ipcMain.handle(IPC.SETTINGS_SET_AUTO_OCR, (_e, enabled: boolean): boolean => {
+    settings = saveSettings({ autoOcrCapture: enabled === true });
+    return settings.autoOcrCapture;
+  });
 
   // --- Auto-update (electron-updater) — NON-FORCED -------------------------
   // Read/persist the update-check flag (default true) and install a downloaded

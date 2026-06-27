@@ -402,6 +402,32 @@ export interface BackfillProgress {
 // ---------------------------------------------------------------------------
 
 /**
+ * A per-user CALIBRATED capture region for the OCR fallback (Phase 2 one-button
+ * capture). Stored as PROPORTIONS — each field is a fraction 0..1 of the captured
+ * screen — NOT pixels, so the same calibration works across resolutions / display
+ * scales. (x, y) is the top-left corner; (w, h) the width/height, all 0..1.
+ *
+ * WHY PROPORTIONS: the full-screen grab's pixel dimensions differ per user
+ * (1080p vs 1440p vs ultrawide), but the mobiGlas contract panel sits at roughly
+ * the same RELATIVE position. Calibrating once and storing fractions lets every
+ * subsequent capture auto-crop to the same area without re-drawing.
+ *
+ * The crop's job is to EXCLUDE the DETAILS column so flavor text can't bleed into
+ * the parsed locations; the user defines the exact box at calibration time, so no
+ * layout numbers are hardcoded anywhere.
+ */
+export interface OcrCaptureRegion {
+  /** Left edge as a fraction of screen width, 0..1. */
+  x: number;
+  /** Top edge as a fraction of screen height, 0..1. */
+  y: number;
+  /** Width as a fraction of screen width, 0..1 (must be > 0). */
+  w: number;
+  /** Height as a fraction of screen height, 0..1 (must be > 0). */
+  h: number;
+}
+
+/**
  * Result of a primary-display screen grab for the OCR fallback. The main process
  * captures the screen via Electron's desktopCapturer and returns the frame as a
  * PNG data URL (`data:image/png;base64,…`) for the renderer to feed to
@@ -497,6 +523,37 @@ export interface MissionPatch {
   }>;
   /** Leg ids to DELETE from the mission (remove ✕ in the detail panel). */
   removeLegIds?: string[];
+}
+
+/**
+ * One OCR-recovered objective the review dialog confirmed, sent to the store's
+ * semantic-merge apply path (MISSION_APPLY_OCR). The store fills a matching
+ * suppressed-placeholder leg in place (preserving its game objectiveId) or
+ * inserts a new leg — instead of always appending (which produced duplicates).
+ * `scu`/`location` are null/empty when the OCR couldn't read them.
+ */
+export interface OcrApplyObjective {
+  kind: LegKind;
+  commodity: string;
+  scu: number | null;
+  location: string | null;
+}
+
+/**
+ * EXPERIMENTAL Auto OCR Capture (Phase 3) — the payload of the OCR_AUTO_REQUEST
+ * push. Main emits it when a CARGO contract is accepted AND both autoOcrCapture
+ * and ocrEnabled are on. It carries ONLY the just-accepted mission's identity so
+ * the renderer can correlate the OCR result back to the right mission (direct by
+ * `missionId`, with a time+name fallback for the leg-arrival race). Main never
+ * captures or OCRs; this is purely the trigger signal.
+ */
+export interface OcrAutoRequest {
+  /** The game missionId of the just-accepted cargo contract. */
+  missionId: string;
+  /** The contract title (used as the time+name fallback correlation key). */
+  title: string;
+  /** Epoch ms of the accept event (the fallback's time window anchor). */
+  ts: number;
 }
 
 // ===========================================================================

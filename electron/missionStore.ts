@@ -35,6 +35,7 @@ import type {
   DropoffCommodity,
   LegRef,
   Totals,
+  OcrApplyObjective,
 } from "@shared/types";
 import type { Database as DB } from "better-sqlite3";
 import { createDb } from "./db/schema";
@@ -94,6 +95,18 @@ export interface MissionStore {
   addManualMission(input: ManualMissionInput): Mission;
   /** Patch payout/notes/status/leg completion. Returns the updated record. */
   updateMission(missionId: string, patch: MissionPatch): Mission;
+  /**
+   * Apply OCR-recovered objectives by semantically MERGING them into the
+   * mission's legs (rather than appending duplicates). Fills suppressed
+   * placeholder legs in place — preserving their game objectiveId so future
+   * ObjectiveComplete log events still key correctly — and prunes leftover
+   * unmatched placeholders. See {@link OcrApplyObjective}. Returns the updated
+   * record.
+   */
+  applyOcrObjectives(
+    missionId: string,
+    objectives: OcrApplyObjective[],
+  ): Mission;
   /** Toggle a single leg's completion (sets scuDelivered accordingly). */
   toggleLeg(missionId: string, legId: string, completed: boolean): Mission;
   /** Mark a mission abandoned (terminal). Returns the updated record. */
@@ -1134,6 +1147,164 @@ class SqliteMissionStore implements MissionStore {
     ) {
       this.recomputeStatus(missionId);
     }
+    return this.getMission(missionId)!;
+  }
+
+  /**
+   * Apply OCR-recovered objectives by semantically MERGING them into the
+   * mission's existing legs — the fix for Bug 1a, where applying OCR appended
+   * brand-new legs and left the original SUPPRESSED PLACEHOLDER legs (game
+   * objectiveId, empty commodity, scuTotal 0, location null) intact, producing
+   * duplicates.
+   *
+   * Rules (see the briefing):
+   *  1. PRESERVE untouched any leg that is `completed` OR carries a
+   *     `manual_override` — never clobber completed/user-edited legs.
+   *  2. Remaining legs are "fillable candidates" (open, not user-edited).
+   *  3. For each OCR objective in order, greedily match a fillable candidate of
+   *     the SAME kind, preferring a case-insensitive exact commodity match, else
+   *     any candidate of that kind; each candidate is consumed once. On match,
+   *     UPDATE in place — scuTotal (when scu != null), location (when non-empty),
+   *     commodity (when non-empty) — and KEEP the existing objectiveId so future
+   *     ObjectiveComplete log events still key correctly. We deliberately do NOT
+   *     stamp manual_override on OCR-filled legs, so a re-apply re-matches them
+   *     (idempotency).
+   *  4. OCR objectives with no candidate -> INSERT a new leg (synthetic id).
+   *  5. Fillable candidates NOT matched by any OCR objective -> DELETE (leftover
+   *     suppressed-placeholder dupes).
+   */
+  applyOcrObjectives(
+    missionId: string,
+    objectives: OcrApplyObjective[],
+  ): Mission {
+    const m = this.rawMission(missionId);
+    if (!m) throw new Error(`mission not found: ${missionId}`);
+
+    // Pull the raw leg rows so we can see completed + manual_override (rowToLeg
+    // intentionally drops manual_override from the public Leg type).
+    const rows = this.db
+      .prepare(
+        `SELECT objective_id, kind, commodity, completed, manual_override
+           FROM legs WHERE mission_id = @m`,
+      )
+      .all({ m: missionId }) as Array<{
+      objective_id: string;
+      kind: string;
+      commodity: string;
+      completed: number;
+      manual_override: number | null;
+    }>;
+
+    // Rule 1: protected legs (completed OR user-edited) are never candidates.
+    // Rule 2: everything else is a fillable candidate, tracked as consumed.
+    interface Candidate {
+      objectiveId: string;
+      kind: string;
+      commodity: string;
+      consumed: boolean;
+    }
+    const candidates: Candidate[] = rows
+      .filter((r) => r.completed !== 1 && r.manual_override === null)
+      .map((r) => ({
+        objectiveId: r.objective_id,
+        kind: r.kind,
+        commodity: r.commodity,
+        consumed: false,
+      }));
+
+    // Update an existing leg IN PLACE without stamping manual_override (so the
+    // OCR-filled leg stays fillable on a future re-apply). Only writes the
+    // fields the OCR actually read (null scu / empty strings leave existing
+    // values), matching the partial-fill intent.
+    const fillLeg = (objectiveId: string, o: OcrApplyObjective): void => {
+      const sets: string[] = [];
+      const params: Record<string, unknown> = { m: missionId, o: objectiveId };
+      if (o.scu !== null) {
+        sets.push("scu_total = @scu");
+        params.scu = o.scu;
+        // Keep a (necessarily un-completed) candidate's delivered figure at 0;
+        // candidates are open by construction, so nothing to reconcile here.
+      }
+      if (o.location !== null && o.location.length > 0) {
+        sets.push("location = @loc");
+        params.loc = o.location;
+      }
+      if (o.commodity.length > 0) {
+        sets.push("commodity = @com");
+        params.com = o.commodity;
+      }
+      if (sets.length > 0) {
+        this.db
+          .prepare(
+            `UPDATE legs SET ${sets.join(", ")}
+               WHERE mission_id = @m AND objective_id = @o`,
+          )
+          .run(params);
+      }
+    };
+
+    // Insert a new leg for an OCR objective with no candidate (Rule 4). Reuses
+    // the synthetic-id scheme from updateMission's addLegs path, retried against
+    // the live set to stay unique within (missionId, objectiveId). These ARE
+    // user-confirmed values, so we stamp manual_override (a genuinely new leg the
+    // user is authoring via OCR — same semantics as a manual addLeg).
+    const existingIds = new Set(rows.map((r) => r.objective_id));
+    let insertSeq = 0;
+    const insertLeg = (o: OcrApplyObjective): void => {
+      const ts = Date.now();
+      let oid = `manual_${o.kind}_${ts}_${insertSeq}`;
+      let n = insertSeq;
+      while (existingIds.has(oid)) {
+        n += 1;
+        oid = `manual_${o.kind}_${ts}_${n}`;
+      }
+      insertSeq += 1;
+      existingIds.add(oid);
+      this.db
+        .prepare(
+          `INSERT INTO legs
+             (mission_id, objective_id, kind, commodity, scu_total,
+              scu_delivered, location, completed, manual_override)
+           VALUES (@m, @o, @kind, @commodity, @scu, 0, @loc, 0, @ov)`,
+        )
+        .run({
+          m: missionId,
+          o: oid,
+          kind: o.kind,
+          commodity: o.commodity,
+          scu: o.scu ?? 0,
+          loc: o.location && o.location.length > 0 ? o.location : null,
+          ov: ts,
+        });
+    };
+
+    // Rule 3: greedily match each OCR objective in order.
+    for (const o of objectives) {
+      const sameKind = candidates.filter(
+        (c) => !c.consumed && c.kind === o.kind,
+      );
+      // Prefer a case-insensitive exact commodity match, else any same-kind.
+      const exact = sameKind.find(
+        (c) => c.commodity.toLowerCase() === o.commodity.toLowerCase(),
+      );
+      const pick = exact ?? sameKind[0];
+      if (pick) {
+        pick.consumed = true;
+        fillLeg(pick.objectiveId, o);
+      } else {
+        insertLeg(o);
+      }
+    }
+
+    // Rule 5: prune leftover fillable candidates no OCR objective matched.
+    const del = this.db.prepare(
+      `DELETE FROM legs WHERE mission_id = @m AND objective_id = @o`,
+    );
+    for (const c of candidates) {
+      if (!c.consumed) del.run({ m: missionId, o: c.objectiveId });
+    }
+
+    this.recomputeStatus(missionId);
     return this.getMission(missionId)!;
   }
 

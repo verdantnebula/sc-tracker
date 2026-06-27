@@ -24,6 +24,8 @@ export function TopBar({
   ocrEnabled,
   onToggleOcr,
   onOcrCapture,
+  autoOcrCapture,
+  onToggleAutoOcr,
 }: {
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
@@ -46,6 +48,10 @@ export function TopBar({
   onToggleOcr: () => void;
   /** Open the OCR capture/review dialog (only shown when ocrEnabled). */
   onOcrCapture: () => void;
+  /** Whether EXPERIMENTAL Auto OCR Capture is enabled (Phase 3). */
+  autoOcrCapture: boolean;
+  /** Toggle Auto OCR Capture on/off (persists; gated on ocrEnabled). */
+  onToggleAutoOcr: () => void;
 }): React.JSX.Element {
   return (
     <header
@@ -112,7 +118,7 @@ export function TopBar({
         onResync={onResync}
         onReset={onReset}
         onCollectLogs={onCollectLogs}
-        ocr={{ ocrEnabled, onToggleOcr }}
+        ocr={{ ocrEnabled, onToggleOcr, autoOcrCapture, onToggleAutoOcr }}
       />
 
       {/* EXPERIMENTAL OCR capture entry — only present when the feature is

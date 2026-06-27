@@ -13,6 +13,7 @@ import type {
   Mission,
   ManualMissionInput,
   MissionPatch,
+  OcrApplyObjective,
   ReferenceData,
   LogStatus,
   BackfillProgress,
@@ -21,6 +22,8 @@ import type {
   ExportReportResult,
   OcrCaptureResult,
   OcrRecognizeResult,
+  OcrCaptureRegion,
+  OcrAutoRequest,
   AppMode,
   OverlayState,
   SalvageRun,
@@ -53,6 +56,12 @@ const api: ApiBridge = {
       IPC.MISSION_UPDATE,
       missionId,
       patch,
+    ) as Promise<Mission>,
+  applyOcr: (missionId: string, objectives: OcrApplyObjective[]) =>
+    ipcRenderer.invoke(
+      IPC.MISSION_APPLY_OCR,
+      missionId,
+      objectives,
     ) as Promise<Mission>,
   abandonMission: (missionId: string) =>
     ipcRenderer.invoke(IPC.MISSION_ABANDON, missionId) as Promise<void>,
@@ -92,6 +101,19 @@ const api: ApiBridge = {
       IPC.SETTINGS_SET_OCR_ENABLED,
       enabled,
     ) as Promise<boolean>,
+  getOcrCaptureRegion: () =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_GET_OCR_REGION,
+    ) as Promise<OcrCaptureRegion | null>,
+  setOcrCaptureRegion: (region: OcrCaptureRegion | null) =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_SET_OCR_REGION,
+      region,
+    ) as Promise<OcrCaptureRegion | null>,
+  getAutoOcrCapture: () =>
+    ipcRenderer.invoke(IPC.SETTINGS_GET_AUTO_OCR) as Promise<boolean>,
+  setAutoOcrCapture: (enabled: boolean) =>
+    ipcRenderer.invoke(IPC.SETTINGS_SET_AUTO_OCR, enabled) as Promise<boolean>,
   captureScreenForOcr: () =>
     ipcRenderer.invoke(IPC.OCR_CAPTURE_SCREEN) as Promise<OcrCaptureResult>,
   recognizeOcr: (imageDataUrl: string, psm?: "6" | "11") =>
@@ -191,6 +213,7 @@ const api: ApiBridge = {
     subscribe<OverlayState>(IPC.OVERLAY_STATE_CHANGED, cb),
   onModeChanged: (cb) => subscribe<AppMode>(IPC.MODE_CHANGED, cb),
   onUpdateStatus: (cb) => subscribe<UpdateStatus>(IPC.UPDATE_STATUS, cb),
+  onOcrAutoRequest: (cb) => subscribe<OcrAutoRequest>(IPC.OCR_AUTO_REQUEST, cb),
 };
 
 contextBridge.exposeInMainWorld("api", api);

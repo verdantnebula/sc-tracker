@@ -1,20 +1,34 @@
 // ============================================================================
 // OcrCaptureDialog — EXPERIMENTAL OCR contract capture review modal (Phase F)
 // ----------------------------------------------------------------------------
-// Opt-in fallback for when the game suppressed the New Objective log line. Flow:
+// Opt-in fallback for when the game suppressed the New Objective log line.
 //
-//   capture FULL screen at native res (main desktopCapturer)
-//     -> CROP: user drags a box around the objectives + reward on a scaled
-//        preview, confirms "Read selection"
-//     -> PREPROCESS the crop in a <canvas>: upscale ~3x, grayscale, threshold +
-//        invert (dark text on light, which tesseract prefers)
-//     -> OCR the processed crop (tesseract.js, MAIN process; PSM 6 + whitelist)
-//     -> parse (pure parseContractOcr) -> fuzzy-match commodity/location
-//     -> REVIEW: user confirms/corrects every field + picks the target mission
-//     -> APPLY via window.api.updateMission (the existing, audited path)
+// PHASE 2 — ONE-BUTTON CAPTURE via a per-user CALIBRATED region:
+//   The full-screen grab stays (we do NOT target the SC window). The crop's job
+//   is to EXCLUDE the right-hand DETAILS column so flavor text can't bleed into
+//   parsed locations. Screen sizes/resolutions differ, so the region is the
+//   USER's own, calibrated once and stored as PROPORTIONS (fractions 0..1).
 //
-// WHY MANUAL CROP + PREPROCESS: OCR'ing the full busy frame returned gibberish —
-// the small stylized mobiGlas text was lost in the scene. Cropping to just the
+//   CALIBRATED (region set) — the common path, no drawing:
+//     capture FULL screen -> cropRectFromRegion (proportions -> px, clamped)
+//       -> normalizeScale (upscale the crop to ~a consistent height across
+//          resolutions) -> PREPROCESS in <canvas> (grayscale, threshold+invert)
+//       -> OCR (tesseract.js, MAIN) -> parse -> fuzzy-match -> REVIEW -> APPLY.
+//
+//   UNCALIBRATED (region null = first run) — calibrate-as-you-go:
+//     capture -> user drags a box on the scaled preview -> we SAVE the box as
+//     proportions (setOcrCaptureRegion) AND proceed with that capture. So the
+//     first capture calibrates; every capture after is one-button.
+//
+//   CONTROLS: "Re-draw capture region" (recalibrate) and "Reset region" (clear
+//   to null so the next capture re-calibrates).
+//
+//   FALLBACK (never a dead end): if a CALIBRATED capture parses ZERO objectives,
+//   we surface a clear message and offer to re-draw the region (manual crop) for
+//   this capture — the screenshot is still in hand, so no recapture is needed.
+//
+// WHY CROP + PREPROCESS: OCR'ing the full busy frame returned gibberish — the
+// small stylized mobiGlas text was lost in the scene. Cropping to just the
 // contract text and feeding tesseract a large, high-contrast binarized image is
 // the difference between noise and a usable read.
 //
@@ -30,40 +44,38 @@
 // a top-level entry; the target mission can be preselected by the caller.
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Mission, ReferenceData, MissionPatch } from "@shared/types";
-import { fuzzyMatch } from "@shared/ocrMatch";
+import { useEffect, useRef, useState } from "react";
+import type { Mission, ReferenceData, OcrCaptureRegion } from "@shared/types";
 import {
   mapSelectionToSource,
-  luminance,
-  thresholdInvert,
-  OCR_PREPROCESS_DEFAULTS,
+  cropRectFromRegion,
   type Rect,
 } from "@shared/ocrPreprocess";
 import { pickDefaultTarget } from "../lib/selectors";
 import { recognizeContract } from "../lib/ocrRunner";
-
-/** A reviewable objective row: the OCR'd + fuzzy-matched values, all editable. */
-interface ReviewObjective {
-  kind: "pickup" | "dropoff";
-  scu: number | null;
-  commodity: string;
-  /** 0..1 confidence of the commodity fuzzy match (0 when user-edited/no match). */
-  commodityScore: number;
-  location: string;
-  locationScore: number;
-}
+import {
+  reviewObjectivesFrom,
+  loadImage,
+  preprocessCrop,
+  type ReviewObjective,
+} from "../lib/ocrPipeline";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "capturing" }
-  /** Screenshot in hand; user drags a selection box over the scaled preview. */
+  /**
+   * Screenshot in hand; user drags a selection box over the scaled preview. This
+   * is reached when UNCALIBRATED (first run / recalibrate) OR as the fallback when
+   * a calibrated capture parsed zero objectives (`note` carries that message).
+   */
   | {
       kind: "cropping";
       dataUrl: string;
       /** True source pixel dimensions of the captured frame. */
       sourceWidth: number;
       sourceHeight: number;
+      /** Optional banner shown above the crop UI (e.g. the zero-objective fallback). */
+      note?: string;
     }
   | { kind: "recognizing" }
   | { kind: "review"; confidence: number; rawText: string }
@@ -93,38 +105,57 @@ export function OcrCaptureDialog({
     pickDefaultTarget(missions, initialMissionId),
   );
   const [showRaw, setShowRaw] = useState(false);
-
-  // Candidate name lists for fuzzy matching (computed once per reference).
-  const commodityNames = useMemo(
-    () => reference.commodities.map((c) => c.name),
-    [reference.commodities],
-  );
-  const locationNames = useMemo(
-    () =>
-      reference.terminals.map((t) => t.displayname || t.name).filter(Boolean),
-    [reference.terminals],
-  );
+  // The user's calibrated capture region (proportions 0..1), or null until the
+  // first capture draws one. Held in component state so a recalibrate / reset
+  // within this session takes effect immediately (and is also persisted).
+  const [region, setRegion] = useState<OcrCaptureRegion | null>(null);
+  // Gates the very first capture until the persisted region has been read, so we
+  // don't flash the draw UI for a user who is already calibrated.
+  const [regionLoaded, setRegionLoaded] = useState(false);
 
   // The full-resolution screenshot, held in memory only (an offscreen <img> used
   // as the canvas crop source). Cleared on unmount; never persisted.
   const sourceImgRef = useRef<HTMLImageElement | null>(null);
 
-  // Kick off capture immediately on mount — the user already opted in by opening
-  // the dialog. (No auto-apply; this only READS the screen.)
+  // On mount: read the persisted calibrated region, THEN kick off the first
+  // capture. The user already opted in by opening the dialog. (No auto-apply;
+  // this only READS the screen.) We pass the freshly-read region directly into
+  // the first capture so it branches correctly without waiting for a re-render.
   useEffect(() => {
-    void runCapture();
+    let cancelled = false;
+    void (async () => {
+      let initialRegion: OcrCaptureRegion | null = null;
+      try {
+        initialRegion = await window.api.getOcrCaptureRegion();
+      } catch {
+        initialRegion = null; // defensive: a read failure -> uncalibrated.
+      }
+      if (cancelled) return;
+      setRegion(initialRegion);
+      setRegionLoaded(true);
+      await runCapture(initialRegion);
+    })();
     return () => {
+      cancelled = true;
       sourceImgRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
-   * STEP 1: grab the full screen at native resolution and move to the crop step.
-   * We decode the PNG into an offscreen <img> so the crop canvas has a pixel
-   * source, and read its true dimensions for the selection -> source mapping.
+   * STEP 1: grab the full screen at native resolution. We decode the PNG into an
+   * offscreen <img> so the crop canvas has a pixel source, and read its true
+   * dimensions. Then we BRANCH on the active region:
+   *   - CALIBRATED (region set): auto-crop to the region + recognize (one-button).
+   *   - UNCALIBRATED (region null): show the draw-a-box crop step.
+   *
+   * `activeRegion` is passed explicitly (defaulting to current state) so the
+   * mount flow can use the freshly-read region before a re-render, and the
+   * Recapture button can force a re-draw by passing null.
    */
-  async function runCapture(): Promise<void> {
+  async function runCapture(
+    activeRegion: OcrCaptureRegion | null = region,
+  ): Promise<void> {
     setPhase({ kind: "capturing" });
     try {
       const cap = await window.api.captureScreenForOcr();
@@ -137,6 +168,13 @@ export function OcrCaptureDialog({
       }
       const img = await loadImage(cap.dataUrl);
       sourceImgRef.current = img;
+
+      if (activeRegion) {
+        // Calibrated: auto-crop to the saved proportional region and recognize.
+        await recognizeRegion(img, activeRegion);
+        return;
+      }
+      // Uncalibrated: show the draw-a-box step (the draw will calibrate + run).
       setPhase({
         kind: "cropping",
         dataUrl: cap.dataUrl,
@@ -154,10 +192,75 @@ export function OcrCaptureDialog({
   }
 
   /**
-   * STEP 2-4: given the user's selection (in displayed/CSS-pixel space) and the
-   * displayed image size, map it to source pixels, crop + preprocess via canvas
-   * (upscale, grayscale, threshold+invert), then OCR the processed crop and run
-   * the pure parser + fuzzy matcher. PSM defaults to "6" (uniform block).
+   * CALIBRATED path: convert the saved proportional region into a pixel crop for
+   * THIS screenshot (cropRectFromRegion clamps to bounds), preprocess + OCR, then
+   * parse/match into the review step. FALLBACK: if zero objectives are parsed, we
+   * don't dead-end — we drop back to the crop UI (screenshot still in hand) with a
+   * message so the user can re-draw the region for this capture.
+   */
+  async function recognizeRegion(
+    img: HTMLImageElement,
+    activeRegion: OcrCaptureRegion,
+  ): Promise<void> {
+    const srcRect = cropRectFromRegion(
+      activeRegion,
+      img.naturalWidth,
+      img.naturalHeight,
+    );
+    if (srcRect.width <= 0 || srcRect.height <= 0) {
+      // A degenerate region (shouldn't happen post-normalize) -> re-draw.
+      setPhase({
+        kind: "cropping",
+        dataUrl: img.src,
+        sourceWidth: img.naturalWidth,
+        sourceHeight: img.naturalHeight,
+        note: "The saved capture region was empty. Draw it again below.",
+      });
+      return;
+    }
+
+    setPhase({ kind: "recognizing" });
+    try {
+      const result = await runOcrOnRect(img, srcRect, "6");
+      const reviewed = reviewObjectivesFrom(
+        result.contract.objectives,
+        reference,
+      );
+      if (reviewed.length === 0) {
+        // FALLBACK — never a dead end: offer a manual re-draw for this capture.
+        setPhase({
+          kind: "cropping",
+          dataUrl: img.src,
+          sourceWidth: img.naturalWidth,
+          sourceHeight: img.naturalHeight,
+          note:
+            "No objectives were recognized from the saved region. Try re-drawing " +
+            "the capture region around the “Deliver … SCU …” lines (this also " +
+            "re-calibrates it for next time).",
+        });
+        return;
+      }
+      setObjectives(reviewed);
+      setReward(result.contract.reward);
+      setPhase({
+        kind: "review",
+        confidence: result.confidence,
+        rawText: result.rawText,
+      });
+    } catch (err) {
+      setPhase({
+        kind: "error",
+        message:
+          "OCR failed. " + String(err instanceof Error ? err.message : err),
+      });
+    }
+  }
+
+  /**
+   * UNCALIBRATED / re-draw path: given the user's drawn selection (displayed/CSS
+   * pixels) and the displayed image size, map it to source pixels, SAVE it as a
+   * proportional capture region (so every future capture is one-button), then OCR
+   * + parse + review. PSM defaults to "6" (uniform block).
    */
   async function recognizeSelection(
     selection: Rect,
@@ -185,29 +288,29 @@ export function OcrCaptureDialog({
       return;
     }
 
+    // CALIBRATE: persist this selection as proportions of the source frame so the
+    // next capture auto-crops to it. Best-effort — a save failure must not block
+    // this capture, so we still proceed with the in-hand rect.
+    const proportional: OcrCaptureRegion = {
+      x: srcRect.x / img.naturalWidth,
+      y: srcRect.y / img.naturalHeight,
+      w: srcRect.width / img.naturalWidth,
+      h: srcRect.height / img.naturalHeight,
+    };
+    try {
+      const saved = await window.api.setOcrCaptureRegion(proportional);
+      setRegion(saved);
+    } catch {
+      // Keep the in-memory region so the session is still calibrated.
+      setRegion(proportional);
+    }
+
     setPhase({ kind: "recognizing" });
     try {
-      const processed = preprocessCrop(img, srcRect);
-      const result = await recognizeContract(processed, psm);
-
-      // Fuzzy-match each OCR'd objective against the bundled reference. The raw
-      // span is the fallback when no candidate clears the threshold, so the user
-      // still sees what OCR read and can correct it.
-      const reviewed: ReviewObjective[] = result.contract.objectives.map(
-        (o) => {
-          const cm = fuzzyMatch(o.commodity, commodityNames);
-          const lm = fuzzyMatch(o.location, locationNames);
-          return {
-            kind: o.kind,
-            scu: o.scu,
-            commodity: cm.value ?? o.commodity,
-            commodityScore: cm.value ? cm.score : 0,
-            location: lm.value ?? o.location,
-            locationScore: lm.value ? lm.score : 0,
-          };
-        },
+      const result = await runOcrOnRect(img, srcRect, psm);
+      setObjectives(
+        reviewObjectivesFrom(result.contract.objectives, reference),
       );
-      setObjectives(reviewed);
       setReward(result.contract.reward);
       setPhase({
         kind: "review",
@@ -223,6 +326,32 @@ export function OcrCaptureDialog({
     }
   }
 
+  /**
+   * Crop + preprocess `srcRect` from `img` and OCR it. Shared by the calibrated
+   * and manual-draw paths so both use the SAME preprocessing (cropRectFromRegion
+   * /mapSelectionToSource feed the same canvas pipeline + normalizeScale upscale).
+   */
+  async function runOcrOnRect(
+    img: HTMLImageElement,
+    srcRect: Rect,
+    psm: "6" | "11",
+  ): ReturnType<typeof recognizeContract> {
+    const processed = preprocessCrop(img, srcRect);
+    return recognizeContract(processed, psm);
+  }
+
+  /** Reset the calibration to null (next capture re-draws). Best-effort persist. */
+  async function resetRegion(): Promise<void> {
+    try {
+      await window.api.setOcrCaptureRegion(null);
+    } catch {
+      /* ignore — clearing in-memory below still un-calibrates this session */
+    }
+    setRegion(null);
+    // Recapture immediately into the draw UI so the user sees the effect.
+    await runCapture(null);
+  }
+
   function updateObjective(
     index: number,
     patch: Partial<ReviewObjective>,
@@ -236,30 +365,41 @@ export function OcrCaptureDialog({
     setObjectives((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Busy = an in-flight capture/OCR pass; disables the footer controls so the
+  // user can't kick off a second capture mid-recognition.
+  const busy = phase.kind === "capturing" || phase.kind === "recognizing";
+
   const target = missions.find((m) => m.id === targetId) ?? null;
   const canApply =
     target !== null &&
     (objectives.length > 0 || reward !== null) &&
     phase.kind === "review";
 
-  // Build the MissionPatch and apply via the EXISTING audited update path. We add
-  // the reviewed objectives as new legs (addLegs) — the common case is a
-  // suppressed mission missing its legs entirely — and set the reward if read.
-  // The store stamps manual_override on these, protecting them from log replay.
+  // Apply the reviewed objectives via the semantic-MERGE path (applyOcr): it
+  // FILLS the mission's suppressed placeholder legs in place (preserving their
+  // game objectiveId so future ObjectiveComplete log events still key correctly)
+  // and prunes leftover unmatched placeholders — instead of appending duplicate
+  // legs (the old addLegs path, Bug 1a). Any non-leg field (reward) still flows
+  // through the existing audited updateMission path.
   function apply(): void {
     if (!target) return;
-    const patch: MissionPatch = {};
-    if (objectives.length > 0) {
-      patch.addLegs = objectives.map((o) => ({
-        kind: o.kind,
-        commodity: o.commodity,
-        scuTotal: o.scu ?? 0,
-        location: o.location.length > 0 ? o.location : null,
-      }));
-    }
-    if (reward !== null) patch.reward = reward;
-    void window.api
-      .updateMission(target.id, patch)
+    const run = async (): Promise<void> => {
+      if (objectives.length > 0) {
+        await window.api.applyOcr(
+          target.id,
+          objectives.map((o) => ({
+            kind: o.kind,
+            commodity: o.commodity,
+            scu: o.scu,
+            location: o.location.length > 0 ? o.location : null,
+          })),
+        );
+      }
+      if (reward !== null) {
+        await window.api.updateMission(target.id, { reward });
+      }
+    };
+    void run()
       .then(() => setPhase({ kind: "applied" }))
       .catch((err: unknown) =>
         setPhase({
@@ -353,10 +493,14 @@ export function OcrCaptureDialog({
           }}
         >
           Reads your mobiGlas contract screen to recover details the game didn’t
-          write to the log. Drag a box around the “Deliver … SCU …” objectives
-          and the aUEC reward, then read the selection. OCR can misread the
-          stylized font — check every field before applying. Nothing is changed
-          until you press Apply.
+          write to the log.{" "}
+          {region
+            ? "Your capture region is calibrated, so capture is one-button — " +
+              "use the controls below to re-draw or reset it."
+            : "The first time, drag a box around the “Deliver … SCU …” " +
+              "objectives (this calibrates the capture region for next time)."}{" "}
+          OCR can misread the stylized font — check every field before applying.
+          Nothing is changed until you press Apply.
         </p>
 
         {(phase.kind === "capturing" || phase.kind === "recognizing") && (
@@ -380,6 +524,7 @@ export function OcrCaptureDialog({
             dataUrl={phase.dataUrl}
             sourceWidth={phase.sourceWidth}
             sourceHeight={phase.sourceHeight}
+            note={phase.note}
             onConfirm={(sel, dispW, dispH) =>
               void recognizeSelection(sel, dispW, dispH)
             }
@@ -422,21 +567,46 @@ export function OcrCaptureDialog({
             alignItems: "center",
             gap: 10,
             marginTop: 18,
+            flexWrap: "wrap",
           }}
         >
-          <button
-            className="sc-ghost-btn"
-            onClick={() => void runCapture()}
-            disabled={
-              phase.kind === "capturing" || phase.kind === "recognizing"
-            }
-            style={ghostBtn(
-              phase.kind !== "capturing" && phase.kind !== "recognizing",
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="sc-ghost-btn"
+              onClick={() => void runCapture()}
+              disabled={busy}
+              style={ghostBtn(!busy)}
+            >
+              ⟳ Recapture
+            </button>
+            {/* Recalibrate: force the draw-a-box step on a fresh capture so the
+                user can re-draw (and re-save) the region. Available once loaded. */}
+            {regionLoaded && (
+              <button
+                className="sc-ghost-btn"
+                onClick={() => void runCapture(null)}
+                disabled={busy}
+                style={ghostBtn(!busy)}
+                title="Capture again and draw a new region (re-calibrate)"
+              >
+                ✎ Re-draw capture region
+              </button>
             )}
-          >
-            ⟳ Recapture
-          </button>
-          <div style={{ display: "flex", gap: 10 }}>
+            {/* Reset: clear the saved region to null so the NEXT capture
+                re-calibrates. Only meaningful when a region is set. */}
+            {region !== null && (
+              <button
+                className="sc-ghost-btn"
+                onClick={() => void resetRegion()}
+                disabled={busy}
+                style={ghostBtn(!busy)}
+                title="Clear the saved capture region (next capture re-calibrates)"
+              >
+                ⌫ Reset region
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button
               className="sc-ghost-btn"
               onClick={onClose}
@@ -445,87 +615,46 @@ export function OcrCaptureDialog({
               {phase.kind === "applied" ? "Close" : "Cancel"}
             </button>
             {phase.kind === "review" && (
-              <button
-                className="sc-primary-btn"
-                onClick={apply}
-                disabled={!canApply}
-                style={primaryBtn(canApply)}
-              >
-                APPLY TO MISSION
-              </button>
+              <>
+                {/* Mission selector mirrored at the bottom (matches the mockup) so
+                    the apply target is chosen right beside the button. Bound to the
+                    SAME targetId state as the top selector. */}
+                <select
+                  value={targetId ?? ""}
+                  onChange={(e) => setTargetId(e.target.value || null)}
+                  aria-label="Apply to mission"
+                  title="Choose the mission to apply these objectives to"
+                  style={{ ...selectStyle, maxWidth: 260, marginBottom: 0 }}
+                >
+                  {missions.length === 0 && (
+                    <option value="">No active missions</option>
+                  )}
+                  {missions.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.title || m.id}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="sc-primary-btn"
+                  onClick={apply}
+                  disabled={!canApply}
+                  style={primaryBtn(canApply)}
+                  title={
+                    canApply
+                      ? "Apply the reviewed objectives to the selected mission"
+                      : "Select a mission first"
+                  }
+                >
+                  APPLY TO MISSION
+                </button>
+              </>
             )}
           </div>
         </div>
       </div>
     </>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Image helpers — capture decode + canvas crop/preprocess (renderer-only)
-// ---------------------------------------------------------------------------
-
-/** Decode a PNG data URL into an <img> (resolves once it has real dimensions). */
-function loadImage(dataUrl: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Could not decode the screenshot."));
-    img.src = dataUrl;
-  });
-}
-
-/**
- * Crop `srcRect` (in source pixels) from `img` and preprocess it for OCR:
- *   1. draw the crop upscaled ~3x (small glyphs -> large, readable),
- *   2. grayscale via perceptual luminance,
- *   3. threshold + invert -> dark text on light (what tesseract reads best).
- * Returns a PNG data URL. The only non-pure step (canvas getImageData) lives
- * here; the per-pixel math is the pure {@link luminance}/{@link thresholdInvert}.
- *
- * Defensive: throws a readable error if a 2D context can't be obtained, which the
- * caller turns into an on-screen message (the app never crashes).
- */
-function preprocessCrop(img: HTMLImageElement, srcRect: Rect): string {
-  const { scale, threshold } = OCR_PREPROCESS_DEFAULTS;
-  const outW = Math.max(1, Math.round(srcRect.width * scale));
-  const outH = Math.max(1, Math.round(srcRect.height * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = outW;
-  canvas.height = outH;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Canvas 2D context unavailable for preprocessing.");
-
-  // Draw the cropped source region scaled up to the full canvas.
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(
-    img,
-    srcRect.x,
-    srcRect.y,
-    srcRect.width,
-    srcRect.height,
-    0,
-    0,
-    outW,
-    outH,
-  );
-
-  // Grayscale + threshold + invert, in place.
-  const image = ctx.getImageData(0, 0, outW, outH);
-  const px = image.data;
-  for (let i = 0; i < px.length; i += 4) {
-    const lum = luminance(px[i], px[i + 1], px[i + 2]);
-    const v = thresholdInvert(lum, threshold);
-    px[i] = v;
-    px[i + 1] = v;
-    px[i + 2] = v;
-    px[i + 3] = 255;
-  }
-  ctx.putImageData(image, 0, 0);
-
-  return canvas.toDataURL("image/png");
 }
 
 // ---------------------------------------------------------------------------
@@ -536,11 +665,14 @@ function CropStep({
   dataUrl,
   sourceWidth,
   sourceHeight,
+  note,
   onConfirm,
 }: {
   dataUrl: string;
   sourceWidth: number;
   sourceHeight: number;
+  /** Optional banner shown above the crop UI (e.g. the zero-objective fallback). */
+  note?: string;
   /** Called with the selection (CSS px) + the displayed image size (CSS px). */
   onConfirm: (sel: Rect, displayWidth: number, displayHeight: number) => void;
 }): React.JSX.Element {
@@ -594,6 +726,22 @@ function CropStep({
 
   return (
     <div style={{ margin: "4px 0 2px" }}>
+      {note && (
+        <div
+          style={{
+            padding: "10px 12px",
+            marginBottom: 10,
+            border: "1px solid rgba(255,107,107,0.4)",
+            background: "rgba(255,107,107,0.06)",
+            color: "var(--danger, #ff6b6b)",
+            fontFamily: "var(--font-display)",
+            fontSize: 11.5,
+            lineHeight: 1.5,
+          }}
+        >
+          {note}
+        </div>
+      )}
       <div
         style={{
           fontFamily: "var(--font-display)",
@@ -603,8 +751,9 @@ function CropStep({
           marginBottom: 8,
         }}
       >
-        Drag a box around the objectives + reward, then “Read selection”.
-        Captured at {sourceWidth}×{sourceHeight}px.
+        Drag a box around the objectives + reward (exclude the right-hand
+        DETAILS column), then “Read selection”. This calibrates the region for
+        next time. Captured at {sourceWidth}×{sourceHeight}px.
       </div>
       <div
         ref={imgWrapRef}

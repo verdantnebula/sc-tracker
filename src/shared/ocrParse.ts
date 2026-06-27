@@ -157,6 +157,18 @@ const COLLECT_PLAIN_RE = new RegExp(
 const TRAILING_SECTION_RE =
   /\s+(?:max\s*box\s*size|box\s*size|container\s*size|reward|payout|contract\s*deadline|contracted|primary\s*objectives|deadline)\b.*$/i;
 
+// Prose lead-ins that the DETAILS column bleeds into a location span on a
+// full-screen capture (Bug 1b). These tokens cannot legitimately be part of a
+// station name, so cutting at the FIRST occurrence bounds the destination to the
+// place name while leaving real multi-word names ("Thundering Express Station",
+// "Green Glade Station") intact. CONSERVATIVE by design — every token here is a
+// sentence connective/verb or a flavor noun the contract DETAILS text uses, not
+// a station-name word. Anchored on a leading space so it only fires mid-span.
+//   " are looking …", " is …", " has been …", " Freight elevator …",
+//   " The refinery …", " We …", " They …"
+const LOCATION_FLAVOR_RE =
+  /\s+(?:are\s+looking|is\s|has\s+been|freight\s+elevator|the\s+refinery|we\s|they\s).*$/i;
+
 /**
  * Trim a destination/location span read after "to"/"from":
  *   - drop an " at … Lagrange point" qualifier (the fuzzy matcher keys off the
@@ -172,8 +184,16 @@ function trimDestination(raw: string): string {
   let s = raw;
   // Cut an " at … Lagrange point" qualifier (case-insensitive).
   s = s.replace(/\s+at\s+.*?lagrange\s+point.*$/i, "");
+  // Cut a trailing " above <body>" qualifier — the station name precedes the
+  // " above " token (e.g. "Everus Harbor above Hurston" -> "Everus Harbor";
+  // "Everus Harbor above j The refinery …" -> "Everus Harbor"). Cut at the FIRST
+  // case-insensitive " above " so any bleed after it (orbital body + DETAILS
+  // prose) is dropped together. A real station name doesn't contain " above ".
+  s = s.replace(/\s+above\s+.*$/i, "");
   // Cut a trailing non-objective section that flattened in after the place name.
   s = s.replace(TRAILING_SECTION_RE, "");
+  // Cut a prose lead-in the DETAILS column bled into the location (Bug 1b).
+  s = s.replace(LOCATION_FLAVOR_RE, "");
   // Cut at the first sentence-ending period (the screen ends a sentence there).
   const dot = s.indexOf(".");
   if (dot >= 0) s = s.slice(0, dot);

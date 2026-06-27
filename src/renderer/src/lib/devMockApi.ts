@@ -23,6 +23,7 @@ import type {
   LogStatus,
   ManualMissionInput,
   MissionPatch,
+  OcrApplyObjective,
   Leg,
   LogPathInfo,
   PickLogFolderResult,
@@ -36,6 +37,7 @@ import type {
   StrippedComponentPatch,
   SalvageReferenceData,
   MiningReferenceData,
+  OcrCaptureRegion,
 } from "@shared/types";
 
 let idSeq = 0;
@@ -406,6 +408,13 @@ function createMockApi(): ApiBridge {
   let overlayEnabled = false;
   // In-memory experimental-OCR flag (Phase F) for standalone-dev of the toggle.
   let ocrEnabled = false;
+  // In-memory Auto OCR Capture flag (Phase 3). The auto path never fires in
+  // standalone dev (no OCR_AUTO_REQUEST is ever emitted here), so this just lets
+  // the gear checkbox round-trip its value.
+  let autoOcrCapture = false;
+  // In-memory calibrated OCR capture region (Phase 2). null = uncalibrated; a
+  // saved region is clamped to [0,1] proportions like the real normalizer.
+  let ocrCaptureRegion: OcrCaptureRegion | null = null;
   // In-memory update-check flag (auto-update) for standalone-dev of the gear
   // toggle. The updater itself never runs in dev (gated on app.isPackaged).
   let updateCheckEnabled = true;
@@ -511,6 +520,60 @@ function createMockApi(): ApiBridge {
       return missions.find((m) => m.id === missionId)!;
     },
 
+    // Semantic MERGE of OCR objectives (mirrors the real store's
+    // applyOcrObjectives). Dev legs carry no manual_override, so completed is the
+    // only protection signal here; the merge fills open legs in place (preserving
+    // ids), inserts unmatched objectives, and prunes leftover open legs.
+    applyOcr: async (missionId: string, objectives: OcrApplyObjective[]) => {
+      missions = missions.map((m) => {
+        if (m.id !== missionId) return m;
+        const consumed = new Set<string>();
+        const next = m.legs.map((l) => ({ ...l }));
+        const isCandidate = (l: Leg): boolean => !l.completed;
+
+        for (const o of objectives) {
+          const sameKind = next.filter(
+            (l) => isCandidate(l) && l.kind === o.kind && !consumed.has(l.id),
+          );
+          const exact = sameKind.find(
+            (l) => l.commodity.toLowerCase() === o.commodity.toLowerCase(),
+          );
+          const pick = exact ?? sameKind[0];
+          if (pick) {
+            consumed.add(pick.id);
+            if (o.scu !== null) pick.scuTotal = o.scu;
+            if (o.location !== null && o.location.length > 0)
+              pick.location = o.location;
+            if (o.commodity.length > 0) pick.commodity = o.commodity;
+          } else {
+            next.push(
+              mkLeg({
+                id: uid(`manual_${o.kind}`),
+                missionId,
+                kind: o.kind,
+                commodity: o.commodity,
+                scuTotal: o.scu ?? 0,
+                location:
+                  o.location && o.location.length > 0 ? o.location : null,
+                completed: false,
+              }),
+            );
+          }
+        }
+        // Prune leftover open legs not matched by any OCR objective. Keep a leg
+        // if it is protected (completed), was matched (consumed), or is a freshly
+        // inserted leg (not present in the original legs).
+        const originalIds = new Set(m.legs.map((l) => l.id));
+        const finalLegs = next.filter(
+          (l) =>
+            !isCandidate(l) || consumed.has(l.id) || !originalIds.has(l.id),
+        );
+        return { ...m, legs: finalLegs };
+      });
+      emit();
+      return missions.find((m) => m.id === missionId)!;
+    },
+
     abandonMission: async (missionId: string) => {
       missions = missions.map((m) =>
         m.id === missionId
@@ -594,6 +657,34 @@ function createMockApi(): ApiBridge {
     setOcrEnabled: async (enabled: boolean): Promise<boolean> => {
       ocrEnabled = enabled === true;
       return ocrEnabled;
+    },
+    getOcrCaptureRegion: async (): Promise<OcrCaptureRegion | null> =>
+      ocrCaptureRegion,
+    setOcrCaptureRegion: async (
+      region: OcrCaptureRegion | null,
+    ): Promise<OcrCaptureRegion | null> => {
+      // Mirror the real normalizer: clamp to [0,1]; drop a degenerate box to null.
+      if (
+        region &&
+        Number.isFinite(region.x) &&
+        Number.isFinite(region.y) &&
+        Number.isFinite(region.w) &&
+        Number.isFinite(region.h)
+      ) {
+        const cl = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+        const w = cl(region.w);
+        const h = cl(region.h);
+        ocrCaptureRegion =
+          w > 0 && h > 0 ? { x: cl(region.x), y: cl(region.y), w, h } : null;
+      } else {
+        ocrCaptureRegion = null;
+      }
+      return ocrCaptureRegion;
+    },
+    getAutoOcrCapture: async (): Promise<boolean> => autoOcrCapture,
+    setAutoOcrCapture: async (enabled: boolean): Promise<boolean> => {
+      autoOcrCapture = enabled === true;
+      return autoOcrCapture;
     },
     captureScreenForOcr: async () => ({
       outcome: "error" as const,
@@ -772,6 +863,9 @@ function createMockApi(): ApiBridge {
     },
     // No updater in standalone dev — never emits, so the banner never shows.
     onUpdateStatus: () => () => {},
+    // No log watcher in standalone dev — the auto-capture signal never fires, so
+    // this subscription is inert (unsubscribe is a no-op).
+    onOcrAutoRequest: () => () => {},
   };
 }
 

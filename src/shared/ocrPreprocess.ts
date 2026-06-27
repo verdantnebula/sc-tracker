@@ -96,6 +96,116 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 /**
+ * A proportional capture region (each field a fraction 0..1 of the screen). Kept
+ * structurally local here so this pure module needs no cross-module value import;
+ * it is the same shape as `OcrCaptureRegion` in @shared/types.
+ */
+export interface ProportionalRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Convert a PROPORTIONAL capture region (fractions 0..1 of the screen) into an
+ * integer pixel {@link Rect} for an image of `srcW`×`srcH`, clamped to the image
+ * bounds. This is how the Phase-2 one-button capture turns a per-user calibrated
+ * region into the actual crop rectangle for the current screenshot, at whatever
+ * resolution it was captured.
+ *
+ * PURE + total + defensive:
+ *  - non-finite / non-positive source dimensions -> a zero rect;
+ *  - each proportion is clamped to [0,1] first, so a slightly-out-of-range region
+ *    (e.g. a calibration that ran to the very edge) never reads out of bounds;
+ *  - the right/bottom edges are clamped to the image, then the rect is rounded to
+ *    whole pixels. A degenerate (zero-area) result yields a zero rect, which the
+ *    caller treats as "nothing to crop".
+ *
+ * @param region proportional region; fields are fractions 0..1 of the screen.
+ * @param srcW   the screenshot's true pixel width.
+ * @param srcH   the screenshot's true pixel height.
+ */
+export function cropRectFromRegion(
+  region: ProportionalRegion,
+  srcW: number,
+  srcH: number,
+): Rect {
+  const ZERO: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  if (
+    !Number.isFinite(srcW) ||
+    !Number.isFinite(srcH) ||
+    srcW <= 0 ||
+    srcH <= 0 ||
+    region === null ||
+    typeof region !== "object" ||
+    !Number.isFinite(region.x) ||
+    !Number.isFinite(region.y) ||
+    !Number.isFinite(region.w) ||
+    !Number.isFinite(region.h)
+  ) {
+    return ZERO;
+  }
+
+  // Clamp the proportional box to [0,1], then derive its right/bottom fractions.
+  const fx = clamp(region.x, 0, 1);
+  const fy = clamp(region.y, 0, 1);
+  const fRight = clamp(region.x + region.w, 0, 1);
+  const fBottom = clamp(region.y + region.h, 0, 1);
+
+  // Proportions -> pixels, clamped to the image, then rounded.
+  const left = clamp(fx * srcW, 0, srcW);
+  const top = clamp(fy * srcH, 0, srcH);
+  const right = clamp(fRight * srcW, 0, srcW);
+  const bottom = clamp(fBottom * srcH, 0, srcH);
+
+  const x = Math.round(left);
+  const y = Math.round(top);
+  const width = Math.round(right - left);
+  const height = Math.round(bottom - top);
+
+  if (width <= 0 || height <= 0) return ZERO;
+  return { x, y, width, height };
+}
+
+/**
+ * Pick an upscale factor that brings a crop of `cropH` px tall to ~`targetHeightPx`
+ * px tall, clamped to [1, maxScale]. Replaces the old FIXED 3× so the OCR input
+ * size is consistent across resolutions: a tall 1440p crop is upscaled less, a
+ * short 1080p crop more, both landing near a size tesseract reads well.
+ *
+ * PURE + total + defensive:
+ *  - a non-finite / non-positive crop height, or a non-positive target, yields the
+ *    neutral factor 1 (the crop is used as-is rather than throwing);
+ *  - the raw ratio is clamped to [1, maxScale] so we never DOWNSCALE (which would
+ *    lose glyph detail) and never blow memory on a tiny crop.
+ *
+ * @param _cropW          crop width in px (accepted for symmetry / future use).
+ * @param cropH           crop height in px.
+ * @param targetHeightPx  desired output height in px (default from defaults).
+ * @param maxScale        upper bound on the factor (default from defaults).
+ */
+export function normalizeScale(
+  _cropW: number,
+  cropH: number,
+  targetHeightPx: number = OCR_PREPROCESS_DEFAULTS.targetHeightPx,
+  maxScale: number = OCR_PREPROCESS_DEFAULTS.maxScale,
+): number {
+  if (
+    !Number.isFinite(cropH) ||
+    cropH <= 0 ||
+    !Number.isFinite(targetHeightPx) ||
+    targetHeightPx <= 0 ||
+    !Number.isFinite(maxScale) ||
+    maxScale < 1
+  ) {
+    return 1;
+  }
+  const raw = targetHeightPx / cropH;
+  return clamp(raw, 1, maxScale);
+}
+
+/**
  * Perceptual luminance of an 8-bit RGB pixel, 0..255 (Rec. 601 weights). Used to
  * collapse a color crop to grayscale before thresholding. PURE.
  */
@@ -121,11 +231,19 @@ export function thresholdInvert(lum: number, threshold = 140): number {
 /**
  * Default preprocessing parameters for the crop. Centralized so the component and
  * any future tuning/tests share one source of truth.
- *  - `scale`     : upscale factor applied to the crop before OCR (~3–4× makes the
- *                  small contract glyphs large enough for tesseract).
- *  - `threshold` : luminance cutoff for {@link thresholdInvert}.
+ *  - `scale`          : legacy FIXED upscale factor (kept for reference; the
+ *                       Phase-2 flow now derives the factor via {@link normalizeScale}
+ *                       so OCR input height is consistent across resolutions).
+ *  - `threshold`      : luminance cutoff for {@link thresholdInvert}.
+ *  - `targetHeightPx` : the height (px) {@link normalizeScale} aims the crop at —
+ *                       ~1200px makes the small contract glyphs large enough for
+ *                       tesseract while staying bounded across resolutions.
+ *  - `maxScale`       : upper bound on the derived upscale factor (avoids blowing
+ *                       memory / over-upscaling a very short crop).
  */
 export const OCR_PREPROCESS_DEFAULTS = {
   scale: 3,
   threshold: 140,
+  targetHeightPx: 1200,
+  maxScale: 4,
 } as const;
