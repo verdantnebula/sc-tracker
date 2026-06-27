@@ -26,7 +26,9 @@ import type { ReferenceData, OcrCaptureRegion } from "@shared/types";
 import { fuzzyMatch } from "@shared/ocrMatch";
 import {
   cropRectFromRegion,
+  fullFrameRect,
   normalizeScale,
+  fullFrameScale,
   luminance,
   thresholdInvert,
   OCR_PREPROCESS_DEFAULTS,
@@ -59,18 +61,25 @@ export interface OcrPipelineResult {
 }
 
 /**
- * Run the calibrated OCR pipeline end-to-end and return the matched objectives.
+ * Run the OCR pipeline end-to-end and return the matched objectives.
+ *
+ * REGION IS OPTIONAL. When `region` is null/undefined the pass OCRs the FULL
+ * captured frame (no crop); when a region is set it crops to it exactly as the
+ * calibrated path always did. Calibration is now an accuracy booster, not a
+ * prerequisite.
  *
  * Throws (for the caller to handle) on: a failed/empty screen capture, an
- * undecodable screenshot, a degenerate crop (region maps to zero pixels), or an
- * OCR error. Returns an EMPTY `objectives` array when the pass simply parsed
- * nothing — the auto path treats that as "discard", the dialog as "offer re-draw".
+ * undecodable screenshot, a degenerate rect (a SET region maps to zero pixels, or
+ * a zero-size frame), or an OCR error. Returns an EMPTY `objectives` array when
+ * the pass simply parsed nothing — the auto path treats that as "discard", the
+ * dialog as "offer re-draw".
  *
- * @param region    the user's calibrated proportional capture region.
+ * @param region    the user's calibrated proportional capture region, or null to
+ *                  OCR the whole frame.
  * @param reference bundled reference (fuzzy-match candidates).
  */
 export async function runOcrPipeline(
-  region: OcrCaptureRegion,
+  region: OcrCaptureRegion | null,
   reference: ReferenceData,
 ): Promise<OcrPipelineResult> {
   // 1. CAPTURE the full screen (main grabs the primary display as a PNG).
@@ -82,18 +91,23 @@ export async function runOcrPipeline(
   // Decode into an offscreen <img> so the crop canvas has a pixel source.
   const img = await loadImage(cap.dataUrl);
 
-  // 2. CROP to the calibrated region (proportions -> pixels, clamped to bounds).
-  const srcRect = cropRectFromRegion(
-    region,
-    img.naturalWidth,
-    img.naturalHeight,
-  );
+  // 2. Determine the OCR rect. A SET region crops (proportions -> pixels, clamped
+  // to bounds); a NULL region uses the whole frame (full-screen OCR by default).
+  // preprocessCrop reads the right scale per case (full-frame is capped at 1×).
+  const srcRect = region
+    ? cropRectFromRegion(region, img.naturalWidth, img.naturalHeight)
+    : fullFrameRect(img.naturalWidth, img.naturalHeight);
   if (srcRect.width <= 0 || srcRect.height <= 0) {
-    throw new Error("The saved capture region was empty.");
+    throw new Error(
+      region
+        ? "The saved capture region was empty."
+        : "The captured screen was empty.",
+    );
   }
 
   // 3. PREPROCESS + 4. RECOGNIZE + 5. PARSE (recognizeContract does 4+5).
-  const processed = preprocessCrop(img, srcRect);
+  // `isFullFrame` tells preprocessCrop to cap the scale at 1× (memory guard).
+  const processed = preprocessCrop(img, srcRect, region == null);
   const result = await recognizeContract(processed, "6");
 
   // 6. FUZZY-MATCH each objective vs the bundled reference.
@@ -153,16 +167,31 @@ export function loadImage(dataUrl: string): Promise<HTMLImageElement> {
 
 /**
  * Crop `srcRect` (source pixels) from `img` and preprocess it for OCR:
- *   1. draw the crop upscaled by a RESOLUTION-NORMALIZED factor (normalizeScale),
+ *   1. draw the crop scaled by the appropriate factor,
  *   2. grayscale via perceptual luminance,
  *   3. threshold + invert -> dark text on light (what tesseract reads best).
  * Returns a PNG data URL. The only non-pure step (canvas getImageData) lives
- * here; the geometry/per-pixel math is the pure normalizeScale/luminance/
- * thresholdInvert. Throws a readable error if a 2D context can't be obtained.
+ * here; the geometry/per-pixel math is the pure normalizeScale/fullFrameScale/
+ * luminance/thresholdInvert. Throws a readable error if a 2D context can't be
+ * obtained.
+ *
+ * SCALE DECISION (memory guard):
+ *  - CROPPED region (`isFullFrame` false): a small crop is upscaled toward the
+ *    target height via normalizeScale (3–4×) so the glyphs are legible.
+ *  - FULL FRAME (`isFullFrame` true): capped at fullFrameScale() === 1×, so a 4K
+ *    frame stays 4K instead of exploding to ~11k×6k. Never downscaled below 1×.
+ *
+ * @param isFullFrame true when `srcRect` is the WHOLE captured frame (no region).
  */
-export function preprocessCrop(img: HTMLImageElement, srcRect: Rect): string {
+export function preprocessCrop(
+  img: HTMLImageElement,
+  srcRect: Rect,
+  isFullFrame = false,
+): string {
   const { threshold } = OCR_PREPROCESS_DEFAULTS;
-  const scale = normalizeScale(srcRect.width, srcRect.height);
+  const scale = isFullFrame
+    ? fullFrameScale(srcRect.width, srcRect.height)
+    : normalizeScale(srcRect.width, srcRect.height);
   const outW = Math.max(1, Math.round(srcRect.width * scale));
   const outH = Math.max(1, Math.round(srcRect.height * scale));
 

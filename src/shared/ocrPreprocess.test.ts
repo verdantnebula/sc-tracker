@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   mapSelectionToSource,
   cropRectFromRegion,
+  fullFrameRect,
   normalizeScale,
+  fullFrameScale,
   luminance,
   thresholdInvert,
   OCR_PREPROCESS_DEFAULTS,
@@ -164,6 +166,75 @@ describe("cropRectFromRegion", () => {
         1000,
       ),
     ).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+});
+
+describe("fullFrameRect (region OPTIONAL -> whole-frame OCR)", () => {
+  it("returns the whole frame as the rect for a 4K capture", () => {
+    expect(fullFrameRect(3840, 2160)).toEqual({
+      x: 0,
+      y: 0,
+      width: 3840,
+      height: 2160,
+    });
+  });
+
+  it("returns the whole frame for a small 720p capture", () => {
+    expect(fullFrameRect(1280, 720)).toEqual({
+      x: 0,
+      y: 0,
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it("rounds fractional source dimensions to whole pixels", () => {
+    expect(fullFrameRect(1280.4, 719.6)).toEqual({
+      x: 0,
+      y: 0,
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it("returns a zero rect for invalid / non-positive source dimensions", () => {
+    const ZERO = { x: 0, y: 0, width: 0, height: 0 };
+    expect(fullFrameRect(0, 1080)).toEqual(ZERO);
+    expect(fullFrameRect(1920, -1)).toEqual(ZERO);
+    expect(fullFrameRect(NaN, 1080)).toEqual(ZERO);
+  });
+
+  it("equals a 0..1 cropRectFromRegion (full-frame is the trivial whole-screen crop)", () => {
+    const whole: ProportionalRegion = { x: 0, y: 0, w: 1, h: 1 };
+    expect(fullFrameRect(1920, 1080)).toEqual(
+      cropRectFromRegion(whole, 1920, 1080),
+    );
+  });
+});
+
+describe("fullFrameScale (full-frame memory guard)", () => {
+  it("never upscales a large full frame (4K stays 1x, not 3-4x)", () => {
+    // Critical guard: a 3840x2160 frame at 3-4x would be ~11k-15k px wide and
+    // blow up memory. The full-frame factor is capped at 1x.
+    expect(fullFrameScale(3840, 2160)).toBe(1);
+  });
+
+  it("does not upscale a small full frame the way a crop would", () => {
+    // A 720px-tall CROP would upscale toward 1200px (~1.67x) via normalizeScale;
+    // a 720px-tall FULL FRAME must stay 1x.
+    expect(fullFrameScale(1280, 720)).toBe(1);
+    expect(normalizeScale(1280, 720)).toBeGreaterThan(1); // crop path differs
+  });
+
+  it("is 1x regardless of (or without) frame dimensions", () => {
+    expect(fullFrameScale()).toBe(1);
+    expect(fullFrameScale(100, 50)).toBe(1);
+  });
+
+  it("contrast: a small cropped region still upscales toward the target height", () => {
+    // The cropped-region path is unchanged — a small crop upscales for legibility.
+    expect(normalizeScale(800, 300)).toBe(4); // 1200/300 = 4, within maxScale
+    expect(normalizeScale(800, 600)).toBeCloseTo(2, 5); // 1200/600 = 2x
   });
 });
 

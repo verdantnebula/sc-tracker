@@ -88,12 +88,12 @@ export interface AppSettings {
   ocrCaptureRegion: OcrCaptureRegion | null;
   /**
    * EXPERIMENTAL (Phase 3): when true, accepting a CARGO contract auto-runs the
-   * OCR capture pipeline against the calibrated region and TENTATIVELY fills that
-   * mission's details (with a visible "review" cue). Strictly opt-in and gated on
-   * ocrEnabled — it is meaningless without the OCR fallback, and requires a
-   * calibrated ocrCaptureRegion (no region -> a one-time "calibrate first" notice,
-   * no capture). Default false. Persisted so the choice survives a restart. The
-   * apply still merges idempotently via applyOcr; nothing is appended blindly.
+   * OCR capture pipeline and surfaces a review with that mission's details pre-
+   * filled (with a visible "review" cue). Strictly opt-in and gated on ocrEnabled
+   * — it is meaningless without the OCR fallback. A calibrated ocrCaptureRegion is
+   * OPTIONAL: with no region the pipeline OCRs the full frame (calibration only
+   * improves accuracy). Default false. Persisted so the choice survives a restart.
+   * The apply still merges idempotently via applyOcr; nothing is appended blindly.
    */
   autoOcrCapture: boolean;
   /**

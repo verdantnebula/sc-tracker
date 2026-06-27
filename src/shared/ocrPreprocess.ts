@@ -174,6 +174,12 @@ export function cropRectFromRegion(
  * size is consistent across resolutions: a tall 1440p crop is upscaled less, a
  * short 1080p crop more, both landing near a size tesseract reads well.
  *
+ * This is the CROPPED-REGION path's scale: a small calibrated crop (just the
+ * "Deliver … SCU …" lines) is upscaled for glyph legibility. The FULL-FRAME path
+ * (no calibrated region) must NOT use this — a whole busy frame should never be
+ * upscaled (it explodes memory and adds no legible detail); use
+ * {@link fullFrameScale} there instead.
+ *
  * PURE + total + defensive:
  *  - a non-finite / non-positive crop height, or a non-positive target, yields the
  *    neutral factor 1 (the crop is used as-is rather than throwing);
@@ -203,6 +209,56 @@ export function normalizeScale(
   }
   const raw = targetHeightPx / cropH;
   return clamp(raw, 1, maxScale);
+}
+
+/**
+ * The output rect for a FULL-FRAME OCR pass (no calibrated capture region): the
+ * whole captured image, integer-pixel, clamped to a positive size. Used when
+ * `ocrCaptureRegion` is null/undefined so OCR runs on the entire screen instead
+ * of a crop. PURE + total + defensive: non-finite / non-positive source dims
+ * yield a zero rect (the caller treats that as "nothing to OCR").
+ *
+ * @param srcW the captured frame's true pixel width.
+ * @param srcH the captured frame's true pixel height.
+ */
+export function fullFrameRect(srcW: number, srcH: number): Rect {
+  const ZERO: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  if (
+    !Number.isFinite(srcW) ||
+    !Number.isFinite(srcH) ||
+    srcW <= 0 ||
+    srcH <= 0
+  ) {
+    return ZERO;
+  }
+  return { x: 0, y: 0, width: Math.round(srcW), height: Math.round(srcH) };
+}
+
+/**
+ * The output scale for a FULL-FRAME OCR pass — the critical memory guard.
+ *
+ * A full-resolution frame must NEVER be blindly upscaled the way a small cropped
+ * region is: a 4K frame (3840×2160) at the cropped-region's 3–4× would become an
+ * ~11k×6k / ~15k×8k canvas and blow up memory (and add no legible detail, since
+ * the source pixels are already there). So the full-frame factor is capped at 1×
+ * (never upscaled). We also never DOWNSCALE below 1× — losing pixels only hurts
+ * OCR — so the factor is exactly 1 for any valid full frame.
+ *
+ * Numbers, by design:
+ *  - 3840×2160 full frame  -> factor 1   (stays 3840×2160; ~33 MB RGBA, fine)
+ *  - 1280×720  full frame  -> factor 1   (stays 1280×720; NOT upscaled to ~1200px
+ *                                          tall like a crop would be)
+ *  - a small CROPPED region (e.g. 800×300) still goes through {@link normalizeScale}
+ *    in the pipeline and upscales toward the target height (3–4×) for legibility.
+ *
+ * PURE + total. `_srcW`/`_srcH` are accepted for symmetry and to document that the
+ * decision is intentionally INDEPENDENT of the frame size (always 1×).
+ *
+ * @param _srcW the captured frame's true pixel width (unused; documents intent).
+ * @param _srcH the captured frame's true pixel height (unused; documents intent).
+ */
+export function fullFrameScale(_srcW?: number, _srcH?: number): number {
+  return 1;
 }
 
 /**

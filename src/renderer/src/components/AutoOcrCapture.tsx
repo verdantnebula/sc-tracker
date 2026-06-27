@@ -4,10 +4,11 @@
 // A headless host mounted in CargoApp (active in cargo mode) that listens for
 // the OCR_AUTO_REQUEST push main broadcasts when a cargo contract is accepted
 // while the feature is on. On a request it:
-//   1. reads the calibrated capture region — if NULL (uncalibrated), shows a
-//      one-time non-blocking notice and STOPS (auto-capture needs a region);
-//   2. else runs the shared runOcrPipeline() headless -> objectives[]; if zero
-//      objectives, silently discards (defensive — never surface garbage);
+//   1. reads the OPTIONAL calibrated capture region (null is fine — calibration
+//      only boosts accuracy, it is not required);
+//   2. runs the shared runOcrPipeline() headless -> objectives[] (full-frame OCR
+//      when no region is set); if zero objectives, silently discards (defensive —
+//      never surface garbage);
 //   3. enqueues a PendingApply and lets the pure ocrAutoCorrelate reducer decide
 //      WHEN the capture is ready to SURFACE and WHETHER it can confidently pre-
 //      target a mission (handling the leg-arrival race):
@@ -86,10 +87,6 @@ export function AutoOcrCapture({
   const onAutoReviewRef = useRef(onAutoReview);
   onAutoReviewRef.current = onAutoReview;
 
-  // One-time "calibrate first" notice (shown once per session when an auto
-  // request arrives with no calibrated region). Dismissible.
-  const [showCalibrateNotice, setShowCalibrateNotice] = useState(false);
-  const calibrateNoticeShownRef = useRef(false);
   // True when a capture is ready to review but a dialog is already open, so we
   // show a small "waiting" badge until the open dialog closes.
   const [deferred, setDeferred] = useState(false);
@@ -169,23 +166,20 @@ export function AutoOcrCapture({
       ts: number;
     }): Promise<void> => {
       try {
-        // 1. Region gate — auto-capture needs a calibrated region.
-        let region = null;
+        // 1. Read the OPTIONAL calibrated region. null is fine now — the pipeline
+        // OCRs the full frame when there's no region (calibration only boosts
+        // accuracy, it is no longer a prerequisite). No "calibrate first" gate.
+        let region: Awaited<
+          ReturnType<typeof window.api.getOcrCaptureRegion>
+        > | null = null;
         try {
           region = await window.api.getOcrCaptureRegion();
         } catch {
           region = null;
         }
         if (cancelled) return;
-        if (!region) {
-          if (!calibrateNoticeShownRef.current) {
-            calibrateNoticeShownRef.current = true;
-            setShowCalibrateNotice(true);
-          }
-          return;
-        }
 
-        // 2. Run the shared pipeline headless.
+        // 2. Run the shared pipeline headless (full-frame when region is null).
         const result = await runOcrPipeline(region, referenceRef.current);
         if (cancelled) return;
         const objectives = toApplyObjectives(result.objectives);
@@ -258,11 +252,10 @@ export function AutoOcrCapture({
     pendingRef.current = [];
     resultsRef.current.clear();
     setDeferred(false);
-    setShowCalibrateNotice(false);
   }, [enabled]);
 
   if (!enabled) return null;
-  if (!showCalibrateNotice && !deferred) return null;
+  if (!deferred) return null;
 
   return (
     <div
@@ -277,28 +270,6 @@ export function AutoOcrCapture({
         maxWidth: 380,
       }}
     >
-      {showCalibrateNotice && (
-        <div
-          role="status"
-          onClick={() => setShowCalibrateNotice(false)}
-          style={{
-            padding: "12px 14px",
-            background: "rgba(28,22,10,0.98)",
-            border: "1px solid rgba(224,160,52,0.5)",
-            color: "var(--warning, #e0a034)",
-            fontFamily: "var(--font-display)",
-            fontSize: 12,
-            lineHeight: 1.5,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-            cursor: "pointer",
-          }}
-        >
-          Auto-capture is on, but the OCR capture region isn’t calibrated yet.
-          Calibrate it first (open Contract Capture once), then accepting a
-          cargo haul will auto-capture its details for review. (Click to
-          dismiss.)
-        </div>
-      )}
       {deferred && (
         <div
           role="status"

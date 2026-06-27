@@ -448,8 +448,8 @@ function LogFolderPanel({
             >
               When you accept a cargo haul, this auto-OCRs the contract screen
               and tentatively fills the mission’s legs (you’ll see a “review”
-              cue). Requires a calibrated capture region — open Contract Capture
-              once to set it.
+              cue). Works full-screen out of the box; calibrating a capture
+              region in Contract Capture is optional and improves accuracy.
             </p>
           </>
         )}

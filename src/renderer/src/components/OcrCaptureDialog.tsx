@@ -3,34 +3,35 @@
 // ----------------------------------------------------------------------------
 // Opt-in fallback for when the game suppressed the New Objective log line.
 //
-// PHASE 2 — ONE-BUTTON CAPTURE via a per-user CALIBRATED region:
-//   The full-screen grab stays (we do NOT target the SC window). The crop's job
-//   is to EXCLUDE the right-hand DETAILS column so flavor text can't bleed into
-//   parsed locations. Screen sizes/resolutions differ, so the region is the
-//   USER's own, calibrated once and stored as PROPORTIONS (fractions 0..1).
+// CAPTURE via an OPTIONAL per-user CALIBRATED region:
+//   The full-screen grab stays (we do NOT target the SC window). A region is
+//   OPTIONAL — by default we OCR the whole frame; calibrating a region only
+//   improves accuracy by EXCLUDING the right-hand DETAILS column so flavor text
+//   can't bleed into parsed locations. Screen sizes/resolutions differ, so the
+//   region is the USER's own, stored as PROPORTIONS (fractions 0..1).
 //
-//   CALIBRATED (region set) — the common path, no drawing:
+//   UNCALIBRATED (region null = default) — full-screen, no drawing required:
+//     capture FULL screen -> fullFrameRect (whole image) -> PREPROCESS in <canvas>
+//       at 1× (fullFrameScale — NOT upscaled, memory guard) -> OCR -> parse ->
+//       fuzzy-match -> REVIEW -> APPLY.
+//
+//   CALIBRATED (region set) — reads just the region, no drawing:
 //     capture FULL screen -> cropRectFromRegion (proportions -> px, clamped)
 //       -> normalizeScale (upscale the crop to ~a consistent height across
 //          resolutions) -> PREPROCESS in <canvas> (grayscale, threshold+invert)
 //       -> OCR (tesseract.js, MAIN) -> parse -> fuzzy-match -> REVIEW -> APPLY.
 //
-//   UNCALIBRATED (region null = first run) — calibrate-as-you-go:
-//     capture -> user drags a box on the scaled preview -> we SAVE the box as
-//     proportions (setOcrCaptureRegion) AND proceed with that capture. So the
-//     first capture calibrates; every capture after is one-button.
-//
-//   CONTROLS: "Re-draw capture region" (recalibrate) and "Reset region" (clear
-//   to null so the next capture re-calibrates).
+//   CONTROLS (optional accuracy tool): "Calibrate a region (optional)" (draw a
+//   box) and "Reset region" (clear to null so the next capture is full-frame).
 //
 //   FALLBACK (never a dead end): if a CALIBRATED capture parses ZERO objectives,
 //   we surface a clear message and offer to re-draw the region (manual crop) for
 //   this capture — the screenshot is still in hand, so no recapture is needed.
 //
-// WHY CROP + PREPROCESS: OCR'ing the full busy frame returned gibberish — the
-// small stylized mobiGlas text was lost in the scene. Cropping to just the
-// contract text and feeding tesseract a large, high-contrast binarized image is
-// the difference between noise and a usable read.
+// WHY CALIBRATE (OPTIONAL): OCR'ing the full busy frame can pick up scene noise
+// and let DETAILS-column flavor text bleed into parsed locations. Cropping to just
+// the contract text and feeding tesseract a high-contrast binarized image sharpens
+// the read — so a region is offered as an accuracy booster, not a requirement.
 //
 // HARD RULES (defensive by construction):
 //   - NEVER auto-applies. Apply is a deliberate button after review.
@@ -49,6 +50,7 @@ import type { Mission, ReferenceData, OcrCaptureRegion } from "@shared/types";
 import {
   mapSelectionToSource,
   cropRectFromRegion,
+  fullFrameRect,
   type Rect,
 } from "@shared/ocrPreprocess";
 import { recognizeContract } from "../lib/ocrRunner";
@@ -185,16 +187,21 @@ export function OcrCaptureDialog({
   /**
    * STEP 1: grab the full screen at native resolution. We decode the PNG into an
    * offscreen <img> so the crop canvas has a pixel source, and read its true
-   * dimensions. Then we BRANCH on the active region:
+   * dimensions. Then we BRANCH:
+   *   - `forceDraw` true: always show the draw-a-box step (the explicit
+   *     "Re-draw capture region" / Reset controls — the OPTIONAL calibration tool).
    *   - CALIBRATED (region set): auto-crop to the region + recognize (one-button).
-   *   - UNCALIBRATED (region null): show the draw-a-box crop step.
+   *   - UNCALIBRATED (region null): OCR the FULL frame. Region is OPTIONAL now —
+   *     the default capture works full-screen without forcing the user to draw a
+   *     box; calibration only improves accuracy.
    *
    * `activeRegion` is passed explicitly (defaulting to current state) so the
-   * mount flow can use the freshly-read region before a re-render, and the
-   * Recapture button can force a re-draw by passing null.
+   * mount flow can use the freshly-read region before a re-render. `forceDraw`
+   * lets the calibration buttons open the draw UI on demand.
    */
   async function runCapture(
     activeRegion: OcrCaptureRegion | null = region,
+    forceDraw = false,
   ): Promise<void> {
     setPhase({ kind: "capturing" });
     try {
@@ -209,18 +216,23 @@ export function OcrCaptureDialog({
       const img = await loadImage(cap.dataUrl);
       sourceImgRef.current = img;
 
+      if (forceDraw) {
+        // Explicit calibrate/re-draw: show the draw-a-box step regardless of region.
+        setPhase({
+          kind: "cropping",
+          dataUrl: cap.dataUrl,
+          sourceWidth: img.naturalWidth,
+          sourceHeight: img.naturalHeight,
+        });
+        return;
+      }
       if (activeRegion) {
         // Calibrated: auto-crop to the saved proportional region and recognize.
         await recognizeRegion(img, activeRegion);
         return;
       }
-      // Uncalibrated: show the draw-a-box step (the draw will calibrate + run).
-      setPhase({
-        kind: "cropping",
-        dataUrl: cap.dataUrl,
-        sourceWidth: img.naturalWidth,
-        sourceHeight: img.naturalHeight,
-      });
+      // Uncalibrated: OCR the whole frame (region is optional). No draw forced.
+      await recognizeFullFrame(img);
     } catch (err) {
       setPhase({
         kind: "error",
@@ -367,20 +379,74 @@ export function OcrCaptureDialog({
   }
 
   /**
-   * Crop + preprocess `srcRect` from `img` and OCR it. Shared by the calibrated
-   * and manual-draw paths so both use the SAME preprocessing (cropRectFromRegion
-   * /mapSelectionToSource feed the same canvas pipeline + normalizeScale upscale).
+   * Crop + preprocess `srcRect` from `img` and OCR it. Shared by the calibrated,
+   * manual-draw, and full-frame paths so all use the SAME preprocessing pipeline.
+   * `isFullFrame` caps the scale at 1× for a whole-frame rect (memory guard); the
+   * cropped paths leave it false so the crop upscales toward the target height.
    */
   async function runOcrOnRect(
     img: HTMLImageElement,
     srcRect: Rect,
     psm: "6" | "11",
+    isFullFrame = false,
   ): ReturnType<typeof recognizeContract> {
-    const processed = preprocessCrop(img, srcRect);
+    const processed = preprocessCrop(img, srcRect, isFullFrame);
     return recognizeContract(processed, psm);
   }
 
-  /** Reset the calibration to null (next capture re-draws). Best-effort persist. */
+  /**
+   * FULL-FRAME path (no calibrated region): OCR the entire captured frame. This is
+   * the default when the user hasn't drawn a region — calibration is optional and
+   * only improves accuracy. If zero objectives parse we don't dead-end; we surface
+   * the draw UI so the user can OPT IN to a region for this (and future) captures.
+   */
+  async function recognizeFullFrame(img: HTMLImageElement): Promise<void> {
+    const srcRect = fullFrameRect(img.naturalWidth, img.naturalHeight);
+    if (srcRect.width <= 0 || srcRect.height <= 0) {
+      setPhase({ kind: "error", message: "The captured screen was empty." });
+      return;
+    }
+    setPhase({ kind: "recognizing" });
+    try {
+      const result = await runOcrOnRect(img, srcRect, "6", true);
+      const reviewed = reviewObjectivesFrom(
+        result.contract.objectives,
+        reference,
+      );
+      if (reviewed.length === 0) {
+        // Not a dead end: offer the OPTIONAL region tool to sharpen this read.
+        setPhase({
+          kind: "cropping",
+          dataUrl: img.src,
+          sourceWidth: img.naturalWidth,
+          sourceHeight: img.naturalHeight,
+          note:
+            "No objectives were recognized from the full screen. For better " +
+            "accuracy you can draw a box around the “Deliver … SCU …” lines " +
+            "(optional — this also calibrates the region for next time).",
+        });
+        return;
+      }
+      setObjectives(reviewed);
+      setReward(result.contract.reward);
+      setPhase({
+        kind: "review",
+        confidence: result.confidence,
+        rawText: result.rawText,
+      });
+    } catch (err) {
+      setPhase({
+        kind: "error",
+        message:
+          "OCR failed. " + String(err instanceof Error ? err.message : err),
+      });
+    }
+  }
+
+  /**
+   * Reset the calibration to null. The next capture falls back to the new DEFAULT
+   * (full-frame OCR), not the draw UI — region is optional. Best-effort persist.
+   */
   async function resetRegion(): Promise<void> {
     try {
       await window.api.setOcrCaptureRegion(null);
@@ -388,7 +454,7 @@ export function OcrCaptureDialog({
       /* ignore — clearing in-memory below still un-calibrates this session */
     }
     setRegion(null);
-    // Recapture immediately into the draw UI so the user sees the effect.
+    // Recapture immediately so the user sees the (now full-frame) default effect.
     await runCapture(null);
   }
 
@@ -535,10 +601,11 @@ export function OcrCaptureDialog({
           Reads your mobiGlas contract screen to recover details the game didn’t
           write to the log.{" "}
           {region
-            ? "Your capture region is calibrated, so capture is one-button — " +
+            ? "Your capture region is calibrated, so it reads just that area — " +
               "use the controls below to re-draw or reset it."
-            : "The first time, drag a box around the “Deliver … SCU …” " +
-              "objectives (this calibrates the capture region for next time)."}{" "}
+            : "It reads the full screen by default. For better accuracy you can " +
+              "optionally calibrate a capture region around the “Deliver … SCU …” " +
+              "objectives using the controls below."}{" "}
           OCR can misread the stylized font — check every field before applying.
           Nothing is changed until you press Apply.
         </p>
@@ -624,12 +691,12 @@ export function OcrCaptureDialog({
             {regionLoaded && (
               <button
                 className="sc-ghost-btn"
-                onClick={() => void runCapture(null)}
+                onClick={() => void runCapture(region, true)}
                 disabled={busy}
                 style={ghostBtn(!busy)}
-                title="Capture again and draw a new region (re-calibrate)"
+                title="Capture again and draw a region to improve accuracy (optional)"
               >
-                ✎ Re-draw capture region
+                ✎ Calibrate a region (optional)
               </button>
             )}
             {/* Reset: clear the saved region to null so the NEXT capture
