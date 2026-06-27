@@ -766,10 +766,21 @@ class SqliteMissionStore implements MissionStore {
     if (inserted.changes === 0) return; // already recorded
 
     // Candidate hauling missions ended within the window BEFORE this award.
+    //
+    // terminal_source='game' gate: a real "Awarded N aUEC" event only ever
+    // corresponds to a GAME-completed mission (the game writes <EndMission>
+    // before the award line, so onMissionEnded has already stamped
+    // terminal_source='game' when this runs — see onMissionEnded). A mission
+    // completed MANUALLY (terminal_source='manual') or by leg-derived roll-up
+    // (terminal_source NULL) was not turned in to the game, so a real award must
+    // never be pinned to it even if its completed_at happens to fall in the
+    // window. Pre-v7 terminal rows were backfilled to 'game' (schema.ts), so
+    // historical game completions remain attributable.
     const candidates = this.db
       .prepare(
         `SELECT id FROM missions
           WHERE status = 'complete'
+            AND terminal_source = 'game'
             AND completed_at IS NOT NULL
             AND completed_at <= @ts
             AND completed_at >= @lo

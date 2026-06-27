@@ -601,6 +601,100 @@ describe("payout attribution", () => {
     expect(store.totals().creditsEarned).toBe(100000);
     expect(store.totals().finesTotal).toBe(5000);
   });
+
+  // --- terminal_source gating (a real game award only ever maps to a GAME
+  //     completion) --------------------------------------------------------
+  // Missions can now reach 'complete' three ways: game EndMission
+  // (terminal_source='game'), a manual "Mark complete" (terminal_source='manual'),
+  // and leg-derived roll-up (terminal_source NULL). A real "Awarded N aUEC" event
+  // only ever corresponds to a GAME completion, so the payout candidate set must
+  // be restricted to terminal_source='game'; otherwise a real award landing in
+  // the window could be mis-attributed to a manual / leg-derived completion.
+
+  it("GAME-completed hauling mission in window STILL gets the award (regression guard)", () => {
+    // terminal_source='game' is set by onMissionEnded; onMissionEnded runs before
+    // onPayout (game writes EndMission before "Awarded N aUEC"), so the marker is
+    // present when the award lands. This is the legitimate attribution path.
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(
+      marker(
+        "m1",
+        "d0",
+        "dropoff",
+        "HaulCargo_AToB_Ice_Ice_Stanton1_SupplyGrade",
+      ),
+    );
+    store.applyEvent(ended("m1", "complete", 5000));
+    store.applyEvent(award(142500, 5170)); // 170ms after, inside 2s window
+    const m = store.getMission("m1")!;
+    expect(m.payout).toBe(142500);
+    expect(m.payoutConfidence).toBe("confirmed");
+    expect(store.totals().creditsEarned).toBe(142500);
+  });
+
+  it("MANUALLY-completed hauling mission in window does NOT absorb the award", () => {
+    // A user "Mark complete" sets terminal_source='manual'. A real game award must
+    // not be pinned to it even if completed_at falls inside the window.
+    // completed_at is stamped Date.now() by updateMission, so use a Date.now()-based
+    // award ts + a window wide enough to cover it. This proves the gate, not luck.
+    const local = openMissionStore({
+      dbPath: ":memory:",
+      payoutWindowMs: 60000,
+    });
+    try {
+      local.applyEvent(accepted("m1", "Haul", 1000));
+      local.applyEvent(
+        marker(
+          "m1",
+          "d0",
+          "dropoff",
+          "HaulCargo_AToB_Ice_Ice_Stanton1_SupplyGrade",
+        ),
+      );
+      // Manual completion -> terminal_source='manual', completed_at=Date.now().
+      local.updateMission("m1", { status: "complete" });
+      expect(local.getMission("m1")!.status).toBe("complete");
+      // Award fires "now" — well inside the 60s window relative to completed_at.
+      local.applyEvent(award(142500, Date.now() + 50));
+      // Award is NOT attributed to the manual mission; it accrues as other income.
+      expect(local.getMission("m1")!.payout).toBeNull();
+      expect(local.getMission("m1")!.payoutConfidence).toBe("unknown");
+      expect(local.totals().creditsEarned).toBe(142500); // total still accrues
+    } finally {
+      local.close();
+    }
+  });
+
+  it("leg-derived complete (terminal_source NULL) in window does NOT absorb the award", () => {
+    // All legs delivered -> recomputeStatus rolls the mission to 'complete' WITHOUT
+    // setting terminal_source (it stays NULL = reactive). A real game award must not
+    // be pinned to this reactive completion.
+    const local = openMissionStore({
+      dbPath: ":memory:",
+      payoutWindowMs: 60000,
+    });
+    try {
+      local.applyEvent(accepted("m1", "Haul", 1000));
+      local.applyEvent(
+        marker(
+          "m1",
+          "d0",
+          "dropoff",
+          "HaulCargo_AToB_Ice_Ice_Stanton1_SupplyGrade",
+        ),
+      );
+      local.applyEvent(declared("m1", "d0", "Ice", 10, "A", 1000));
+      // Complete the only leg -> leg-derived roll-up to 'complete', terminal_source NULL.
+      local.applyEvent(completedObj("m1", "d0", 2000));
+      expect(local.getMission("m1")!.status).toBe("complete");
+      local.applyEvent(award(142500, Date.now() + 50));
+      expect(local.getMission("m1")!.payout).toBeNull();
+      expect(local.getMission("m1")!.payoutConfidence).toBe("unknown");
+      expect(local.totals().creditsEarned).toBe(142500); // total still accrues
+    } finally {
+      local.close();
+    }
+  });
 });
 
 // =============================================================================
