@@ -393,6 +393,236 @@ describe("completion roll-up (A1)", () => {
 });
 
 // =============================================================================
+// Convergence Part 1 — EndMission(Complete) crosses off ALL the mission's legs.
+// The robust, id-INDEPENDENT safety net: when the game says a mission completed,
+// every leg is marked done regardless of whether its objective_id is a real game
+// id or a synthetic OCR/manual id. Abandon must NOT force-complete legs.
+// =============================================================================
+
+describe("EndMission(Complete) crosses off all legs (Part 1)", () => {
+  it("force-completes EVERY open leg (mixed real-id + manual_* ids)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    // A real-game-id placeholder (the game will complete this by id)...
+    store.applyEvent(declared("m1", "dropoff_x_0", "Quartz", 10, "Baijini"));
+    // ...plus a synthetic OCR-added leg the game's completion can't key on.
+    store.updateMission("m1", {
+      addLegs: [{ kind: "dropoff", commodity: "Iron", scuTotal: 8 }],
+    });
+    const before = store.getMission("m1")!;
+    expect(before.legs.length).toBe(2);
+    expect(before.legs.every((l) => !l.completed)).toBe(true);
+    const synthId = before.legs.find((l) => l.id.startsWith("manual_"))!.id;
+    expect(synthId).toBeDefined();
+
+    store.applyEvent(ended("m1", "complete", 3000));
+
+    const m = store.getMission("m1")!;
+    expect(m.status).toBe("complete");
+    // BOTH legs crossed off, including the synthetic one (id-independent).
+    expect(m.legs.every((l) => l.completed)).toBe(true);
+    for (const l of m.legs) expect(l.scuDelivered).toBe(l.scuTotal);
+  });
+
+  it("is IDEMPOTENT: re-applying EndMission(Complete) changes nothing", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "dropoff_x_0", "Quartz", 10, "Baijini"));
+    store.applyEvent(ended("m1", "complete", 3000));
+    const first = store.getMission("m1")!;
+    const firstSnapshot = JSON.stringify(first);
+
+    store.applyEvent(ended("m1", "complete", 3000));
+    expect(JSON.stringify(store.getMission("m1")!)).toBe(firstSnapshot);
+  });
+
+  it("EndMission(Abandon) does NOT force-complete legs", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "dropoff_x_0", "Quartz", 10, "Baijini"));
+    store.updateMission("m1", {
+      addLegs: [{ kind: "dropoff", commodity: "Iron", scuTotal: 8 }],
+    });
+
+    store.applyEvent(ended("m1", "abandon", 3000));
+
+    const m = store.getMission("m1")!;
+    expect(m.status).toBe("abandoned");
+    // Legs are left exactly as they were — abandon never crosses them off.
+    expect(m.legs.every((l) => !l.completed)).toBe(true);
+    expect(m.legs.every((l) => l.scuDelivered === 0)).toBe(true);
+  });
+
+  it("does not disturb already-completed legs (mixed completed + open)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyEvent(declared("m1", "dropoff_x_0", "Quartz", 10, "Baijini"));
+    store.applyEvent(declared("m1", "dropoff_x_1", "Iron", 6, "Area18"));
+    store.toggleLeg("m1", "dropoff_x_0", true); // one leg done by the user
+    expect(store.getMission("m1")!.status).toBe("in_progress");
+
+    store.applyEvent(ended("m1", "complete", 3000));
+    const m = store.getMission("m1")!;
+    expect(m.status).toBe("complete");
+    expect(m.legs.every((l) => l.completed)).toBe(true);
+    for (const l of m.legs) expect(l.scuDelivered).toBe(l.scuTotal);
+  });
+});
+
+// =============================================================================
+// Convergence Part 2b — game detailed New-Objective adopts a synthetic OCR leg.
+// When a game objectiveDeclared (real objectiveId + commodity + location) arrives
+// and a SYNTHETIC (manual_*) leg already exists matching legKey(kind,commodity,
+// location), the synthetic leg is RE-KEYED to the real game id (and filled),
+// rather than inserting a duplicate. This converges the OCR-added leg with the
+// game's real objective so a later objectiveCompleted (real id) crosses it off.
+// =============================================================================
+
+describe("game New-Objective adopts a synthetic OCR leg (Part 2b)", () => {
+  it("re-keys a matching synthetic leg to the real game id (one leg, not two)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    // OCR added a synthetic leg: Quartz -> Baijini Point (manual_* id).
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 20,
+        location: "Baijini Point",
+      },
+    ]);
+    const seeded = store.getMission("m1")!;
+    expect(seeded.legs.length).toBe(1);
+    expect(seeded.legs[0].id.startsWith("manual_")).toBe(true);
+
+    // Game emits the real New Objective for the SAME commodity+destination.
+    store.applyEvent(
+      declared("m1", "dropoff_x_1", "Quartz", 20, "Baijini Point"),
+    );
+
+    const m = store.getMission("m1")!;
+    // ONE leg, now keyed on the REAL game id (adopted, not duplicated).
+    expect(m.legs.length).toBe(1);
+    expect(m.legs[0].id).toBe("dropoff_x_1");
+    expect(m.legs[0].commodity).toBe("Quartz");
+    expect(m.legs[0].location).toBe("Baijini Point");
+
+    // A later objectiveCompleted for the real id now crosses the adopted leg off.
+    store.applyEvent(completedObj("m1", "dropoff_x_1", 2000));
+    expect(store.getMission("m1")!.legs[0].completed).toBe(true);
+  });
+
+  it("adoption is case/whitespace-insensitive (legKey-normalized)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "quartz",
+        scu: 20,
+        location: "  baijini point  ",
+      },
+    ]);
+    store.applyEvent(
+      declared("m1", "dropoff_x_1", "Quartz", 20, "Baijini Point"),
+    );
+    const m = store.getMission("m1")!;
+    expect(m.legs.length).toBe(1);
+    expect(m.legs[0].id).toBe("dropoff_x_1");
+  });
+
+  it("does NOT adopt across kind (a pickup New-Objective ignores a dropoff synthetic)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 20,
+        location: "Baijini Point",
+      },
+    ]);
+    // A pickup New-Objective for the same commodity+location must NOT steal the
+    // dropoff synthetic — it inserts its own real leg.
+    store.applyEvent(
+      declared(
+        "m1",
+        "pickup_x_0",
+        "Quartz",
+        20,
+        "Baijini Point",
+        1000,
+        "pickup",
+      ),
+    );
+    const m = store.getMission("m1")!;
+    expect(m.legs.length).toBe(2);
+    expect(
+      m.legs.some((l) => l.id === "pickup_x_0" && l.kind === "pickup"),
+    ).toBe(true);
+    expect(m.legs.some((l) => l.id.startsWith("manual_"))).toBe(true);
+  });
+
+  it("does NOT adopt when no synthetic matches — behaves as today (insert real leg)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    // Synthetic leg for a DIFFERENT destination.
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 20,
+        location: "Everus Harbor",
+      },
+    ]);
+    store.applyEvent(
+      declared("m1", "dropoff_x_1", "Quartz", 20, "Baijini Point"),
+    );
+    const m = store.getMission("m1")!;
+    // No legKey match -> the real leg is inserted; the synthetic survives.
+    expect(m.legs.length).toBe(2);
+    expect(m.legs.some((l) => l.id === "dropoff_x_1")).toBe(true);
+    expect(m.legs.some((l) => l.id.startsWith("manual_"))).toBe(true);
+  });
+
+  it("does NOT re-key onto an id that already exists (PK-collision guard)", () => {
+    store.applyEvent(accepted("m1", "Haul", 1000));
+    // A REAL-id leg for this objective already exists (e.g. from a marker).
+    store.applyEvent(
+      declared("m1", "dropoff_x_1", "Quartz", 20, "Baijini Point"),
+    );
+    // Also a matching synthetic leg (OCR added a second Quartz->Baijini).
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 20,
+        location: "Baijini Point",
+      },
+    ]);
+    // Wait — applyOcr would fill the real-id leg, not insert a synthetic, since a
+    // real candidate exists. Force a true collision: add a synthetic directly.
+    store.updateMission("m1", {
+      addLegs: [
+        {
+          kind: "dropoff",
+          commodity: "Quartz",
+          scuTotal: 20,
+          location: "Baijini Point",
+        },
+      ],
+    });
+    const before = store.getMission("m1")!;
+    const synthIdBefore = before.legs.find((l) =>
+      l.id.startsWith("manual_"),
+    )!.id;
+
+    // A re-fire of the real New-Objective must NOT attempt to re-key the synthetic
+    // onto dropoff_x_1 (it already exists) — no crash, no data loss.
+    store.applyEvent(
+      declared("m1", "dropoff_x_1", "Quartz", 20, "Baijini Point"),
+    );
+
+    const m = store.getMission("m1")!;
+    // Real leg still there; synthetic untouched (could not be safely adopted).
+    expect(m.legs.some((l) => l.id === "dropoff_x_1")).toBe(true);
+    expect(m.legs.some((l) => l.id === synthIdBefore)).toBe(true);
+  });
+});
+
+// =============================================================================
 // A2 — manual "Mark complete" / status escape hatch (authoritative terminal)
 // =============================================================================
 

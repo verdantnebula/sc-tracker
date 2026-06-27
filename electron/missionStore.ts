@@ -289,6 +289,35 @@ function parseCommodityDisplay(template: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Leg convergence key (SuperCargo-inspired; SCU deliberately EXCLUDED).
+// ---------------------------------------------------------------------------
+
+/**
+ * A normalized matching key for a leg, built from its semantic identity:
+ *   kind | lower(trim(commodity)) | lower(trim(location))
+ *
+ * SCU is DELIBERATELY excluded so a quantity/OCR-number difference (the game
+ * suppresses the SCU line ~half the time; OCR re-reads can disagree by a digit)
+ * never splits what is logically the same leg. Used to converge an OCR-added
+ * synthetic leg with the game's real-id objective (commodity + destination are
+ * the stable signal both sources agree on).
+ *
+ * PURE + total: a null/undefined commodity or location collapses to "" so two
+ * not-yet-detailed legs of the same kind still key-match. Lowercased + trimmed
+ * so case / whitespace differences between OCR text and the game's New Objective
+ * line don't break the match.
+ */
+export function legKey(
+  kind: string,
+  commodity: string | null | undefined,
+  location: string | null | undefined,
+): string {
+  const c = (commodity ?? "").trim().toLowerCase();
+  const l = (location ?? "").trim().toLowerCase();
+  return `${kind}|${c}|${l}`;
+}
+
+// ---------------------------------------------------------------------------
 // Row <-> domain mapping
 // ---------------------------------------------------------------------------
 
@@ -689,12 +718,72 @@ class SqliteMissionStore implements MissionStore {
   ): void {
     // Authoritative SCU + destination + commodity (when present).
     this.ensureMission(e.missionId, { status: "accepted", source: "log" });
+    // CONVERGENCE Part 2b — adopt a matching SYNTHETIC OCR leg. The game's New
+    // Objective carries the REAL objectiveId the future ObjectiveComplete event
+    // will key on. If OCR already added a synthetic (`manual_*`) leg for the SAME
+    // commodity+destination (legKey, SCU-excluded), re-key that leg's objective_id
+    // to the real game id instead of inserting a duplicate — so the OCR-recovered
+    // detail and the game's completion converge on ONE leg. No synthetic match ->
+    // behaves exactly as before (upsertLeg below creates/updates the real-id leg).
+    this.adoptSyntheticLeg(e);
     this.upsertLeg(e.missionId, e.objectiveId, {
       kind: e.kind,
       commodity: e.commodity,
       scuTotal: e.scuTotal,
       location: e.location,
     });
+  }
+
+  /**
+   * Part 2b helper: re-key a synthetic (`manual_*`) leg matching the declared
+   * objective's legKey(kind,commodity,location) onto the real game objectiveId, so
+   * the subsequent upsertLeg fills that adopted row (preserving the OCR-recovered
+   * leg's completed/manual_override state) and a later ObjectiveComplete (real id)
+   * crosses it off. Guards:
+   *   - Only synthetic ids are adopted (a real id is the game's own — never moved).
+   *   - PK-COLLISION guard: never re-key onto an objective_id that already exists
+   *     for this mission (the composite PK is (mission_id, objective_id)); if the
+   *     real-id leg is already present, the upsertLeg path handles it and the
+   *     synthetic is left untouched (it'll be reconciled by OCR re-apply / Part 1).
+   *   - First match wins; a re-fire after adoption finds the real-id leg already
+   *     present (no synthetic left matching), so this is a no-op on replay.
+   */
+  private adoptSyntheticLeg(
+    e: Extract<DomainEvent, { type: "objectiveDeclared" }>,
+  ): void {
+    // PK guard: if the real-id leg already exists, do not attempt a re-key.
+    const realExists = this.db
+      .prepare(`SELECT 1 FROM legs WHERE mission_id = @m AND objective_id = @o`)
+      .get({ m: e.missionId, o: e.objectiveId });
+    if (realExists) return;
+
+    const targetKey = legKey(e.kind, e.commodity, e.location);
+    const rows = this.db
+      .prepare(
+        `SELECT objective_id, kind, commodity, location
+           FROM legs WHERE mission_id = @m`,
+      )
+      .all({ m: e.missionId }) as Array<{
+      objective_id: string;
+      kind: string;
+      commodity: string;
+      location: string | null;
+    }>;
+    const match = rows.find(
+      (r) =>
+        r.objective_id.startsWith("manual_") &&
+        legKey(r.kind, r.commodity, r.location) === targetKey,
+    );
+    if (!match) return;
+
+    // Re-key the synthetic leg to the real game objectiveId (PK already proven
+    // free above). The upsertLeg call that follows then fills the adopted row.
+    this.db
+      .prepare(
+        `UPDATE legs SET objective_id = @real
+           WHERE mission_id = @m AND objective_id = @synth`,
+      )
+      .run({ m: e.missionId, real: e.objectiveId, synth: match.objective_id });
   }
 
   private onObjectiveCompleted(
@@ -750,6 +839,24 @@ class SqliteMissionStore implements MissionStore {
          WHERE id = @id`,
       )
       .run({ id: e.missionId, status, ts: e.ts });
+
+    // CONVERGENCE Part 1 — id-INDEPENDENT all-legs cross-off (the robust safety
+    // net). When the game says a mission COMPLETED, mark EVERY leg of that mission
+    // done, whatever its objective_id: a real game id (already crossed off by its
+    // ObjectiveComplete) OR a synthetic `manual_*` id the per-objective completion
+    // event can't key on (an OCR/manually-added leg). This guarantees an
+    // OCR-tracked delivery is crossed off on whole-mission completion even when no
+    // per-leg event ever named it. Idempotent (a re-fired EndMission re-runs the
+    // same UPDATE to the same already-done values). ABANDON deliberately does NOT
+    // force-complete legs — an abandoned mission's cargo was not delivered.
+    if (status === "complete") {
+      this.db
+        .prepare(
+          `UPDATE legs SET completed = 1, scu_delivered = scu_total
+             WHERE mission_id = @id`,
+        )
+        .run({ id: e.missionId });
+    }
   }
 
   // -- payout attribution (SPEC §4a) ---------------------------------------
@@ -1270,13 +1377,14 @@ class SqliteMissionStore implements MissionStore {
     // intentionally drops manual_override from the public Leg type).
     const rows = this.db
       .prepare(
-        `SELECT objective_id, kind, commodity, completed, manual_override
+        `SELECT objective_id, kind, commodity, location, completed, manual_override
            FROM legs WHERE mission_id = @m`,
       )
       .all({ m: missionId }) as Array<{
       objective_id: string;
       kind: string;
       commodity: string;
+      location: string | null;
       completed: number;
       manual_override: number | null;
     }>;
@@ -1295,6 +1403,7 @@ class SqliteMissionStore implements MissionStore {
       objectiveId: string;
       kind: string;
       commodity: string;
+      location: string | null;
       consumed: boolean;
       /** True for synthetic `manual_*` ids; false for real game objectiveIds. */
       isManual: boolean;
@@ -1305,6 +1414,7 @@ class SqliteMissionStore implements MissionStore {
         objectiveId: r.objective_id,
         kind: r.kind,
         commodity: r.commodity,
+        location: r.location,
         consumed: false,
         isManual: isManualId(r.objective_id),
       }));
@@ -1426,13 +1536,18 @@ class SqliteMissionStore implements MissionStore {
     // that objectiveId). Filling it in place PRESERVES that id so completion
     // crosses the leg off; inserting a synthetic `manual_*` leg instead would
     // orphan it. So among same-kind fillable candidates we pick in this order,
-    // biasing toward preserving a real id and using commodity to disambiguate
-    // when several placeholders exist:
-    //   1. real-id, exact commodity match
-    //   2. real-id, blank commodity (an as-yet-unnamed suppressed placeholder)
-    //   3. real-id, any
-    //   4. synthetic (manual_*), exact commodity match
-    //   5. synthetic, any
+    // biasing toward preserving a real id and using the commodity+location
+    // convergence key (legKey, SCU-excluded) to disambiguate when several
+    // placeholders exist (Part 2a — location now factors in so a mission
+    // delivering the SAME commodity to several destinations fills each
+    // placeholder by its destination rather than arbitrarily):
+    //   1. real-id, FULL key match (commodity AND location)
+    //   2. real-id, commodity match
+    //   3. real-id, blank commodity (an as-yet-unnamed suppressed placeholder)
+    //   4. real-id, any same-kind
+    //   5. synthetic (manual_*), FULL key match (commodity AND location)
+    //   6. synthetic, commodity match
+    //   7. synthetic, any same-kind
     // Only when NO same-kind candidate exists at all do we insertLeg.
     for (const o of objectives) {
       const sameKind = candidates.filter(
@@ -1442,11 +1557,19 @@ class SqliteMissionStore implements MissionStore {
         c.commodity.toLowerCase() === o.commodity.toLowerCase();
       const blank = (c: Candidate): boolean => c.commodity.trim() === "";
       const real = (c: Candidate): boolean => !c.isManual;
+      // FULL key match folds commodity + location (SCU excluded) through the
+      // shared, normalized legKey — so case/whitespace differences between the
+      // OCR text and the leg's stored location don't break the match.
+      const oKey = legKey(o.kind, o.commodity, o.location);
+      const fullKey = (c: Candidate): boolean =>
+        legKey(c.kind, c.commodity, c.location) === oKey;
 
       const pick =
+        sameKind.find((c) => real(c) && fullKey(c)) ??
         sameKind.find((c) => real(c) && exact(c)) ??
         sameKind.find((c) => real(c) && blank(c)) ??
         sameKind.find((c) => real(c)) ??
+        sameKind.find((c) => fullKey(c)) ??
         sameKind.find((c) => exact(c)) ??
         sameKind[0];
 

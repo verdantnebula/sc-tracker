@@ -252,6 +252,117 @@ describe("applyOcrObjectives — fills suppressed placeholders in place", () => 
 });
 
 // =============================================================================
+// Part 2a — location factors into the match order (commodity+destination key).
+// Among same-kind, same-commodity candidates, the one whose LOCATION also matches
+// is preferred, so a multi-stop mission delivering the SAME commodity to several
+// destinations fills each placeholder by its destination rather than arbitrarily.
+// Real-id legs are still preferred over synthetic and never pruned.
+// =============================================================================
+
+describe("applyOcrObjectives — location-aware match order (Part 2a)", () => {
+  it("prefers the candidate whose commodity AND location both match", () => {
+    // Two real-id dropoff placeholders, same commodity (Quartz) to DIFFERENT
+    // destinations. A single OCR obj for Quartz->Baijini must land on the
+    // Baijini placeholder, not the (first) Everus one.
+    seedPlaceholders("m1", [
+      { kind: "dropoff", objectiveId: "dropoff_a_0" },
+      { kind: "dropoff", objectiveId: "dropoff_b_0" },
+    ]);
+    // Pass 1 (no manual_override): a -> Quartz/Everus Harbor, b -> Quartz/Baijini.
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 10,
+        location: "Everus Harbor",
+      },
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 12,
+        location: "Baijini Point",
+      },
+    ]);
+
+    // Pass 2: a single Quartz->Baijini obj must re-fill dropoff_b_0 by LOCATION,
+    // even though dropoff_a_0 is the first same-commodity candidate.
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 20,
+        location: "Baijini Point",
+      },
+    ]);
+
+    const m = store.getMission("m1")!;
+    expect(m.legs.length).toBe(2);
+    const b = m.legs.find((l) => l.id === "dropoff_b_0")!;
+    expect(b.scuTotal).toBe(20); // matched by commodity+location
+    const a = m.legs.find((l) => l.id === "dropoff_a_0")!;
+    expect(a.scuTotal).toBe(10); // untouched (different location)
+    expect(a.location).toBe("Everus Harbor");
+  });
+
+  it("location match is case/whitespace-insensitive (legKey-normalized)", () => {
+    seedPlaceholders("m1", [
+      { kind: "dropoff", objectiveId: "dropoff_a_0" },
+      { kind: "dropoff", objectiveId: "dropoff_b_0" },
+    ]);
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 10,
+        location: "Everus Harbor",
+      },
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 12,
+        location: "Baijini Point",
+      },
+    ]);
+    // Re-read with different case + padding — must still land on dropoff_b_0.
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "quartz",
+        scu: 33,
+        location: "  baijini point  ",
+      },
+    ]);
+    const m = store.getMission("m1")!;
+    expect(m.legs.find((l) => l.id === "dropoff_b_0")!.scuTotal).toBe(33);
+    expect(m.legs.find((l) => l.id === "dropoff_a_0")!.scuTotal).toBe(10);
+  });
+
+  it("falls back to commodity-only when no location matches (location still null)", () => {
+    // A real-id placeholder with a commodity but NO location yet (suppressed),
+    // and an OCR obj carrying that commodity to a destination -> must fill it
+    // (commodity match, then location written), not insert a synthetic dup.
+    seedPlaceholders("m1", [{ kind: "dropoff", objectiveId: "dropoff_a_0" }]);
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Quartz", scu: null, location: null },
+    ]);
+    // Now the placeholder carries Quartz but no location. Re-apply with a located obj.
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 25,
+        location: "Baijini Point",
+      },
+    ]);
+    const m = store.getMission("m1")!;
+    expect(m.legs.length).toBe(1); // filled in place, no dup
+    expect(m.legs[0].id).toBe("dropoff_a_0");
+    expect(m.legs[0].scuTotal).toBe(25);
+    expect(m.legs[0].location).toBe("Baijini Point");
+  });
+});
+
+// =============================================================================
 // Preservation rules
 // =============================================================================
 
