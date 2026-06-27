@@ -375,6 +375,183 @@ describe("applyOcrObjectives — insert unmatched, prune leftovers", () => {
 });
 
 // =============================================================================
+// C1 — null/rejected OCR SCU must never become silent 0-SCU corruption.
+// A rejected garbage amount (clampScu/recoverMergedFraction null it upstream) or
+// an unreadable amount arrives as scu: null. The store must NOT persist it as a
+// real, user-confirmed 0-SCU cargo leg: on INSERT it becomes a fillable "amount
+// unknown" placeholder (scuTotal 0 = the app's unknown sentinel — slider hidden,
+// counted as 0 remaining but still open), and on FILL it never overwrites an
+// existing valid SCU. The skip is surfaced via the diagnostics capture sink.
+// =============================================================================
+
+describe("applyOcrObjectives — C1: null/rejected SCU is never silent-0 corruption", () => {
+  it("INSERT with null scu writes a fillable placeholder (0 = unknown), not real 0 cargo", () => {
+    // No placeholder of this kind exists, so the objective is INSERTed. Its scu
+    // was rejected upstream (null). It must land as scuTotal 0 = "unknown", with
+    // the real commodity/location preserved — not dropped, not real 0 cargo.
+    seedPlaceholders("m1", [{ kind: "dropoff", objectiveId: "dropoff_a_0" }]);
+    store.applyOcrObjectives("m1", [
+      // fills the existing placeholder with a known amount
+      { kind: "dropoff", commodity: "Titanium", scu: 32, location: "Area18" },
+      // no pickup candidate -> INSERTED; scu rejected -> null
+      { kind: "pickup", commodity: "Iron", scu: null, location: "Lorville" },
+    ]);
+
+    const m = store.getMission("m1")!;
+    const pk = m.legs.find((l) => l.kind === "pickup")!;
+    // The leg exists with its real commodity/location (not lost)...
+    expect(pk.commodity).toBe("Iron");
+    expect(pk.location).toBe("Lorville");
+    // ...but its amount is the "unknown" placeholder sentinel, not real cargo.
+    expect(pk.scuTotal).toBe(0);
+    expect(pk.scuDelivered).toBe(0);
+    expect(pk.completed).toBe(false);
+  });
+
+  it("an inserted null-scu placeholder stays FILLABLE on re-apply (not locked as confirmed)", () => {
+    // The C1 guard leaves manual_override NULL for a null-scu insert, so a later
+    // OCR re-read can still fill the amount — proving it wasn't recorded as a
+    // user-confirmed real value. (manual_override isn't on the public Leg type,
+    // so we prove it behaviorally: a second apply with a real amount re-matches
+    // the SAME leg and fills it, rather than being blocked + the leg pruned.)
+    store.applyEvent(accepted("m1"), "live");
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: null, location: "Lorville" },
+    ]);
+    const firstId = store.getMission("m1")!.legs[0].id;
+    expect(store.getMission("m1")!.legs[0].scuTotal).toBe(0);
+
+    // Re-apply with the now-readable amount: same leg, filled (not a new dup, not
+    // pruned-as-leftover). A confirmed/locked leg could not be re-filled this way.
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 50, location: "Lorville" },
+    ]);
+    const after = store.getMission("m1")!.legs;
+    expect(after.length).toBe(1);
+    expect(after[0].id).toBe(firstId);
+    expect(after[0].scuTotal).toBe(50);
+  });
+
+  it("a null-scu placeholder is NOT counted as real cargo by dropoffGroups", () => {
+    // dropoffGroups feeds the capacity/route math. A 0-SCU placeholder must add
+    // 0 to scuTotal/scuRemaining yet still surface as an OPEN stop (todo), never
+    // miscounted as delivered cargo.
+    store.applyEvent(accepted("m1"), "live");
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: null, location: "Lorville" },
+    ]);
+    const groups = store.dropoffGroups(null);
+    const g = groups.find((x) => x.location === "Lorville")!;
+    expect(g.scuTotal).toBe(0); // contributes no real cargo to capacity math
+    expect(g.scuRemaining).toBe(0);
+    expect(g.allDone).toBe(false); // still an outstanding stop (open leg)
+    expect(g.todo.length).toBe(1); // surfaced as to-do, not "delivered"
+  });
+
+  it("reports the unreadable amount via the diagnostics capture sink", () => {
+    const entries: { kind: string; what: string; reason?: string }[] = [];
+    const s = openMissionStore({
+      dbPath: ":memory:",
+      onCapture: (e) => entries.push(e),
+    });
+    try {
+      s.applyEvent(accepted("m1"), "live");
+      s.applyOcrObjectives("m1", [
+        { kind: "dropoff", commodity: "Iron", scu: null, location: "Lorville" },
+      ]);
+      const skip = entries.find(
+        (e) =>
+          e.kind === "skipped" && /unreadable\/rejected/i.test(e.reason ?? ""),
+      );
+      expect(skip).toBeDefined();
+    } finally {
+      s.close();
+    }
+  });
+
+  it("INSERT with scu 0 writes a fillable placeholder (not real 0 cargo, not locked)", () => {
+    // Defense-in-depth: even if a literal 0 somehow reaches the store (the parser
+    // collapses non-positive to null, but the store must not trust that), a 0-scu
+    // INSERT must land as a fillable "amount unknown" placeholder — scuTotal 0,
+    // manual_override NOT stamped (proven behaviorally: a later real amount
+    // re-matches + fills the SAME leg, which a locked leg could not do).
+    store.applyEvent(accepted("m1"), "live");
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 0, location: "Lorville" },
+    ]);
+    const m1 = store.getMission("m1")!;
+    expect(m1.legs.length).toBe(1);
+    const firstId = m1.legs[0].id;
+    expect(m1.legs[0].commodity).toBe("Iron");
+    expect(m1.legs[0].location).toBe("Lorville");
+    expect(m1.legs[0].scuTotal).toBe(0); // unknown sentinel, not real 0 cargo
+    expect(m1.legs[0].completed).toBe(false);
+
+    // Not locked: a later readable amount re-fills the SAME leg.
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 50, location: "Lorville" },
+    ]);
+    const after = store.getMission("m1")!.legs;
+    expect(after.length).toBe(1);
+    expect(after[0].id).toBe(firstId);
+    expect(after[0].scuTotal).toBe(50);
+  });
+
+  it("INSERT with scu 0 is reported via the diagnostics capture sink (parity with null)", () => {
+    const entries: { kind: string; what: string; reason?: string }[] = [];
+    const s = openMissionStore({
+      dbPath: ":memory:",
+      onCapture: (e) => entries.push(e),
+    });
+    try {
+      s.applyEvent(accepted("m1"), "live");
+      s.applyOcrObjectives("m1", [
+        { kind: "dropoff", commodity: "Iron", scu: 0, location: "Lorville" },
+      ]);
+      const skip = entries.find(
+        (e) =>
+          e.kind === "skipped" && /unreadable\/rejected/i.test(e.reason ?? ""),
+      );
+      expect(skip).toBeDefined(); // counted in unappliedScu like the null case
+    } finally {
+      s.close();
+    }
+  });
+
+  it("FILL with scu 0 PRESERVES an existing valid SCU (never overwrites with 0)", () => {
+    // Seed a placeholder, fill it with a real amount (stays fillable), then
+    // re-apply with scu: 0. The prior 40 must survive untouched (0 is unknown).
+    seedPlaceholders("m1", [{ kind: "dropoff", objectiveId: "dropoff_a_0" }]);
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 40, location: "Lorville" },
+    ]);
+    expect(store.getMission("m1")!.legs[0].scuTotal).toBe(40);
+
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 0, location: "Lorville" },
+    ]);
+    const leg = store.getMission("m1")!.legs[0];
+    expect(leg.scuTotal).toBe(40); // preserved, NOT zeroed
+  });
+
+  it("FILL with null scu PRESERVES an existing valid SCU (never overwrites with 0)", () => {
+    // Seed a placeholder, fill it with a real amount via OCR (stays fillable),
+    // then re-apply with scu: null. The prior 40 must survive untouched.
+    seedPlaceholders("m1", [{ kind: "dropoff", objectiveId: "dropoff_a_0" }]);
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: 40, location: "Lorville" },
+    ]);
+    expect(store.getMission("m1")!.legs[0].scuTotal).toBe(40);
+
+    store.applyOcrObjectives("m1", [
+      { kind: "dropoff", commodity: "Iron", scu: null, location: "Lorville" },
+    ]);
+    const leg = store.getMission("m1")!.legs[0];
+    expect(leg.scuTotal).toBe(40); // preserved, NOT zeroed
+  });
+});
+
+// =============================================================================
 // On-disk restart persistence (isolated temp DB — never the live app DB)
 // =============================================================================
 

@@ -40,17 +40,21 @@ export interface OcrRecognizeResult {
 }
 
 /**
- * Tesseract page-segmentation modes we use. The user crops to just the objective
- * lines + reward, so the input is a tight text region:
- *   - PSM 6  : "Assume a single uniform block of text" — the default for a crop
- *              of the objectives list; treats it as flowing lines (best general
- *              choice for the "Deliver … SCU …" block).
+ * Tesseract page-segmentation modes we use. The input may be a tight crop OR a
+ * fuller capture where two screen columns sit side by side:
+ *   - PSM 3  : "Fully automatic page segmentation" — the DEFAULT. It detects the
+ *              column layout and reads each column as its own block, which stops
+ *              the DETAILS column bleeding into the objective/location text (the
+ *              root of the location over-capture bug). Paired with
+ *              preserve_interword_spaces so column gaps survive as spaces.
+ *   - PSM 6  : "Assume a single uniform block of text" — for a tight single-column
+ *              crop of just the objectives list. Exposed so the renderer can retry.
  *   - PSM 11 : "Sparse text — find as much text as possible in no particular
- *              order" — a fallback when the crop is loosely laid out / the block
- *              assumption hurts. Exposed so the renderer can retry.
+ *              order" — a fallback when the crop is loosely laid out. Exposed for
+ *              retry.
  * (Values are tesseract's own PSM enum numbers, passed as strings to setParameters.)
  */
-export type OcrPsm = "6" | "11";
+export type OcrPsm = "3" | "6" | "11";
 
 /**
  * Character whitelist for the contract crop. The objectives/reward use only
@@ -105,19 +109,19 @@ export function ocrAssetDir(info: AppPathInfo): string {
  *
  * The image is expected to be a PREPROCESSED crop (the renderer upscales,
  * grayscales, and binarizes the user's selection before sending it here), so we
- * tune tesseract for a tight text block: a page-segmentation mode (default PSM 6,
- * a single uniform block) and a character whitelist that stops the stylized font
- * producing junk glyphs.
+ * tune tesseract with a page-segmentation mode (default PSM 3, fully automatic —
+ * detects the column layout so adjacent screen columns don't bleed together) and
+ * a character whitelist that stops the stylized font producing junk glyphs.
  *
  * @param imageDataUrl a `data:image/png;base64,…` preprocessed crop.
  * @param assetDir     directory holding eng.traineddata.gz + the core/worker
  *                     assets (from {@link ocrAssetDir}).
- * @param psm          page-segmentation mode (default "6" = single uniform block).
+ * @param psm          page-segmentation mode (default "3" = fully automatic).
  */
 export async function recognize(
   imageDataUrl: string,
   assetDir: string,
-  psm: OcrPsm = "6",
+  psm: OcrPsm = "3",
 ): Promise<OcrRecognizeResult> {
   if (typeof imageDataUrl !== "string" || imageDataUrl.length === 0) {
     throw new Error("No image to recognize.");
@@ -139,14 +143,22 @@ export async function recognize(
   });
 
   try {
-    // Tune for a cropped text block. tessedit_pageseg_mode picks the segmentation
-    // strategy; the whitelist constrains the alphabet to what a contract uses.
-    // PSM enum values ARE the strings "6"/"11", so map straight onto the enum.
+    // Tune segmentation. tessedit_pageseg_mode picks the strategy; the whitelist
+    // constrains the alphabet to what a contract uses. PSM enum values ARE the
+    // strings "3"/"6"/"11", so map straight onto the enum (default AUTO = PSM 3).
     const pageSegMode =
-      psm === "11" ? Tesseract.PSM.SPARSE_TEXT : Tesseract.PSM.SINGLE_BLOCK;
+      psm === "11"
+        ? Tesseract.PSM.SPARSE_TEXT
+        : psm === "6"
+          ? Tesseract.PSM.SINGLE_BLOCK
+          : Tesseract.PSM.AUTO;
     await worker.setParameters({
       tessedit_pageseg_mode: pageSegMode,
       tessedit_char_whitelist: OCR_CHAR_WHITELIST,
+      // Keep inter-word spaces so a wide gutter between the objective and DETAILS
+      // columns survives as whitespace instead of collapsing the two columns'
+      // words together — reinforces PSM 3's column split against bleed.
+      preserve_interword_spaces: "1",
     });
     const { data } = await worker.recognize(imageDataUrl);
     const rawText = data.text ?? "";

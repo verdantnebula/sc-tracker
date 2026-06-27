@@ -1212,18 +1212,37 @@ class SqliteMissionStore implements MissionStore {
         consumed: false,
       }));
 
+    // C1: count objectives whose SCU could not be applied (null/rejected), so the
+    // host can surface "N legs need an amount" instead of the corruption being
+    // silently written as a confirmed 0. Reported via the diagnostics capture sink
+    // (no IPC contract change); the leg is still created/filled as an "unknown"
+    // placeholder so the real commodity/location aren't lost.
+    let unappliedScu = 0;
+
     // Update an existing leg IN PLACE without stamping manual_override (so the
     // OCR-filled leg stays fillable on a future re-apply). Only writes the
     // fields the OCR actually read (null scu / empty strings leave existing
     // values), matching the partial-fill intent.
+    //
+    // C1 GUARD (FILL): a null OR non-positive OCR scu must NEVER overwrite an
+    // existing valid SCU. The `o.scu !== null && o.scu > 0` gate below is exactly
+    // that protection — a rejected garbage amount (nulled upstream) leaves the
+    // prior real value intact. Locked with a test. (Invariant: the parser collapses
+    // any non-positive resolved amount to null, so a literal 0 should not reach
+    // here; the `> 0` check is defense-in-depth so the store independently treats a
+    // non-positive amount as unknown rather than as confirmed 0 cargo.)
     const fillLeg = (objectiveId: string, o: OcrApplyObjective): void => {
       const sets: string[] = [];
       const params: Record<string, unknown> = { m: missionId, o: objectiveId };
-      if (o.scu !== null) {
+      if (o.scu !== null && o.scu > 0) {
         sets.push("scu_total = @scu");
         params.scu = o.scu;
         // Keep a (necessarily un-completed) candidate's delivered figure at 0;
         // candidates are open by construction, so nothing to reconcile here.
+      } else {
+        // Null SCU: the existing scu_total is preserved (never zeroed). If it was
+        // itself still an unknown placeholder (0), it stays an unknown — report it.
+        unappliedScu += 1;
       }
       if (o.location !== null && o.location.length > 0) {
         sets.push("location = @loc");
@@ -1245,9 +1264,27 @@ class SqliteMissionStore implements MissionStore {
 
     // Insert a new leg for an OCR objective with no candidate (Rule 4). Reuses
     // the synthetic-id scheme from updateMission's addLegs path, retried against
-    // the live set to stay unique within (missionId, objectiveId). These ARE
-    // user-confirmed values, so we stamp manual_override (a genuinely new leg the
-    // user is authoring via OCR — same semantics as a manual addLeg).
+    // the live set to stay unique within (missionId, objectiveId).
+    //
+    // C1 GUARD (defense-in-depth against silent-0 corruption): an OCR scu that is
+    // null OR non-positive — whether OCR couldn't read it OR a garbage value was
+    // REJECTED upstream (clampScu nulls null/<=0/over-ceiling amounts; see
+    // @shared/ocrParse) — must NEVER be persisted as if it were a user-confirmed
+    // real 0-SCU cargo leg. The parser already collapses non-positive to null, so
+    // a literal 0 should not arrive here; the `> 0` check below is defense-in-depth
+    // so the store independently treats a non-positive amount as unknown. In this
+    // app, scu_total = 0 is the "amount unknown / fill me" PLACEHOLDER sentinel
+    // (the delivery slider hides + the SCU field renders empty in CommodityLine,
+    // and dropoffGroups counts it as 0 remaining while keeping the stop open), so
+    // writing 0 is the correct way to surface it for review rather than guessing.
+    // The distinction we MUST preserve: a known SCU is a confirmed value, a null
+    // SCU is an unknown to be filled. We encode that in manual_override:
+    //   - real scu  -> stamp manual_override (user-confirmed, protected, locked-in)
+    //   - null scu  -> leave manual_override NULL: an un-protected, FILLABLE
+    //                  placeholder. It never reads as real 0 cargo, and a later
+    //                  OCR re-apply (or a manual edit) can still fill the amount,
+    //                  so a rejected garbage value can't masquerade as confirmed.
+    // unappliedScu counts these so the caller can surface "N legs need an amount".
     const existingIds = new Set(rows.map((r) => r.objective_id));
     let insertSeq = 0;
     const insertLeg = (o: OcrApplyObjective): void => {
@@ -1260,6 +1297,8 @@ class SqliteMissionStore implements MissionStore {
       }
       insertSeq += 1;
       existingIds.add(oid);
+      const scuKnown = o.scu !== null && o.scu > 0;
+      if (!scuKnown) unappliedScu += 1;
       this.db
         .prepare(
           `INSERT INTO legs
@@ -1272,9 +1311,14 @@ class SqliteMissionStore implements MissionStore {
           o: oid,
           kind: o.kind,
           commodity: o.commodity,
-          scu: o.scu ?? 0,
+          // null/non-positive scu -> 0 = the "unknown / fill me" placeholder
+          // sentinel, NOT real 0 cargo (see the guard note above + dropoffGroups'
+          // open-leg handling). scuKnown is false for these, so manual_override
+          // stays NULL and the leg remains fillable.
+          scu: scuKnown ? o.scu : 0,
           loc: o.location && o.location.length > 0 ? o.location : null,
-          ov: ts,
+          // Only a confirmed amount is protected; an unknown stays fillable.
+          ov: scuKnown ? ts : null,
         });
     };
 
@@ -1302,6 +1346,19 @@ class SqliteMissionStore implements MissionStore {
     );
     for (const c of candidates) {
       if (!c.consumed) del.run({ m: missionId, o: c.objectiveId });
+    }
+
+    // C1: surface unreadable/rejected amounts so the host can cue "N legs need an
+    // amount" rather than the rejection being silently buried as a 0. Best-effort
+    // diagnostics only (no IPC contract change); the legs themselves are kept as
+    // fillable "unknown" placeholders so their commodity/location aren't lost.
+    if (unappliedScu > 0) {
+      this.capture({
+        kind: "skipped",
+        what: "leg",
+        missionId,
+        reason: `ocr: ${unappliedScu} leg(s) had an unreadable/rejected SCU — kept as fillable "amount unknown" placeholders`,
+      });
     }
 
     this.recomputeStatus(missionId);

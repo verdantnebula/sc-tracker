@@ -405,6 +405,291 @@ describe("parseContractOcr — full multi-leg contract (repeated dest/commodity)
   });
 });
 
+// =============================================================================
+// Bug #56 — Number / SCU hardening: a misread fraction slash must not merge two
+// figures into one impossible SCU, and any SCU above a sane per-leg ceiling is
+// rejected (the objective is kept but its scu is nulled so corruption can't be
+// written). The three real corruptions observed in the field were 2318, 2992,
+// and 7106 — each a fraction whose "/" OCR'd as a digit-lookalike glyph.
+// =============================================================================
+
+describe("parseContractOcr — SCU number hardening (Bug #56)", () => {
+  it("treats a slash OCR'd as '7' as the fraction divider (0/106, not 7106)", () => {
+    // "0/106" mis-OCR'd: the "/" became a "7" -> "07106". Without slash-lookalike
+    // handling this parsed as the literal 7106. We must read it as 0-of-106 and
+    // keep the DENOMINATOR (106).
+    const out = parseContractOcr(
+      "Deliver 07106 SCU of Quantum Fuel to Green Glade Station",
+    );
+    expect(out.objectives).toHaveLength(1);
+    expect(out.objectives[0].scu).toBe(106);
+  });
+
+  it("treats a slash OCR'd as '1'/'l'/'I'/'|' as the fraction divider", () => {
+    // Same misread, different lookalike glyph each time. Denominator wins.
+    const variants: Array<[string, number]> = [
+      ["Deliver 01106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0l106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0I106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0|106 SCU of Iron to Baijini Point", 106],
+    ];
+    for (const [text, expected] of variants) {
+      const out = parseContractOcr(text);
+      expect(out.objectives[0].scu).toBe(expected);
+    }
+  });
+
+  it("rejects an impossible merged SCU (2318) by nulling the amount", () => {
+    // "23/18" with the "/" read as nothing -> "2318". Even if it slips past the
+    // fraction logic, the sanity ceiling rejects it: the objective survives so the
+    // user can fix it in review, but the garbage number is NOT written.
+    const out = parseContractOcr(
+      "Deliver 2318 SCU of Titanium to Everus Harbor",
+    );
+    expect(out.objectives).toHaveLength(1);
+    expect(out.objectives[0].scu).toBeNull();
+    expect(out.objectives[0].commodity).toBe("Titanium");
+    expect(out.objectives[0].location).toBe("Everus Harbor");
+  });
+
+  it("rejects an impossible merged SCU (2992) by nulling the amount", () => {
+    const out = parseContractOcr(
+      "Deliver 2992 SCU of Hydrogen Fuel to Melodic Fields Station",
+    );
+    expect(out.objectives).toHaveLength(1);
+    expect(out.objectives[0].scu).toBeNull();
+    expect(out.objectives[0].commodity).toBe("Hydrogen Fuel");
+  });
+
+  it("rejects an impossible merged SCU (7106) by nulling the amount", () => {
+    // A bare "7106" with no recoverable fraction structure: over the ceiling, so
+    // null it rather than write a 7106-SCU leg.
+    const out = parseContractOcr(
+      "Deliver 7106 SCU of Ship Ammunition to Thundering Express Station",
+    );
+    expect(out.objectives).toHaveLength(1);
+    expect(out.objectives[0].scu).toBeNull();
+  });
+
+  it("accepts an SCU exactly at the ceiling and rejects one just above it", () => {
+    const ok = parseContractOcr("Deliver 696 SCU of Iron to Baijini Point");
+    expect(ok.objectives[0].scu).toBe(696);
+    const bad = parseContractOcr("Deliver 697 SCU of Iron to Baijini Point");
+    expect(bad.objectives[0].scu).toBeNull();
+  });
+
+  it("still parses ordinary valid SCU amounts unchanged", () => {
+    const cases: Array<[string, number]> = [
+      ["Deliver 32 SCU of Titanium to Baijini Point", 32],
+      ["Collect 18 SCU of Aluminum from Seraphim Station", 18],
+      ["Deliver 0/46 SCU of Quantum Fuel to Green Glade Station", 46],
+      [
+        "Deliver 0/116 SCU of Ship Ammunition to Thundering Express Station",
+        116,
+      ],
+      ["Deliver 696 SCU of Iron to Baijini Point", 696],
+    ];
+    for (const [text, expected] of cases) {
+      expect(parseContractOcr(text).objectives[0].scu).toBe(expected);
+    }
+  });
+});
+
+// =============================================================================
+// I1 — recoverMergedFraction must not mis-recover ambiguous leading-0 tokens.
+//
+// Round-1 anchored on a leading "0" and a digit-LOOKALIKE divider (7/1/|/l/I)
+// too eagerly, so realistic OCR tokens were silently mis-recovered into plausible
+// but WRONG SMALL values that passed the ceiling and were written:
+//   "0106" -> 6,  "0716" -> 16,  "0796" -> 96   (correct totals: 106 / 716 / 796)
+//
+// Chosen behavior (documented here):
+//   - A LITERAL "/" divider is unambiguous (a "/" is never a real digit), so we
+//     recover the denominator at any length: "0/46" -> 46, "0/696" -> 696.
+//   - A DIGIT-LOOKALIKE divider is ambiguous; we only recover when the split is
+//     unambiguous: a single leading "0", the lookalike divider, then a PLAUSIBLE
+//     denominator (3+ digits, no leading zero). The real favorable case
+//     "07106" -> 106 still recovers. The ambiguous SHORT merges no longer emit a
+//     guessed small value; instead the lone token falls through to parseOcrNumber
+//     and is judged on its NUMERIC value:
+//       "0106" -> 106  (== the correct total, and within the ceiling -> kept)
+//       "0716" -> 716  (correct total, but over the 696 ceiling -> rejected/null)
+//       "0796" -> 796  (correct total, but over the ceiling -> rejected/null)
+//     In every case the WRONG small value (6 / 16 / 96) is gone: either the right
+//     total is read, or the amount is routed to review (null) — never silent
+//     corruption.
+// =============================================================================
+
+describe("parseContractOcr — leading-0 merge ambiguity (I1)", () => {
+  it("no longer emits the WRONG small value for an ambiguous leading-0 token", () => {
+    // "0106" numerically equals its correct total (106) and is within the
+    // ceiling, so it is read correctly — NOT the round-1 mis-recovery to 6.
+    expect(
+      parseContractOcr("Deliver 0106 SCU of Iron to Baijini Point")
+        .objectives[0].scu,
+    ).toBe(106);
+
+    // "0716"/"0796" equal totals above the 696 ceiling, so rather than the
+    // round-1 wrong small values (16 / 96) they are rejected -> null (routed to
+    // review via the C1 placeholder path). The key guarantee: never 16 / 96.
+    for (const text of [
+      "Deliver 0716 SCU of Iron to Baijini Point",
+      "Deliver 0796 SCU of Iron to Baijini Point",
+    ]) {
+      const scu = parseContractOcr(text).objectives[0].scu;
+      expect(scu).toBeNull();
+    }
+  });
+
+  it("STILL recovers the unambiguous favorable lookalike + literal-slash cases", () => {
+    // The plausible-denominator (3+ digit) lookalike case and every literal-slash
+    // case must remain green — the fix only tightens the AMBIGUOUS short merges.
+    const cases: Array<[string, number]> = [
+      ["Deliver 07106 SCU of Quantum Fuel to Green Glade Station", 106],
+      ["Deliver 0/46 SCU of Quantum Fuel to Green Glade Station", 46],
+      ["Deliver 0/116 SCU of Ship Ammunition to Baijini Point", 116],
+      ["Deliver 0/696 SCU of Iron to Baijini Point", 696],
+      // lookalike divider variants with a plausible 3-digit denominator.
+      ["Deliver 01106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0l106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0I106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0|106 SCU of Iron to Baijini Point", 106],
+    ];
+    for (const [text, expected] of cases) {
+      expect(parseContractOcr(text).objectives[0].scu).toBe(expected);
+    }
+  });
+});
+
+// =============================================================================
+// C1 — a resolved SCU of literal 0 is corruption, never real 0 cargo.
+//
+// A delivery/collection objective is never legitimately 0 SCU, so a resolved 0
+// (or any non-positive value) means the amount was unreadable and must collapse
+// to null — NOT pass through as a known 0. Realistic OCR corruptions produce a
+// resolved 0: a literal "0" amount, the letter "O" misread as 0, "00", "0/0",
+// and a 0/zero-lookalike-denominator fraction. clampScu/pickScu now enforce the
+// contract "positive number or null, never a literal 0", so the downstream store
+// never locks a corrupt 0-SCU leg as user-confirmed cargo. All previously
+// favorable cases (real positives, fraction denominators, over-ceiling -> null)
+// must stay green.
+// =============================================================================
+
+describe("parseContractOcr — zero SCU is corruption, collapses to null (C1)", () => {
+  const zeroCases: Array<[string, string]> = [
+    // [text, the corruption it guards]
+    ["Deliver 0 SCU of Titanium to Everus Harbor", "literal 0 amount"],
+    ["Collect O SCU of Quartz from Port Tressler", "letter O misread as 0"],
+    ["Deliver 00 SCU of Iron to Baijini Point", "doubled-zero misread"],
+    ["Deliver 0/0 SCU of Iron to Baijini Point", "0/0 fraction (zero denom)"],
+    // 0 / zero-lookalike denominator ("O" denom de-confuses to 0 -> total 0).
+    ["Deliver 0/O SCU of Iron to Baijini Point", "0/<zero-lookalike denom>"],
+  ];
+  it.each(zeroCases)("yields scu null (not 0) for %s", (text) => {
+    const out = parseContractOcr(text);
+    expect(out.objectives.length).toBe(1);
+    // The objective is KEPT (commodity/location intact) but the amount is null,
+    // so the store routes it to a fillable placeholder, never real 0 cargo.
+    expect(out.objectives[0].scu).toBeNull();
+  });
+
+  it("keeps every favorable SCU case green (positives, fractions, over-ceiling)", () => {
+    // Positives + fraction denominators are unchanged; over-ceiling still nulls.
+    const cases: Array<[string, number | null]> = [
+      ["Deliver 32 SCU of Titanium to Baijini Point", 32],
+      ["Deliver 07106 SCU of Quantum Fuel to Green Glade Station", 106],
+      ["Deliver 0/46 SCU of Quantum Fuel to Green Glade Station", 46],
+      ["Deliver 0/116 SCU of Ship Ammunition to Baijini Point", 116],
+      ["Deliver 0/696 SCU of Iron to Baijini Point", 696],
+      // lookalike-divider variants with a plausible 3-digit denominator.
+      ["Deliver 01106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 0l106 SCU of Iron to Baijini Point", 106],
+      ["Deliver 696 SCU of Iron to Baijini Point", 696],
+      ["Deliver 697 SCU of Iron to Baijini Point", null], // over-ceiling
+    ];
+    for (const [text, expected] of cases) {
+      expect(parseContractOcr(text).objectives[0].scu).toBe(expected);
+    }
+  });
+});
+
+// =============================================================================
+// Bug #57 — Prose / over-capture rejection: a full-screen capture lets the
+// DETAILS column bleed prose into the location span. A blocklist of words that
+// never appear in a station name, a "no second preposition" rule, and a
+// station-type suffix anchor must trim the location back to the place name
+// WITHOUT over-cutting legitimate multi-word names.
+// =============================================================================
+
+describe("parseContractOcr — prose over-capture rejection (Bug #57)", () => {
+  it("drops a destination at a blocklist prose word (refinery/looking/etc.)", () => {
+    const cases: Array<[string, string]> = [
+      [
+        "Deliver 12 SCU of Titanium to Everus Harbor above j The refinery at Shallow Fields",
+        "Everus Harbor",
+      ],
+      [
+        "Deliver 1 SCU of Quantum Fuel to CRU-L4 Shallow Fields are looking to get the containers",
+        "CRU-L4 Shallow Fields",
+      ],
+      [
+        "Deliver 5 SCU of Iron to Baijini Point seems the contractors are waiting",
+        "Baijini Point",
+      ],
+      [
+        "Deliver 5 SCU of Iron to Port Tressler please contact the processed shipment",
+        "Port Tressler",
+      ],
+    ];
+    for (const [text, expected] of cases) {
+      expect(parseContractOcr(text).objectives[0].location).toBe(expected);
+    }
+  });
+
+  it("trims at a SECOND preposition that bled into the location", () => {
+    // The location span absorbed another "to"/"from" from following prose.
+    const out = parseContractOcr(
+      "Deliver 5 SCU of Iron to Green Glade Station to be processed by the crew",
+    );
+    expect(out.objectives[0].location).toBe("Green Glade Station");
+  });
+
+  it("anchors to a station-type suffix and cuts trailing prose after it", () => {
+    const out = parseContractOcr(
+      "Deliver 5 SCU of Iron to Thundering Express Station and the freight elevator is ready",
+    );
+    expect(out.objectives[0].location).toBe("Thundering Express Station");
+  });
+
+  it("keeps a trailing pad code after the station-type suffix", () => {
+    // A real station name can carry a pad/dock code (e.g. "S4DC05") AFTER the
+    // station-type word; the anchor must keep it.
+    const out = parseContractOcr(
+      "Deliver 5 SCU of Iron to Everus Harbor Station S4DC05 seems busy today",
+    );
+    expect(out.objectives[0].location).toBe("Everus Harbor Station S4DC05");
+  });
+
+  it("does NOT over-cut legitimate multi-word station names", () => {
+    const cases: Array<[string, string]> = [
+      [
+        "Deliver 5 SCU of Iron to Thundering Express Station",
+        "Thundering Express Station",
+      ],
+      ["Deliver 5 SCU of Iron to Green Glade Station", "Green Glade Station"],
+      ["Deliver 5 SCU of Iron to Port Tressler", "Port Tressler"],
+      ["Collect Quantum Fuel from Everus Harbor", "Everus Harbor"],
+      [
+        "Deliver 5 SCU of Iron to CRU-L4 Shallow Fields",
+        "CRU-L4 Shallow Fields",
+      ],
+    ];
+    for (const [text, expected] of cases) {
+      expect(parseContractOcr(text).objectives[0].location).toBe(expected);
+    }
+  });
+});
+
 describe("parseContractOcr — multi-objective contract", () => {
   it("parses several objectives and the reward from one screen", () => {
     const text = [

@@ -75,6 +75,139 @@ export function parseOcrNumber(token: string): number | null {
 }
 
 /**
+ * Soft ceiling for a SINGLE delivery/collection leg's SCU. An amount above this
+ * is treated as OCR corruption — two figures merged or a misread "X/Y" fraction
+ * slash (the observed field bugs were 2318, 2992, 7106).
+ *
+ * EXCEEDING THIS IS NOT DATA LOSS. An over-ceiling amount is NULLED (clampScu),
+ * which routes the objective to REVIEW: with the C1 store guard, a null SCU is
+ * never written as a real 0-SCU cargo leg — it becomes a fillable "amount
+ * unknown" placeholder (and is reported via the diagnostics capture sink) so the
+ * user can correct it. So the cost of the ceiling being a touch LOW is only an
+ * extra review prompt, never a silently corrupted/dropped value. That makes 696
+ * a safe conservative default rather than a hard data boundary.
+ *
+ * 696 sits comfortably above any legitimate single-leg amount seen so far while
+ * still rejecting every observed corruption. It has no sourced basis yet.
+ * TODO: derive the real per-leg max from actual contract data (UEX / log corpus)
+ * and raise this to that empirical ceiling; do NOT raise it arbitrarily, since a
+ * too-HIGH ceiling lets a genuine merged-figure corruption slip through as a
+ * plausible large value (the failure the ceiling exists to catch).
+ */
+export const MAX_OBJECTIVE_SCU = 696;
+
+/**
+ * The DIGIT-lookalike glyphs OCR may produce for the "/" fraction divider in an
+ * "X/Y" SCU amount. On the stylized font the slash frequently reads as 7, 1, |,
+ * l, or I — which silently merges "0/106" into "07106" (then 7106). These are
+ * AMBIGUOUS dividers: unlike a literal "/", a "7" between two digit runs could
+ * genuinely be part of the number, so recovery using one of these is only
+ * trusted when the split is otherwise unambiguous (see recoverMergedFraction).
+ * The literal "/" is intentionally NOT in this class — it gets the unconditional
+ * path because a "/" can never be a real digit.
+ */
+const SLASH_DIGIT_LOOKALIKE = "[71|lI]";
+
+/**
+ * Resolve the SCU amount for an objective from the matched amount groups.
+ *
+ * Order of preference:
+ *   1. An EXPLICIT fraction "<num>/<total>" — keep the TOTAL (denominator); the
+ *      done-count numerator is irrelevant to the contract size.
+ *   2. A lone number — but first try to recover a fraction whose "/" OCR'd as a
+ *      digit-lookalike glyph and merged the two figures (e.g. "07106" -> 0-of-106
+ *      -> 106). The recovery only fires on a leading "0" (a fresh contract's
+ *      done-count) so it can't mangle a genuine 3-digit amount.
+ *
+ * Any resolved amount that is non-positive (`<= 0`) OR above
+ * {@link MAX_OBJECTIVE_SCU} is rejected (returns null) — see {@link clampScu}.
+ * A resolved 0 means the amount was unreadable/corrupt, not real 0 cargo; both
+ * collapse to null and route the objective to a fillable placeholder for review,
+ * never written as real cargo. This is why the contract is "positive number or
+ * null, never a literal 0".
+ */
+function pickScu(total: string | undefined, lone?: string): number | null {
+  // 1. Explicit fraction captured by the regex: the total IS the denominator.
+  const fromTotal = parseOcrNumber(total ?? "");
+  if (fromTotal !== null) return clampScu(fromTotal);
+
+  // 2. A lone number. First attempt to un-merge a lookalike-slash fraction.
+  const raw = lone ?? "";
+  const recovered = recoverMergedFraction(raw);
+  const n = recovered ?? parseOcrNumber(raw);
+  return clampScu(n);
+}
+
+/** A denominator the lookalike path will trust: 3+ digits with NO leading zero.
+ *  The leading char excludes the zero-equivalent OCR confusions (O/o/Q -> 0) so
+ *  a leading-zero denominator (implausible for a real total) is rejected; l/I/| ->1,
+ *  S/s ->5, B ->8 are non-zero and allowed. Length 3+ matches the real favorable
+ *  case "07106" -> "106" while rejecting the ambiguous 2-digit merges (16/96/06).
+ *  (See recoverMergedFraction for the full rationale.) */
+const PLAUSIBLE_DENOM_RE = /^[1-9lI|SsB][0-9OoQlI|SsB.,]{2,}$/;
+
+/**
+ * If a lone amount token is actually a "0<divider><total>" fraction (a fresh
+ * contract's "0 of N" done-count) whose slash OCR'd into the token, return the
+ * denominator; otherwise null. Anchored on a leading "0" done-count so a genuine
+ * amount (e.g. "106") is never reinterpreted.
+ *
+ * Two divider cases, deliberately split because they differ in ambiguity:
+ *
+ *   A. LITERAL "/" — unambiguous (a "/" can't be a real digit). Recover the
+ *      denominator whatever its length: "0/46" -> 46, "0/696" -> 696.
+ *
+ *   B. DIGIT-LOOKALIKE divider (7/1/|/l/I) — AMBIGUOUS, because the glyph could
+ *      genuinely be a digit of the number. We only recover when the split is
+ *      unambiguous: a single leading "0", then the lookalike divider, then a
+ *      PLAUSIBLE denominator (3+ digits, no leading zero). This keeps the real
+ *      favorable case ("07106" -> 0/106 -> 106) while REFUSING to emit a
+ *      confident-but-wrong SMALL value for realistic merges:
+ *          "0106" (-> would be 06/6), "0716" (-> 16), "0796" (-> 96)
+ *      all fail the plausible-denominator gate and return null, so they are
+ *      routed to review by the SCU ceiling/placeholder path instead of being
+ *      silently mis-recovered into a tiny wrong number.
+ */
+function recoverMergedFraction(token: string): number | null {
+  // A. Literal slash: unambiguous split, any denominator length.
+  const slash = /^0\s*\/\s*([0-9OoQlI|SsB.,]+)$/.exec(token);
+  if (slash) return parseOcrNumber(slash[1] ?? "");
+
+  // B. Digit-lookalike divider: only when the denominator is plausible (3+
+  //    digits, no leading zero), otherwise the split is a guess -> null.
+  const look = new RegExp(
+    `^0\\s*${SLASH_DIGIT_LOOKALIKE}\\s*([0-9OoQlI|SsB.,]+)$`,
+  ).exec(token);
+  if (!look) return null;
+  const denom = look[1] ?? "";
+  if (!PLAUSIBLE_DENOM_RE.test(denom)) return null;
+  return parseOcrNumber(denom);
+}
+
+/**
+ * Resolve a candidate SCU to either a POSITIVE in-range amount or null. This is
+ * the single site that enforces the parser's contract: it emits a positive
+ * number or null, NEVER a literal 0 (or any non-positive value).
+ *
+ *   - A resolved `<= 0` collapses to null. A delivery/collection objective is
+ *     never legitimately 0 SCU — realistic OCR corruptions resolve to 0 ("0"
+ *     amounts, the letter "O" misread as 0, "0/0", or a 0/zero-lookalike-denom
+ *     fraction). Treating 0 as a known value would let a corrupt amount be
+ *     written + LOCKED as user-confirmed real cargo, so 0 means unknown -> null.
+ *   - A resolved `> MAX_OBJECTIVE_SCU` collapses to null (the merged-figure guard).
+ *
+ * BOTH null outcomes route the objective to a fillable "amount unknown"
+ * placeholder for review (and the diagnostics sink) — never written as real
+ * cargo. (See the C1 guard in electron/missionStore.ts.)
+ */
+function clampScu(n: number | null): number | null {
+  if (n === null) return null;
+  if (n <= 0) return null;
+  if (n > MAX_OBJECTIVE_SCU) return null;
+  return n;
+}
+
+/**
  * Normalize a free-text span (commodity or location) read by OCR: collapse
  * runs of whitespace, trim, and strip trailing punctuation/line noise that the
  * OCR commonly appends. Preserves inner spacing so multi-word names survive.
@@ -131,6 +264,13 @@ const VERB_RE = /\b(deliver|collect|pick\s*up|acquire)\b/gi;
 //     still matches with a null amount.
 const NUM = "[0-9OoQlI|][0-9OoQlI|SsB.,]*";
 // number?  SCU  of   (number optional; SCU + of required in this branch)
+// The fraction divider here is the LITERAL "/" only. A fraction whose slash
+// OCR'd as a digit-lookalike (and so merged into a single token, e.g. "07106")
+// is NOT split here — that is recovered downstream by recoverMergedFraction,
+// which anchors on a leading "0" so it can't mis-split a genuine merged number
+// like "2318" (which must instead be REJECTED by the SCU ceiling). Group 1 =
+// numerator (when a fraction), group 2 = the kept number (the denominator of a
+// fraction, or a lone number otherwise).
 const SCU_WITH_UNIT = `(?:(${NUM})\\s*/\\s*)?(${NUM})?\\s*[5S]?cu\\b\\s*of\\s+`;
 const SCU_PREAMBLE = `(?:${SCU_WITH_UNIT}|of\\s+)`;
 
@@ -169,6 +309,43 @@ const TRAILING_SECTION_RE =
 const LOCATION_FLAVOR_RE =
   /\s+(?:are\s+looking|is\s|has\s+been|freight\s+elevator|the\s+refinery|we\s|they\s).*$/i;
 
+// DEST_PROSE — words that NEVER appear inside a Star Citizen station/location
+// name but DO appear in the DETAILS-column flavor text that bleeds into the span
+// on a full-screen capture (Bug #57). When one of these words is seen, the
+// location is truncated at (i.e. before) it. Anchored on a leading space so the
+// word must be its OWN token — this can't fire on a substring inside a real name.
+// Every entry is a connective/verb/flavor noun from the contract prose, NOT a
+// place-name component. "refinery" is intentionally NOT here (a real station can
+// be a refinery — e.g. "ARC-L1 ... Refinery"); the leading-"The refinery" prose
+// is handled separately by LOCATION_FLAVOR_RE.
+const DEST_PROSE_RE =
+  /\s+(?:seems|please|contractors?|waiting|looking|processed|process|above|contact|need|needs|require|requires|delivery|shipment|containers?|elevator|crew|ready|busy|today)\b.*$/i;
+
+// Station-type suffix words that legitimately END a location name. We anchor the
+// destination to the LAST such suffix (keeping an optional trailing pad/dock code
+// like "S4DC05") and cut any prose that follows it. This catches bleed that
+// slips past the blocklist while preserving the full real name + its pad code.
+// "point" is included (e.g. "Baijini Point") but the " at … Lagrange point"
+// qualifier is already removed upstream, so it can't mis-anchor here.
+// Only words that genuinely TERMINATE a station name. "Port"/"Harbor" are
+// excluded deliberately — in SC they typically START a name ("Port Tressler",
+// "Everus Harbor"), so anchoring on them would truncate the name; their bleed is
+// handled by the prose/period cuts instead.
+const STATION_SUFFIX =
+  "station|outpost|depot|hub|gateway|refinery|spaceport|center|centre|point";
+// A trailing pad/dock code after the station-type word (e.g. "S4DC05"): an
+// alphanumeric token that CONTAINS A DIGIT. Requiring a digit means a following
+// lowercase prose word ("and", "the", "seems") is NOT mistaken for a pad code
+// and is dropped instead of kept.
+const PAD_CODE = "[A-Za-z0-9-]*[0-9][A-Za-z0-9-]*";
+// Greedy ".*" so we anchor to the LAST station-suffix word in the span (e.g. in
+// "Everus Harbor Station S4DC05 …" we anchor "Station", not the earlier
+// "Harbor"), then keep one optional trailing pad/dock code and drop the rest.
+const STATION_ANCHOR_RE = new RegExp(
+  `^(.*\\b(?:${STATION_SUFFIX})\\b(?:\\s+${PAD_CODE})?)(?:\\s+.+)?$`,
+  "i",
+);
+
 /**
  * Trim a destination/location span read after "to"/"from":
  *   - drop an " at … Lagrange point" qualifier (the fuzzy matcher keys off the
@@ -194,22 +371,25 @@ function trimDestination(raw: string): string {
   s = s.replace(TRAILING_SECTION_RE, "");
   // Cut a prose lead-in the DETAILS column bled into the location (Bug 1b).
   s = s.replace(LOCATION_FLAVOR_RE, "");
+  // Cut at a blocklisted prose word that can't be part of a station name (#57).
+  s = s.replace(DEST_PROSE_RE, "");
+  // "No second preposition": the location began after the first to/from, so a
+  // further " to "/" from " is prose that bled in — drop it and the tail (#57).
+  s = s.replace(/\s+(?:to|from)\s+.*$/i, "");
   // Cut at the first sentence-ending period (the screen ends a sentence there).
   const dot = s.indexOf(".");
   if (dot >= 0) s = s.slice(0, dot);
   s = cleanOcrSpan(s);
   // Strip a lone trailing stray single-letter token (OCR speckle), e.g. "… j".
   s = s.replace(/\s+[a-z]$/i, "");
+  s = cleanOcrSpan(s);
+  // Final tightening: anchor to a station-type suffix (keeping a trailing pad
+  // code) and drop any prose that slipped past the cuts above (#57). Only applies
+  // when a suffix is present, so suffix-less names (e.g. "CRU-L4 Shallow Fields")
+  // pass through untouched.
+  const anchored = STATION_ANCHOR_RE.exec(s);
+  if (anchored) s = anchored[1];
   return cleanOcrSpan(s);
-}
-
-/**
- * Pick the kept SCU amount from a fraction's denominator (group `total`) or a
- * lone number. parseOcrNumber de-confuses OCR letter/digit swaps and strips
- * separators; returns null when nothing digit-like survives.
- */
-function pickScu(total: string | undefined): number | null {
-  return parseOcrNumber(total ?? "");
 }
 
 /**
@@ -223,7 +403,10 @@ function parseObjectiveSpan(span: string): OcrObjective | null {
     const commodity = cleanOcrSpan(d[3] ?? "");
     const location = trimDestination(d[4] ?? "");
     if (commodity.length === 0 && location.length === 0) return null;
-    return { kind: "dropoff", scu: pickScu(d[2]), commodity, location };
+    // Group 1 set => explicit fraction, so group 2 is the denominator (total);
+    // otherwise group 2 is a lone number (which pickScu may un-merge).
+    const scu = d[1] ? pickScu(d[2]) : pickScu(undefined, d[2]);
+    return { kind: "dropoff", scu, commodity, location };
   }
   // Pickup with explicit "<n> SCU of" (synthetic form).
   const cs = COLLECT_SCU_RE.exec(span);
@@ -231,7 +414,8 @@ function parseObjectiveSpan(span: string): OcrObjective | null {
     const commodity = cleanOcrSpan(cs[3] ?? "");
     const location = trimDestination(cs[4] ?? "");
     if (commodity.length === 0 && location.length === 0) return null;
-    return { kind: "pickup", scu: pickScu(cs[2]), commodity, location };
+    const scu = cs[1] ? pickScu(cs[2]) : pickScu(undefined, cs[2]);
+    return { kind: "pickup", scu, commodity, location };
   }
   // Pickup without the unit (the real "Collect <commodity> from <location>").
   const cp = COLLECT_PLAIN_RE.exec(span);
