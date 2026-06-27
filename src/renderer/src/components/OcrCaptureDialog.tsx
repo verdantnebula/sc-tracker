@@ -47,6 +47,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Mission, ReferenceData, OcrCaptureRegion } from "@shared/types";
+import { matchTitleToMissions } from "@shared/ocrMatch";
 import {
   mapSelectionToSource,
   cropRectFromRegion,
@@ -72,6 +73,8 @@ import {
 export interface OcrPrefill {
   objectives: ReviewObjective[];
   reward: number | null;
+  /** The OCR'd contract title (cleaned), or null when none was read. */
+  title: string | null;
   confidence: number;
   rawText: string;
   /** Confident correlated mission id, or null when correlation was uncertain. */
@@ -99,6 +102,27 @@ type Phase =
   | { kind: "review"; confidence: number; rawText: string }
   | { kind: "applied" }
   | { kind: "error"; message: string };
+
+/**
+ * Resolve a CONFIDENT title-based preselect: match the OCR title against the
+ * candidate missions' titles and return the matched mission id ONLY when the
+ * match is confident (cleared threshold AND beat the runner-up by a margin).
+ * Otherwise null — so the dropdown stays empty (preserving "default empty,
+ * Apply greyed until chosen", and never a false pick between near-duplicates).
+ * PURE.
+ */
+function confidentTitleTarget(
+  ocrTitle: string | null,
+  missions: Mission[],
+): string | null {
+  if (!ocrTitle || missions.length === 0) return null;
+  const match = matchTitleToMissions(
+    ocrTitle,
+    missions.map((m) => m.title ?? ""),
+  );
+  if (!match.confident || match.index < 0) return null;
+  return missions[match.index]?.id ?? null;
+}
 
 export function OcrCaptureDialog({
   missions,
@@ -132,13 +156,27 @@ export function OcrCaptureDialog({
     prefill?.objectives ?? [],
   );
   const [reward, setReward] = useState<number | null>(prefill?.reward ?? null);
+  // The OCR'd contract title (cleaned), shown to the user and used to pre-select
+  // the target mission on a CONFIDENT match. Null until a capture reads one (or
+  // from the auto prefill).
+  const [ocrTitle, setOcrTitle] = useState<string | null>(
+    prefill?.title ?? null,
+  );
   // Apply target. MANUAL opens with NO default (empty placeholder) so the APPLY
   // button stays disabled until the user deliberately picks a mission. The AUTO
   // path may pre-target a CONFIDENT correlated mission so it's a one-click apply;
   // an uncertain auto correlation also starts empty (never guess a target).
-  const [targetId, setTargetId] = useState<string | null>(
-    prefill?.preselectMissionId ?? null,
-  );
+  //
+  // TITLE PRESELECT: when there is no confident DIRECT pre-target (manual path,
+  // or an uncertain auto correlation -> preselectMissionId null), we try to
+  // pre-select by matching the OCR title against the candidate mission titles —
+  // but ONLY on a CONFIDENT title match (clears threshold AND beats the runner-up
+  // by a margin, so two near-duplicates don't get a false pick). An unconfident
+  // or ambiguous match leaves the dropdown EMPTY (Apply greyed until chosen).
+  const [targetId, setTargetId] = useState<string | null>(() => {
+    if (prefill?.preselectMissionId) return prefill.preselectMissionId;
+    return confidentTitleTarget(prefill?.title ?? null, missions);
+  });
   const [showRaw, setShowRaw] = useState(false);
   // The user's calibrated capture region (proportions 0..1), or null until the
   // first capture draws one. Held in component state so a recalibrate / reset
@@ -294,6 +332,7 @@ export function OcrCaptureDialog({
       }
       setObjectives(reviewed);
       setReward(result.contract.reward);
+      applyTitlePreselect(result.contract.title);
       setPhase({
         kind: "review",
         confidence: result.confidence,
@@ -364,6 +403,7 @@ export function OcrCaptureDialog({
         reviewObjectivesFrom(result.contract.objectives, reference),
       );
       setReward(result.contract.reward);
+      applyTitlePreselect(result.contract.title);
       setPhase({
         kind: "review",
         confidence: result.confidence,
@@ -429,6 +469,7 @@ export function OcrCaptureDialog({
       }
       setObjectives(reviewed);
       setReward(result.contract.reward);
+      applyTitlePreselect(result.contract.title);
       setPhase({
         kind: "review",
         confidence: result.confidence,
@@ -469,6 +510,17 @@ export function OcrCaptureDialog({
 
   function removeObjective(index: number): void {
     setObjectives((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Record the OCR'd title and, when the user hasn't already picked a target,
+   * pre-select the matching mission ONLY on a CONFIDENT title match (else leave
+   * the dropdown empty). Called by every manual capture path once OCR completes.
+   * Never overrides a target the user has already chosen this session.
+   */
+  function applyTitlePreselect(title: string | null): void {
+    setOcrTitle(title);
+    setTargetId((cur) => cur ?? confidentTitleTarget(title, missions));
   }
 
   // Busy = an in-flight capture/OCR pass; disables the footer controls so the
@@ -654,6 +706,7 @@ export function OcrCaptureDialog({
             objectives={objectives}
             reward={reward}
             setReward={setReward}
+            ocrTitle={ocrTitle}
             confidence={phase.confidence}
             rawText={phase.rawText}
             showRaw={showRaw}
@@ -931,6 +984,7 @@ function ReviewBody({
   objectives,
   reward,
   setReward,
+  ocrTitle,
   confidence,
   rawText,
   showRaw,
@@ -944,6 +998,8 @@ function ReviewBody({
   objectives: ReviewObjective[];
   reward: number | null;
   setReward: (n: number | null) => void;
+  /** The OCR'd contract title (cleaned), or null when none was read. */
+  ocrTitle: string | null;
   confidence: number;
   rawText: string;
   showRaw: boolean;
@@ -962,6 +1018,26 @@ function ReviewBody({
 
   return (
     <>
+      {/* OCR-read contract title — shown read-only so the user can see what was
+          read (and why a mission may have been pre-selected below). When no
+          title was read we show a muted note instead of an empty field. */}
+      <label style={fieldLabel}>CONTRACT TITLE (read by OCR)</label>
+      <div
+        style={{
+          padding: "8px 10px",
+          marginBottom: 4,
+          border: "1px solid var(--border-strong)",
+          background: "var(--bg, rgba(0,0,0,0.3))",
+          color: ocrTitle ? "var(--text-bright)" : "var(--muted)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 12,
+          lineHeight: 1.4,
+          wordBreak: "break-word",
+        }}
+      >
+        {ocrTitle || "no title detected"}
+      </div>
+
       {/* reward — moved to the TOP (was below the objectives) */}
       <label style={fieldLabel}>REWARD (aUEC)</label>
       <input

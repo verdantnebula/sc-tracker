@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   fuzzyMatch,
   levenshtein,
+  matchTitleToMissions,
   normalizeForMatch,
   similarity,
 } from "./ocrMatch";
@@ -177,5 +178,88 @@ describe("fuzzyMatch — no confident match", () => {
   it("never throws on garbage and skips empty candidates", () => {
     const r = fuzzyMatch("Quartz", ["", "  ", "Quartz"]);
     expect(r.value).toBe("Quartz");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// matchTitleToMissions — title -> mission preselect (Part A)
+// ---------------------------------------------------------------------------
+// SANITIZED + SYNTHETIC mission titles modeled on the real near-duplicate pair
+// (MIC-L2 Long Forest vs ARC-L1 Wide Forest). The matcher must CONFIDENTLY pick
+// the right one when distinct, but refuse to preselect when two candidates are
+// near-identical (no margin) or nothing clears the threshold.
+
+describe("matchTitleToMissions", () => {
+  const NEAR_DUPES = [
+    "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+    "Senior | Medium Haul | from ARC-L1 Wide Forest Station",
+  ];
+
+  it("confidently picks the matching near-duplicate (MIC-L2, not ARC-L1)", () => {
+    // OCR read (no pipes, slight wording drift) of the MIC-L2 contract.
+    const r = matchTitleToMissions(
+      "Senior Medium Haul from MIC-L2 Long Forest Station",
+      NEAR_DUPES,
+    );
+    expect(r.index).toBe(0); // MIC-L2 Long Forest
+    expect(r.confident).toBe(true);
+    expect(r.score).toBeGreaterThan(0.6);
+  });
+
+  it("confidently picks ARC-L1 when that's the OCR'd title", () => {
+    const r = matchTitleToMissions(
+      "Senior Medium Haul from ARC-L1 Wide Forest Station",
+      NEAR_DUPES,
+    );
+    expect(r.index).toBe(1); // ARC-L1 Wide Forest
+    expect(r.confident).toBe(true);
+  });
+
+  it("is NOT confident when two candidate titles are truly identical (no margin)", () => {
+    const identical = [
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+    ];
+    const r = matchTitleToMissions(
+      "Senior Medium Haul from MIC-L2 Long Forest Station",
+      identical,
+    );
+    // A best candidate exists and scores high, but it can't beat its identical
+    // twin by any margin -> ambiguous -> do NOT preselect.
+    expect(r.score).toBeGreaterThan(0.6);
+    expect(r.confident).toBe(false);
+  });
+
+  it("is NOT confident when nothing clears the threshold", () => {
+    const r = matchTitleToMissions("Eliminate the bounty target", NEAR_DUPES);
+    expect(r.confident).toBe(false);
+    expect(r.score).toBeLessThan(0.6);
+  });
+
+  it("a single candidate is confident on a clear match (no runner-up)", () => {
+    const r = matchTitleToMissions(
+      "Senior Medium Haul from MIC-L2 Long Forest Station",
+      ["Senior | Medium Haul | from MIC-L2 Long Forest Station"],
+    );
+    expect(r.index).toBe(0);
+    expect(r.confident).toBe(true);
+  });
+
+  it("is defensive: null/empty title or empty candidates -> no match", () => {
+    expect(matchTitleToMissions(null, NEAR_DUPES)).toEqual({
+      index: -1,
+      score: 0,
+      confident: false,
+    });
+    expect(matchTitleToMissions("", NEAR_DUPES)).toEqual({
+      index: -1,
+      score: 0,
+      confident: false,
+    });
+    expect(matchTitleToMissions("anything", [])).toEqual({
+      index: -1,
+      score: 0,
+      confident: false,
+    });
   });
 });

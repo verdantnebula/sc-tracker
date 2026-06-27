@@ -196,6 +196,7 @@ export function AutoOcrCapture({
         resultsRef.current.set(request.missionId, {
           objectives: result.objectives,
           reward: result.reward,
+          title: result.title,
           confidence: result.confidence,
           rawText: result.rawText,
           preselectMissionId: null, // filled from the reducer at surface time

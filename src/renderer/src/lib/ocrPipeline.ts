@@ -54,6 +54,12 @@ export interface OcrPipelineResult {
   objectives: ReviewObjective[];
   /** Parsed contract reward in aUEC, or null when not detected. */
   reward: number | null;
+  /**
+   * The OCR'd contract title (cleaned), or null when no haul-title line was
+   * found. Used by the review dialog to pre-select the target mission and to
+   * show the user what title was read. See [[ocrMatch]] matchTitleToMissions.
+   */
+  title: string | null;
   /** Tesseract's mean confidence, 0..1 (diagnostic). */
   confidence: number;
   /** Raw OCR text (shown in the dialog's disclosure). */
@@ -123,6 +129,7 @@ export async function runOcrPipeline(
   return {
     objectives,
     reward: result.contract.reward,
+    title: result.contract.title,
     confidence: result.confidence,
     rawText: result.rawText,
   };

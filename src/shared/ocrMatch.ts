@@ -156,3 +156,103 @@ export function fuzzyMatch(
   }
   return { value: null, score: bestScore };
 }
+
+// ---------------------------------------------------------------------------
+// Title → mission matcher (Part A — drives the review-dialog preselect)
+// ---------------------------------------------------------------------------
+//
+// The OCR'd contract TITLE is used to pre-select the correct mission in the
+// review dialog — but ONLY when we're CONFIDENT. Two near-duplicate missions
+// (e.g. "… from MIC-L2 Long Forest Station" vs "… from ARC-L1 Wide Forest
+// Station") share most of their text, so a naive "best score" pick would happily
+// (and wrongly) preselect one over the other. We therefore require the best
+// candidate to BOTH clear an absolute threshold AND beat the runner-up by a
+// clear MARGIN. If two candidates are too close (or nothing clears the
+// threshold), we report `confident: false` and the dialog leaves the dropdown
+// empty (preserving the "default empty, Apply greyed until chosen" rule).
+
+/** Tuning for {@link matchTitleToMissions}. */
+export interface TitleMatchOptions {
+  /**
+   * Minimum similarity the BEST candidate must reach to be eligible at all.
+   * Titles are long and OCR garbles a few chars, so a real match scores high;
+   * 0.6 admits a genuine read while rejecting an unrelated title.
+   */
+  threshold?: number;
+  /**
+   * Minimum gap (best − second-best) required to call the pick CONFIDENT. Two
+   * near-duplicate titles score within a hair of each other, so a small margin
+   * means "ambiguous" → not confident → no preselect. 0.08 separates a clear
+   * winner from a coin-flip between near-duplicates.
+   */
+  margin?: number;
+}
+
+const DEFAULT_TITLE_THRESHOLD = 0.6;
+const DEFAULT_TITLE_MARGIN = 0.08;
+
+/** Outcome of matching an OCR title against the candidate mission titles. */
+export interface TitleMatch {
+  /** Index of the best candidate in the input array, or -1 when none. */
+  index: number;
+  /** The best candidate's similarity score in [0,1]. */
+  score: number;
+  /**
+   * True only when the best candidate cleared the threshold AND beat the
+   * runner-up by the required margin — i.e. safe to PRE-SELECT. When false the
+   * caller must NOT preselect (ambiguous or no real match).
+   */
+  confident: boolean;
+}
+
+/**
+ * Match an OCR'd contract title against a list of candidate mission titles.
+ * Returns the best candidate's index + score, and whether the match is CONFIDENT
+ * enough to pre-select (cleared `threshold` AND beat the runner-up by `margin`).
+ *
+ * PURE + total: an empty/blank OCR title, an empty candidate list, or all-blank
+ * candidates yield `{ index: -1, score: 0, confident: false }` (never throws).
+ * Comparison is case/space/punctuation-insensitive via {@link normalizeForMatch}.
+ *
+ * @param ocrTitle    the title read off the contract screen (may be null).
+ * @param candidates  the candidate mission titles, in the caller's own order
+ *                    (the returned `index` refers to THIS array).
+ */
+export function matchTitleToMissions(
+  ocrTitle: string | null | undefined,
+  candidates: readonly string[],
+  options: TitleMatchOptions = {},
+): TitleMatch {
+  const threshold = options.threshold ?? DEFAULT_TITLE_THRESHOLD;
+  const margin = options.margin ?? DEFAULT_TITLE_MARGIN;
+  const none: TitleMatch = { index: -1, score: 0, confident: false };
+
+  const normInput = normalizeForMatch(ocrTitle ?? "");
+  if (normInput.length === 0 || candidates.length === 0) return none;
+
+  let bestIdx = -1;
+  let bestScore = -1;
+  let secondScore = -1;
+  for (let i = 0; i < candidates.length; i++) {
+    const normCand = normalizeForMatch(candidates[i]);
+    if (normCand.length === 0) continue;
+    const score = similarity(normInput, normCand);
+    if (score > bestScore) {
+      secondScore = bestScore;
+      bestScore = score;
+      bestIdx = i;
+    } else if (score > secondScore) {
+      secondScore = score;
+    }
+  }
+
+  if (bestIdx === -1) return none;
+
+  // CONFIDENT only when the best clears the threshold AND beats the runner-up by
+  // the margin. With a single candidate there's no runner-up, so the threshold
+  // alone decides (secondScore stays -1 -> gap is large).
+  const gap =
+    secondScore < 0 ? Number.POSITIVE_INFINITY : bestScore - secondScore;
+  const confident = bestScore >= threshold && gap >= margin;
+  return { index: bestIdx, score: bestScore, confident };
+}

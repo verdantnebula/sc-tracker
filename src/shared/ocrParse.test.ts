@@ -12,7 +12,12 @@
 // ============================================================================
 
 import { describe, expect, it } from "vitest";
-import { parseContractOcr, parseOcrNumber, cleanOcrSpan } from "./ocrParse";
+import {
+  parseContractOcr,
+  parseOcrNumber,
+  cleanOcrSpan,
+  cleanContractTitle,
+} from "./ocrParse";
 
 // ---------------------------------------------------------------------------
 // Low-level helpers
@@ -48,6 +53,76 @@ describe("cleanOcrSpan", () => {
   it("collapses whitespace and trims edge punctuation", () => {
     expect(cleanOcrSpan("  Baijini   Point. ")).toBe("Baijini Point");
     expect(cleanOcrSpan(">> Agricium <<")).toBe("Agricium");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Title cleaning + extraction (Part A)
+// ---------------------------------------------------------------------------
+
+describe("cleanContractTitle", () => {
+  it("strips a trailing [BP]* tag and keeps pipe separators", () => {
+    expect(
+      cleanContractTitle(
+        "Senior | Medium Haul | from MIC-L2 Long Forest Station [BP]*",
+      ),
+    ).toBe("Senior | Medium Haul | from MIC-L2 Long Forest Station");
+  });
+
+  it("normalizes OCR pipe spacing to a consistent ' | '", () => {
+    expect(
+      cleanContractTitle("Senior |Medium Haul|  from ARC-L1 Wide Forest"),
+    ).toBe("Senior | Medium Haul | from ARC-L1 Wide Forest");
+  });
+
+  it("strips multiple trailing bracket tags and stray asterisks", () => {
+    expect(cleanContractTitle("Bulk Cargo Haul [LG] [BP]*")).toBe(
+      "Bulk Cargo Haul",
+    );
+  });
+});
+
+describe("parseContractOcr — title extraction", () => {
+  it("reads the haul title from the header band, not the reward/flavor lines", () => {
+    const text = [
+      "Reward o 314,000",
+      "Contract Deadline N/A",
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station [BP]*",
+      "Contracted By Covalex Independent Contractors",
+      "PRIMARY OBJECTIVES",
+      "Deliver 0/66 SCU of Quartz to Seraphim Station above Crusader.",
+      "Collect Quartz from MIC-L2 Long Forest Station.",
+    ].join("\n");
+    expect(parseContractOcr(text).title).toBe(
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+    );
+  });
+
+  it("does NOT pick up a Collect objective line or PRIMARY OBJECTIVES", () => {
+    const text = [
+      "Reward 100,000",
+      "PRIMARY OBJECTIVES",
+      "Collect Quartz from MIC-L2 Long Forest Station.",
+    ].join("\n");
+    // No header haul-title line present -> null (never a wrong guess).
+    expect(parseContractOcr(text).title).toBeNull();
+  });
+
+  it("reads a Haul title with no pipes (keyword + from clause)", () => {
+    const text = [
+      "Reward 50,000",
+      "Medium Cargo Haul from Port Tressler",
+      "PRIMARY OBJECTIVES",
+      "Deliver 0/40 SCU of Iron to Baijini Point.",
+    ].join("\n");
+    expect(parseContractOcr(text).title).toBe(
+      "Medium Cargo Haul from Port Tressler",
+    );
+  });
+
+  it("returns null when no title-shaped line is present", () => {
+    const text = "Deliver 5 SCU of Iron to Baijini Point";
+    expect(parseContractOcr(text).title).toBeNull();
   });
 });
 
@@ -186,6 +261,7 @@ describe("parseContractOcr — garbled / empty input", () => {
       objectives: [],
       reward: null,
       boxSize: null,
+      title: null,
     });
   });
 
@@ -194,11 +270,13 @@ describe("parseContractOcr — garbled / empty input", () => {
       objectives: [],
       reward: null,
       boxSize: null,
+      title: null,
     });
     expect(parseContractOcr(42 as unknown)).toEqual({
       objectives: [],
       reward: null,
       boxSize: null,
+      title: null,
     });
   });
 
@@ -775,57 +853,74 @@ describe("parseContractOcr — location bleed (trimDestination hardening)", () =
 // =============================================================================
 // END-TO-END-ISH: the cleaned PRIMARY OBJECTIVES column text (what
 // isolateObjectivesColumn produces from a full-screen two-column capture) feeds
-// the parser. This is the real "DROP OFF LOCATIONS ANY ORDER" multi-dropoff
-// shape: ONE "Deliver N SCU of <commodity>" with NO inline "to <dest>", plus a
-// block of "Freight elevator at <Station> above <body>" dropoff lines. The
-// parser must recover the commodity + SCU and the dropoff station names.
-// (SANITIZED + SYNTHETIC; mirrors the documented Quartz contract geometry.)
+// the parser. This is the REAL Quartz contract structure: FOUR explicit
+// "Deliver N SCU of Quartz to <station> above <body>" deliveries (66/67/105/69),
+// each paired with its own "Collect Quartz from <pickup>" sub-objective. Each
+// Deliver line is its OWN leg — NOT collapsed into a single Deliver + an
+// "ANY ORDER" station list (that earlier heuristic modeled an OCR misread and
+// was removed). The standard per-line parser must yield 4 DISTINCT delivers with
+// the correct SCU each + the Collect pickups.
+// (SANITIZED + SYNTHETIC title text; game contract data only, no personal data.)
 // =============================================================================
 
-describe("parseContractOcr — multi-dropoff DROP OFF LOCATIONS block", () => {
+describe("parseContractOcr — real Quartz multi-delivery structure", () => {
   // The text isolateObjectivesColumn yields for the documented Quartz contract:
-  // header band (reward+title) + objectives column (the Deliver + dropoff lines).
+  // header band (reward + title) + the explicit per-line Deliver/Collect objectives.
   const cleanedColumn = [
     "Reward o 314,000",
-    "Senior Medium Haul from MIC-L2 Long Forest",
+    "Senior | Medium Haul | from MIC-L2 Long Forest Station [BP]*",
+    "Contracted By Covalex Independent Contractors",
     "PRIMARY OBJECTIVES",
-    "DROP OFF LOCATIONS ANY ORDER",
-    "Freight elevator at Seraphim Station above Crusader",
-    "Freight elevator at Baijini Point above ArcCorp",
-    "Freight elevator at Port Tressler above microTech",
-    "Freight elevator at Everus Harbor above Hurston",
-    "Deliver 0/69 SCU of Quartz",
+    "Deliver 0/66 SCU of Quartz to Seraphim Station above Crusader.",
+    "Collect Quartz from MIC-L2 Long Forest Station.",
+    "Deliver 0/67 SCU of Quartz to Baijini Point above ArcCorp.",
+    "Collect Quartz from MIC-L2 Long Forest Station.",
+    "Deliver 0/105 SCU of Quartz to Port Tressler above microTech.",
+    "Collect Quartz from MIC-L2 Long Forest Station.",
+    "Deliver 0/69 SCU of Quartz to Everus Harbor above Hurston.",
+    "Collect Quartz from MIC-L2 Long Forest Station.",
   ].join("\n");
 
   it("recovers the reward (314,000)", () => {
     expect(parseContractOcr(cleanedColumn).reward).toBe(314000);
   });
 
-  it("recovers commodity Quartz and 69 SCU on a dropoff objective", () => {
+  it("recovers exactly 4 DISTINCT deliver legs with SCU 66/67/105/69", () => {
     const out = parseContractOcr(cleanedColumn);
-    expect(out.objectives.length).toBeGreaterThan(0);
-    const quartz = out.objectives.find((o) => /quartz/i.test(o.commodity));
-    expect(quartz).toBeDefined();
-    expect(quartz?.kind).toBe("dropoff");
-    // 69 from the "0/69" fraction (denominator = contract total).
-    const scus = out.objectives.map((o) => o.scu).filter((s) => s !== null);
-    expect(scus).toContain(69);
+    const dropoffs = out.objectives.filter((o) => o.kind === "dropoff");
+    expect(dropoffs).toHaveLength(4);
+    // Each delivery is its own leg — SCU is the per-leg denominator, NOT
+    // collapsed onto one leg nor multiplied across legs.
+    expect(dropoffs.map((d) => d.scu)).toEqual([66, 67, 105, 69]);
   });
 
-  it("recovers all four dropoff station names", () => {
+  it("recovers each delivery's commodity (Quartz) and destination", () => {
     const out = parseContractOcr(cleanedColumn);
-    const locations = out.objectives.map((o) => o.location);
-    expect(locations).toContain("Seraphim Station");
-    expect(locations).toContain("Baijini Point");
-    expect(locations).toContain("Port Tressler");
-    expect(locations).toContain("Everus Harbor");
+    const dropoffs = out.objectives.filter((o) => o.kind === "dropoff");
+    for (const d of dropoffs) expect(d.commodity).toBe("Quartz");
+    // The " above <body>" qualifier is stripped; the station name remains.
+    expect(dropoffs.map((d) => d.location)).toEqual([
+      "Seraphim Station",
+      "Baijini Point",
+      "Port Tressler",
+      "Everus Harbor",
+    ]);
   });
 
-  it("does not double-count SCU across the dropoff legs", () => {
-    // The 69 SCU is the contract total; emitting it once (not per station)
-    // prevents inflating the cargo to 4×69. Only ONE leg carries the SCU.
+  it("recovers the Collect pickups from MIC-L2 Long Forest Station", () => {
     const out = parseContractOcr(cleanedColumn);
-    const withScu = out.objectives.filter((o) => o.scu === 69);
-    expect(withScu).toHaveLength(1);
+    const pickups = out.objectives.filter((o) => o.kind === "pickup");
+    expect(pickups).toHaveLength(4);
+    for (const p of pickups) {
+      expect(p.commodity).toBe("Quartz");
+      expect(p.location).toBe("MIC-L2 Long Forest Station");
+      expect(p.scu).toBeNull();
+    }
+  });
+
+  it("parses the contract title from the header band", () => {
+    expect(parseContractOcr(cleanedColumn).title).toBe(
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+    );
   });
 });

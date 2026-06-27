@@ -47,6 +47,13 @@ export interface OcrContract {
   reward: number | null;
   /** Max container/box size in SCU if the screen showed it, else null. */
   boxSize: number | null;
+  /**
+   * The contract TITLE read from the header band (above DETAILS / PRIMARY
+   * OBJECTIVES), cleaned of trailing tags like "[BP]*" and OCR noise, or null
+   * when no cargo-haul-style title line was found. Used to pre-select the target
+   * mission in the review dialog (see [[ocrMatch]] matchTitleToMissions).
+   */
+  title: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -428,82 +435,6 @@ function parseObjectiveSpan(span: string): OcrObjective | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Multi-dropoff "DROP OFF LOCATIONS ANY ORDER" block (real screen shape)
-// ---------------------------------------------------------------------------
-//
-// The real contract screen often shows ONE "Deliver <done>/<total> SCU of
-// <commodity>" objective with NO inline "to <destination>", paired with a
-// separate "DROP OFF LOCATIONS ANY ORDER" block listing several
-// "Freight elevator at <Station> above <body>" dropoff lines. The single-line
-// verb-span parser can't reach those destinations (they're not after a "to"),
-// so we handle this shape with a dedicated pre-pass:
-//   - read the commodity + SCU from the lone "Deliver … SCU of <commodity>",
-//   - read each "Freight elevator at <Station>" station name,
-//   - emit ONE dropoff objective per station, all carrying the commodity. Only
-//     the FIRST carries the SCU (the contract total); the rest are null so the
-//     cargo total isn't multiplied across the N "any order" destinations.
-//
-// FOLLOW-UP (noted, intentionally not done here to keep the blast radius small):
-// the OcrObjective shape is one-location-per-objective, so a single Deliver with
-// N "any order" dropoffs is modeled as N separate dropoff legs (SCU on the
-// first only). A future enhancement could model "one delivery, choose any of N
-// dropoffs" as a single objective with alternate locations; that needs a richer
-// objective shape + store/apply changes and is out of scope for this fix.
-
-// A lone "Deliver <amount> SCU of <commodity>" with NO "to <dest>" (the
-// multi-dropoff form). Amount is the usual optional "<done>/<total>" fraction or
-// a lone number; group 1 = numerator, group 2 = kept number, group 3 = commodity.
-// Anchored to end-of-line so an inline "… to <dest>" form is NOT captured here
-// (that stays on the normal verb-span path).
-const DELIVER_NO_DEST_RE = new RegExp(
-  `\\bdeliver\\b[^0-9a-z]*${SCU_PREAMBLE}([a-z0-9 .,'-]+?)\\s*$`,
-  "im",
-);
-// One "Freight elevator at <Station> [above <body>]" dropoff line. The station
-// span runs to "above" / end-of-line; trimDestination tightens it afterward.
-const FREIGHT_ELEVATOR_RE = /freight\s+elevator\s+at\s+(.+?)\s*$/gim;
-// The block header that marks the "any order" multi-dropoff layout.
-const DROPOFF_BLOCK_RE = /drop\s*off\s+locations/i;
-
-/**
- * Detect + parse the "DROP OFF LOCATIONS ANY ORDER" multi-dropoff shape. Returns
- * one dropoff OcrObjective per "Freight elevator at <Station>" line (commodity +
- * SCU from the lone Deliver), or null when this shape isn't present (so the
- * caller falls back to the normal verb-span parser). PURE.
- */
-function extractMultiDropoff(text: string): OcrObjective[] | null {
-  // Only engage on the explicit multi-dropoff block header.
-  if (!DROPOFF_BLOCK_RE.test(text)) return null;
-
-  // Collect the Freight-elevator station lines (operate on the ORIGINAL,
-  // line-preserving text so each dropoff stays on its own line).
-  FREIGHT_ELEVATOR_RE.lastIndex = 0;
-  const stations: string[] = [];
-  let fm: RegExpExecArray | null;
-  while ((fm = FREIGHT_ELEVATOR_RE.exec(text)) !== null) {
-    const station = trimDestination(fm[1] ?? "");
-    if (station.length > 0) stations.push(station);
-  }
-  if (stations.length === 0) return null;
-
-  // Read the lone "Deliver … SCU of <commodity>" (no inline destination). If
-  // there's no such line, this isn't the shape we handle here.
-  const dm = DELIVER_NO_DEST_RE.exec(text);
-  if (!dm) return null;
-  const commodity = cleanOcrSpan(dm[3] ?? "");
-  if (commodity.length === 0) return null;
-  const totalScu = dm[1] ? pickScu(dm[2]) : pickScu(undefined, dm[2]);
-
-  // One dropoff per station; SCU on the first only (the contract total).
-  return stations.map((location, i) => ({
-    kind: "dropoff" as const,
-    scu: i === 0 ? totalScu : null,
-    commodity,
-    location,
-  }));
-}
-
 /**
  * Pull every objective out of the OCR text. Normalizes the whole block to one
  * continuous line (rejoining names/sentences wrapped across lines), then splits
@@ -511,16 +442,15 @@ function extractMultiDropoff(text: string): OcrObjective[] | null {
  * parses each span independently. Objectives with empty commodity AND location
  * after cleaning are dropped (pure noise). Order of appearance is preserved.
  *
- * Before the verb-span pass, a dedicated pre-pass handles the real-screen
- * "DROP OFF LOCATIONS ANY ORDER" multi-dropoff shape (a lone Deliver + several
- * "Freight elevator at <Station>" lines), which the single-line parser can't
- * reach; see {@link extractMultiDropoff}.
+ * The real mobiGlas PRIMARY OBJECTIVES column is a set of explicit per-line
+ * "Deliver N SCU of <commodity> to <dest>" / "Collect <commodity> from <loc>"
+ * objectives — each is its own leg. The standard verb-span parser handles every
+ * one of these directly; there is deliberately NO special "any order" pre-pass
+ * (an earlier heuristic that collapsed N explicit delivers into one Deliver +
+ * an ANY-ORDER station list modeled an OCR MISREAD and could misfire, so it was
+ * removed). Each Deliver/Collect line yields exactly one objective.
  */
 function extractObjectives(text: string): OcrObjective[] {
-  // Pre-pass: the real-screen multi-dropoff block (lone Deliver + N stations).
-  const multi = extractMultiDropoff(text);
-  if (multi && multi.length > 0) return multi;
-
   // Normalize first: collapse newlines + multiple spaces into single spaces so a
   // destination/commodity wrapped across lines rejoins ("Melodic Fields" +
   // "Station" -> "Melodic Fields Station").
@@ -608,6 +538,77 @@ function extractBoxSize(text: string): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// Title extraction (the contract name in the header band)
+// ---------------------------------------------------------------------------
+//
+// The contract TITLE sits in the HEADER band — above the DETAILS / PRIMARY
+// OBJECTIVES columns — and is a cargo-hauling-style name, e.g.
+//   "Senior | Medium Haul | from MIC-L2 Long Forest Station [BP]*"
+// It is identified structurally (NOT by position) by the shape every haul title
+// shares: it mentions hauling ("Haul"/"Hauling"/"Cargo") and/or uses the "| … |"
+// pipe separators AND a "from <location>" clause. We deliberately do NOT pick the
+// first non-empty line (that's "Reward …") nor a flavor/section line.
+
+/**
+ * A line is a candidate contract title when it has the haul-title SHAPE. We
+ * require BOTH a hauling signal (the "Haul"/"Hauling"/"Cargo" keyword OR the
+ * "| … |" pipe-separated layout) AND a "from <…>" origin clause, since the real
+ * titles read "… Haul | from <station>". This rejects "Reward 314,000",
+ * "Contracted By …", "PRIMARY OBJECTIVES", "Contract Deadline …" and the
+ * Deliver/Collect objective lines, none of which carry a "from" origin in the
+ * header. Case-insensitive.
+ */
+function looksLikeContractTitle(line: string): boolean {
+  if (!/\bfrom\b/i.test(line)) return false;
+  // A Deliver/Collect objective line ("Collect Quartz from …") also has "from",
+  // so explicitly reject lines that start with an objective verb.
+  if (/^\s*(?:deliver|collect|pick\s*up|acquire)\b/i.test(line)) return false;
+  const hasHaulKeyword = /\bhaul(?:ing)?\b|\bcargo\b/i.test(line);
+  const hasPipes = (line.match(/\|/g) ?? []).length >= 1;
+  return hasHaulKeyword || hasPipes;
+}
+
+/**
+ * Clean a raw title span: strip trailing tags like "[BP]*" / "[XYZ]", collapse
+ * OCR whitespace, and trim edge noise — while PRESERVING the "|" separators and
+ * inner spacing that are part of the real title. Pipes are normalized to a single
+ * " | " with single spaces around them so OCR spacing jitter doesn't vary the
+ * output. Reusable by any future title consumer.
+ */
+export function cleanContractTitle(raw: string): string {
+  let s = raw.replace(/\s+/g, " ").trim();
+  // Strip trailing bracketed tags + any trailing "*" decoration (e.g. "[BP]*").
+  // Applied repeatedly so "… [BP] [X]*" all peel off; anchored to end-of-string.
+  s = s.replace(/(?:\s*\[[^\]]*\]\s*\*?\s*)+$/g, "").trim();
+  s = s.replace(/\*+$/g, "").trim();
+  // Normalize the pipe separators to a consistent " | " (collapse OCR spacing).
+  s = s.replace(/\s*\|\s*/g, " | ").trim();
+  // Trim residual edge punctuation/noise (keep inner pipes + word chars).
+  s = s.replace(/^[\s.,;:<>·•\-—]+/, "").replace(/[\s.,;:<>·•\-—]+$/, "");
+  return s.trim();
+}
+
+/**
+ * Find the contract title in the OCR text: scan line-by-line for the FIRST line
+ * with the haul-title shape ({@link looksLikeContractTitle}), cleaned via
+ * {@link cleanContractTitle}. Returns null when no such line is present (so the
+ * dialog shows no read title rather than a wrong guess). PURE.
+ *
+ * Operates on the ORIGINAL line-preserving text (titles are one screen line; a
+ * flattened stream could merge the title with an adjacent line).
+ */
+function extractTitle(text: string): string | null {
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    if (looksLikeContractTitle(line)) {
+      const cleaned = cleanContractTitle(line);
+      if (cleaned.length > 0) return cleaned;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -620,11 +621,12 @@ function extractBoxSize(text: string): number | null {
  */
 export function parseContractOcr(text: unknown): OcrContract {
   if (typeof text !== "string" || text.length === 0) {
-    return { objectives: [], reward: null, boxSize: null };
+    return { objectives: [], reward: null, boxSize: null, title: null };
   }
   return {
     objectives: extractObjectives(text),
     reward: extractReward(text),
     boxSize: extractBoxSize(text),
+    title: extractTitle(text),
   };
 }
