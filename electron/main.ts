@@ -1032,6 +1032,7 @@ function registerIpc(): void {
       _e,
       imageDataUrl: string,
       psm?: "6" | "11",
+      isFullFrame?: boolean,
     ): Promise<OcrRecognizeResult> => {
       if (!settings.ocrEnabled) {
         return {
@@ -1049,6 +1050,7 @@ function registerIpc(): void {
           imageDataUrl,
           assetDir,
           psm === "11" ? "11" : "6",
+          isFullFrame === true,
         );
         return { outcome: "ok", rawText, confidence };
       } catch (err) {

@@ -116,11 +116,16 @@ const api: ApiBridge = {
     ipcRenderer.invoke(IPC.SETTINGS_SET_AUTO_OCR, enabled) as Promise<boolean>,
   captureScreenForOcr: () =>
     ipcRenderer.invoke(IPC.OCR_CAPTURE_SCREEN) as Promise<OcrCaptureResult>,
-  recognizeOcr: (imageDataUrl: string, psm?: "6" | "11") =>
+  recognizeOcr: (
+    imageDataUrl: string,
+    psm?: "6" | "11",
+    isFullFrame?: boolean,
+  ) =>
     ipcRenderer.invoke(
       IPC.OCR_RECOGNIZE,
       imageDataUrl,
       psm,
+      isFullFrame,
     ) as Promise<OcrRecognizeResult>,
 
   // --- auto-update (electron-updater) ---

@@ -771,3 +771,61 @@ describe("parseContractOcr — location bleed (trimDestination hardening)", () =
     }
   });
 });
+
+// =============================================================================
+// END-TO-END-ISH: the cleaned PRIMARY OBJECTIVES column text (what
+// isolateObjectivesColumn produces from a full-screen two-column capture) feeds
+// the parser. This is the real "DROP OFF LOCATIONS ANY ORDER" multi-dropoff
+// shape: ONE "Deliver N SCU of <commodity>" with NO inline "to <dest>", plus a
+// block of "Freight elevator at <Station> above <body>" dropoff lines. The
+// parser must recover the commodity + SCU and the dropoff station names.
+// (SANITIZED + SYNTHETIC; mirrors the documented Quartz contract geometry.)
+// =============================================================================
+
+describe("parseContractOcr — multi-dropoff DROP OFF LOCATIONS block", () => {
+  // The text isolateObjectivesColumn yields for the documented Quartz contract:
+  // header band (reward+title) + objectives column (the Deliver + dropoff lines).
+  const cleanedColumn = [
+    "Reward o 314,000",
+    "Senior Medium Haul from MIC-L2 Long Forest",
+    "PRIMARY OBJECTIVES",
+    "DROP OFF LOCATIONS ANY ORDER",
+    "Freight elevator at Seraphim Station above Crusader",
+    "Freight elevator at Baijini Point above ArcCorp",
+    "Freight elevator at Port Tressler above microTech",
+    "Freight elevator at Everus Harbor above Hurston",
+    "Deliver 0/69 SCU of Quartz",
+  ].join("\n");
+
+  it("recovers the reward (314,000)", () => {
+    expect(parseContractOcr(cleanedColumn).reward).toBe(314000);
+  });
+
+  it("recovers commodity Quartz and 69 SCU on a dropoff objective", () => {
+    const out = parseContractOcr(cleanedColumn);
+    expect(out.objectives.length).toBeGreaterThan(0);
+    const quartz = out.objectives.find((o) => /quartz/i.test(o.commodity));
+    expect(quartz).toBeDefined();
+    expect(quartz?.kind).toBe("dropoff");
+    // 69 from the "0/69" fraction (denominator = contract total).
+    const scus = out.objectives.map((o) => o.scu).filter((s) => s !== null);
+    expect(scus).toContain(69);
+  });
+
+  it("recovers all four dropoff station names", () => {
+    const out = parseContractOcr(cleanedColumn);
+    const locations = out.objectives.map((o) => o.location);
+    expect(locations).toContain("Seraphim Station");
+    expect(locations).toContain("Baijini Point");
+    expect(locations).toContain("Port Tressler");
+    expect(locations).toContain("Everus Harbor");
+  });
+
+  it("does not double-count SCU across the dropoff legs", () => {
+    // The 69 SCU is the contract total; emitting it once (not per station)
+    // prevents inflating the cargo to 4×69. Only ONE leg carries the SCU.
+    const out = parseContractOcr(cleanedColumn);
+    const withScu = out.objectives.filter((o) => o.scu === 69);
+    expect(withScu).toHaveLength(1);
+  });
+});

@@ -690,7 +690,11 @@ function createMockApi(): ApiBridge {
       outcome: "error" as const,
       error: "Screen capture is unavailable in standalone dev mode.",
     }),
-    recognizeOcr: async (_imageDataUrl: string, _psm?: "6" | "11") => ({
+    recognizeOcr: async (
+      _imageDataUrl: string,
+      _psm?: "6" | "11",
+      _isFullFrame?: boolean,
+    ) => ({
       outcome: "error" as const,
       error: "OCR is unavailable in standalone dev mode.",
     }),

@@ -391,7 +391,7 @@ export function OcrCaptureDialog({
     isFullFrame = false,
   ): ReturnType<typeof recognizeContract> {
     const processed = preprocessCrop(img, srcRect, isFullFrame);
-    return recognizeContract(processed, psm);
+    return recognizeContract(processed, psm, isFullFrame);
   }
 
   /**

@@ -30,6 +30,8 @@
 // ============================================================================
 
 import { join } from "node:path";
+import type { OcrWord } from "@shared/types";
+import { isolateObjectivesColumn } from "@shared/ocrColumns";
 
 /** Result of a main-process OCR pass: raw text + a 0..1 mean-word confidence. */
 export interface OcrRecognizeResult {
@@ -117,11 +119,20 @@ export function ocrAssetDir(info: AppPathInfo): string {
  * @param assetDir     directory holding eng.traineddata.gz + the core/worker
  *                     assets (from {@link ocrAssetDir}).
  * @param psm          page-segmentation mode (default "3" = fully automatic).
+ * @param isFullFrame  true when the image is a WHOLE-screen capture (no
+ *                     calibrated region). On the full-frame path the screen has
+ *                     TWO side-by-side columns (DETAILS + PRIMARY OBJECTIVES),
+ *                     so we OCR with per-word boxes and isolate the objectives
+ *                     column ({@link isolateObjectivesColumn}) before returning
+ *                     the cleaned text. For a calibrated REGION the crop already
+ *                     isolates one column, so isolation is a no-op (default
+ *                     false keeps today's region behavior exactly).
  */
 export async function recognize(
   imageDataUrl: string,
   assetDir: string,
   psm: OcrPsm = "3",
+  isFullFrame = false,
 ): Promise<OcrRecognizeResult> {
   if (typeof imageDataUrl !== "string" || imageDataUrl.length === 0) {
     throw new Error("No image to recognize.");
@@ -160,15 +171,121 @@ export async function recognize(
       // words together — reinforces PSM 3's column split against bleed.
       preserve_interword_spaces: "1",
     });
-    const { data } = await worker.recognize(imageDataUrl);
-    const rawText = data.text ?? "";
+    // On the FULL-FRAME path we need per-word bounding boxes to geometrically
+    // isolate the PRIMARY OBJECTIVES column from the side-by-side DETAILS column.
+    // tesseract.js v7 only populates word geometry (under
+    // data.blocks[].paragraphs[].lines[].words[]) when the recognize call OPTS IN
+    // via the 3rd `output` arg `{ blocks: true }` — by default `data.blocks` is
+    // null. For the region path we keep the default (text only) — no behavior or
+    // cost change. (Verified empirically against tesseract.js 7.0.0.)
+    const { data } = isFullFrame
+      ? await worker.recognize(imageDataUrl, {}, { blocks: true })
+      : await worker.recognize(imageDataUrl);
     const confidence =
       typeof data.confidence === "number"
         ? Math.max(0, Math.min(1, data.confidence / 100))
         : 0;
+
+    // REGION path: return tesseract's flattened text unchanged (the crop already
+    // isolated one column). FULL-FRAME path: rebuild clean text from just the
+    // objectives column using the per-word boxes. Since fullFrameScale() === 1×,
+    // the word boxes are already in source-image space — no inverse-scale needed.
+    if (!isFullFrame) {
+      return { rawText: data.text ?? "", confidence };
+    }
+    const words = wordsFromPage(data);
+    const isolated = isolateObjectivesColumn(
+      words,
+      pageWidth(data, words),
+      pageHeight(data, words),
+    );
+    // Defensive: if isolation produced nothing (no words/empty), fall back to
+    // tesseract's flattened text so the full-frame path is never WORSE than the
+    // region path's behavior.
+    const rawText = isolated.length > 0 ? isolated : (data.text ?? "");
     return { rawText, confidence };
   } finally {
     // Always free the worker — a leaked worker holds the wasm heap alive.
     await worker.terminate();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Word-box extraction from a tesseract.js v7 Page (full-frame path only)
+// ---------------------------------------------------------------------------
+//
+// tesseract.js is dynamically imported, so we describe ONLY the nested shape we
+// read (blocks -> paragraphs -> lines -> words, each word a {text, bbox,
+// confidence}) with a minimal structural type — no static tesseract import at
+// module load. This shape was confirmed empirically against tesseract.js 7.0.0.
+
+/** Minimal structural view of a tesseract Word (what we read). */
+interface TessWordLike {
+  text?: string;
+  confidence?: number;
+  bbox?: { x0?: number; y0?: number; x1?: number; y1?: number };
+}
+/** Minimal structural view of a tesseract Page (what we read). */
+interface TessPageLike {
+  text?: string;
+  blocks?: Array<{
+    paragraphs?: Array<{ lines?: Array<{ words?: TessWordLike[] }> }>;
+  }> | null;
+}
+
+/**
+ * Flatten a tesseract Page's nested block/paragraph/line tree into the flat
+ * {@link OcrWord}[] the pure column-isolation pass consumes. Drops words with a
+ * missing/empty text or an unusable bbox. PURE-ish (reads the page only).
+ */
+function wordsFromPage(page: TessPageLike): OcrWord[] {
+  const out: OcrWord[] = [];
+  for (const block of page.blocks ?? []) {
+    for (const para of block.paragraphs ?? []) {
+      for (const line of para.lines ?? []) {
+        for (const w of line.words ?? []) {
+          const text = typeof w.text === "string" ? w.text.trim() : "";
+          const b = w.bbox;
+          if (
+            text.length === 0 ||
+            !b ||
+            typeof b.x0 !== "number" ||
+            typeof b.y0 !== "number" ||
+            typeof b.x1 !== "number" ||
+            typeof b.y1 !== "number"
+          ) {
+            continue;
+          }
+          out.push({
+            text,
+            x0: b.x0,
+            y0: b.y0,
+            x1: b.x1,
+            y1: b.y1,
+            confidence: typeof w.confidence === "number" ? w.confidence : 0,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Best-effort image WIDTH for the gutter heuristic. The Page doesn't expose the
+ * source dimensions directly, so we use the rightmost word edge as a lower-bound
+ * proxy (sufficient: the gutter test only needs a width scale). Falls back to a
+ * sane default when there are no words.
+ */
+function pageWidth(_page: TessPageLike, words: OcrWord[]): number {
+  let max = 0;
+  for (const w of words) if (w.x1 > max) max = w.x1;
+  return max > 0 ? max : 1;
+}
+
+/** Best-effort image HEIGHT (bottommost word edge); same rationale as width. */
+function pageHeight(_page: TessPageLike, words: OcrWord[]): number {
+  let max = 0;
+  for (const w of words) if (w.y1 > max) max = w.y1;
+  return max > 0 ? max : 1;
 }

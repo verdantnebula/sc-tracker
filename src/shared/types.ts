@@ -416,6 +416,32 @@ export interface BackfillProgress {
  * the parsed locations; the user defines the exact box at calibration time, so no
  * layout numbers are hardcoded anywhere.
  */
+/**
+ * A single word recognized by tesseract.js, with its bounding box in the
+ * recognized image's pixel space and a 0..100 confidence. tesseract.js v7 only
+ * populates per-word geometry when the recognize call opts in to block output
+ * (`worker.recognize(img, {}, { blocks: true })`), under
+ * `data.blocks[].paragraphs[].lines[].words[]`. This is the minimal slice the
+ * column-isolation pass ([[ocrColumns]]) needs — it never leaves the main
+ * process (only the cleaned `rawText` crosses IPC). PURE-friendly: a plain data
+ * shape with no tesseract types, so the isolation logic is unit-testable on
+ * synthetic word arrays.
+ */
+export interface OcrWord {
+  /** The recognized word text. */
+  text: string;
+  /** Left x of the word's bounding box, in source-image pixels. */
+  x0: number;
+  /** Top y of the word's bounding box, in source-image pixels. */
+  y0: number;
+  /** Right x of the word's bounding box, in source-image pixels. */
+  x1: number;
+  /** Bottom y of the word's bounding box, in source-image pixels. */
+  y1: number;
+  /** tesseract's per-word confidence, 0..100 (diagnostic only). */
+  confidence: number;
+}
+
 export interface OcrCaptureRegion {
   /** Left edge as a fraction of screen width, 0..1. */
   x: number;

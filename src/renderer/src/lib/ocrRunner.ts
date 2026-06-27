@@ -34,16 +34,21 @@ export interface OcrRunResult {
  * @param imageDataUrl a `data:image/png;base64,…` preprocessed crop.
  * @param psm          optional page-segmentation mode ("6" uniform block default,
  *                     "11" sparse) forwarded to the main-process tesseract pass.
+ * @param isFullFrame  true for a WHOLE-screen capture (no calibrated region) —
+ *                     forwarded to main so it isolates the PRIMARY OBJECTIVES
+ *                     column from the side-by-side DETAILS column before
+ *                     returning text. Default false (region/crop) is unchanged.
  */
 export async function recognizeContract(
   imageDataUrl: string,
   psm?: "6" | "11",
+  isFullFrame = false,
 ): Promise<OcrRunResult> {
   if (typeof imageDataUrl !== "string" || imageDataUrl.length === 0) {
     throw new Error("No image to recognize.");
   }
 
-  const result = await window.api.recognizeOcr(imageDataUrl, psm);
+  const result = await window.api.recognizeOcr(imageDataUrl, psm, isFullFrame);
   if (result.outcome !== "ok") {
     throw new Error(result.error ?? "OCR failed.");
   }

@@ -106,9 +106,13 @@ export async function runOcrPipeline(
   }
 
   // 3. PREPROCESS + 4. RECOGNIZE + 5. PARSE (recognizeContract does 4+5).
-  // `isFullFrame` tells preprocessCrop to cap the scale at 1× (memory guard).
-  const processed = preprocessCrop(img, srcRect, region == null);
-  const result = await recognizeContract(processed, "6");
+  // `isFullFrame` (region == null) tells preprocessCrop to cap the scale at 1×
+  // (memory guard) AND tells main to isolate the PRIMARY OBJECTIVES column from
+  // the side-by-side DETAILS column (a full-screen capture has both; a calibrated
+  // crop already isolated one column, so the flag stays false there).
+  const isFullFrame = region == null;
+  const processed = preprocessCrop(img, srcRect, isFullFrame);
+  const result = await recognizeContract(processed, "6", isFullFrame);
 
   // 6. FUZZY-MATCH each objective vs the bundled reference.
   const objectives = reviewObjectivesFrom(

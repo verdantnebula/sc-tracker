@@ -428,14 +428,99 @@ function parseObjectiveSpan(span: string): OcrObjective | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Multi-dropoff "DROP OFF LOCATIONS ANY ORDER" block (real screen shape)
+// ---------------------------------------------------------------------------
+//
+// The real contract screen often shows ONE "Deliver <done>/<total> SCU of
+// <commodity>" objective with NO inline "to <destination>", paired with a
+// separate "DROP OFF LOCATIONS ANY ORDER" block listing several
+// "Freight elevator at <Station> above <body>" dropoff lines. The single-line
+// verb-span parser can't reach those destinations (they're not after a "to"),
+// so we handle this shape with a dedicated pre-pass:
+//   - read the commodity + SCU from the lone "Deliver … SCU of <commodity>",
+//   - read each "Freight elevator at <Station>" station name,
+//   - emit ONE dropoff objective per station, all carrying the commodity. Only
+//     the FIRST carries the SCU (the contract total); the rest are null so the
+//     cargo total isn't multiplied across the N "any order" destinations.
+//
+// FOLLOW-UP (noted, intentionally not done here to keep the blast radius small):
+// the OcrObjective shape is one-location-per-objective, so a single Deliver with
+// N "any order" dropoffs is modeled as N separate dropoff legs (SCU on the
+// first only). A future enhancement could model "one delivery, choose any of N
+// dropoffs" as a single objective with alternate locations; that needs a richer
+// objective shape + store/apply changes and is out of scope for this fix.
+
+// A lone "Deliver <amount> SCU of <commodity>" with NO "to <dest>" (the
+// multi-dropoff form). Amount is the usual optional "<done>/<total>" fraction or
+// a lone number; group 1 = numerator, group 2 = kept number, group 3 = commodity.
+// Anchored to end-of-line so an inline "… to <dest>" form is NOT captured here
+// (that stays on the normal verb-span path).
+const DELIVER_NO_DEST_RE = new RegExp(
+  `\\bdeliver\\b[^0-9a-z]*${SCU_PREAMBLE}([a-z0-9 .,'-]+?)\\s*$`,
+  "im",
+);
+// One "Freight elevator at <Station> [above <body>]" dropoff line. The station
+// span runs to "above" / end-of-line; trimDestination tightens it afterward.
+const FREIGHT_ELEVATOR_RE = /freight\s+elevator\s+at\s+(.+?)\s*$/gim;
+// The block header that marks the "any order" multi-dropoff layout.
+const DROPOFF_BLOCK_RE = /drop\s*off\s+locations/i;
+
+/**
+ * Detect + parse the "DROP OFF LOCATIONS ANY ORDER" multi-dropoff shape. Returns
+ * one dropoff OcrObjective per "Freight elevator at <Station>" line (commodity +
+ * SCU from the lone Deliver), or null when this shape isn't present (so the
+ * caller falls back to the normal verb-span parser). PURE.
+ */
+function extractMultiDropoff(text: string): OcrObjective[] | null {
+  // Only engage on the explicit multi-dropoff block header.
+  if (!DROPOFF_BLOCK_RE.test(text)) return null;
+
+  // Collect the Freight-elevator station lines (operate on the ORIGINAL,
+  // line-preserving text so each dropoff stays on its own line).
+  FREIGHT_ELEVATOR_RE.lastIndex = 0;
+  const stations: string[] = [];
+  let fm: RegExpExecArray | null;
+  while ((fm = FREIGHT_ELEVATOR_RE.exec(text)) !== null) {
+    const station = trimDestination(fm[1] ?? "");
+    if (station.length > 0) stations.push(station);
+  }
+  if (stations.length === 0) return null;
+
+  // Read the lone "Deliver … SCU of <commodity>" (no inline destination). If
+  // there's no such line, this isn't the shape we handle here.
+  const dm = DELIVER_NO_DEST_RE.exec(text);
+  if (!dm) return null;
+  const commodity = cleanOcrSpan(dm[3] ?? "");
+  if (commodity.length === 0) return null;
+  const totalScu = dm[1] ? pickScu(dm[2]) : pickScu(undefined, dm[2]);
+
+  // One dropoff per station; SCU on the first only (the contract total).
+  return stations.map((location, i) => ({
+    kind: "dropoff" as const,
+    scu: i === 0 ? totalScu : null,
+    commodity,
+    location,
+  }));
+}
+
 /**
  * Pull every objective out of the OCR text. Normalizes the whole block to one
  * continuous line (rejoining names/sentences wrapped across lines), then splits
  * it into verb-led spans (the next verb keyword bounds the previous span) and
  * parses each span independently. Objectives with empty commodity AND location
  * after cleaning are dropped (pure noise). Order of appearance is preserved.
+ *
+ * Before the verb-span pass, a dedicated pre-pass handles the real-screen
+ * "DROP OFF LOCATIONS ANY ORDER" multi-dropoff shape (a lone Deliver + several
+ * "Freight elevator at <Station>" lines), which the single-line parser can't
+ * reach; see {@link extractMultiDropoff}.
  */
 function extractObjectives(text: string): OcrObjective[] {
+  // Pre-pass: the real-screen multi-dropoff block (lone Deliver + N stations).
+  const multi = extractMultiDropoff(text);
+  if (multi && multi.length > 0) return multi;
+
   // Normalize first: collapse newlines + multiple spaces into single spaces so a
   // destination/commodity wrapped across lines rejoins ("Melodic Fields" +
   // "Station" -> "Melodic Fields Station").

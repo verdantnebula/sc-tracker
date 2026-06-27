@@ -234,9 +234,14 @@ export interface IpcRequestMap {
    * Run tesseract.js OCR (in main) over a PREPROCESSED crop PNG data URL
    * (Phase F). Optional `psm` selects the page-segmentation mode ("6" uniform
    * block, default; "11" sparse) so the renderer can retry a loose layout.
+   * `isFullFrame` is true ONLY for a whole-screen capture (no calibrated region):
+   * main then captures per-word boxes and isolates the PRIMARY OBJECTIVES column
+   * from the side-by-side DETAILS column before returning the cleaned text. For a
+   * calibrated region it stays false (the crop already isolates one column) and
+   * the behavior is unchanged.
    */
   [IPC.OCR_RECOGNIZE]: {
-    args: [imageDataUrl: string, psm?: "6" | "11"];
+    args: [imageDataUrl: string, psm?: "6" | "11", isFullFrame?: boolean];
     result: OcrRecognizeResult;
   };
 
@@ -395,10 +400,14 @@ export interface ApiBridge {
   /**
    * Run OCR (in main) over a PREPROCESSED crop PNG data URL; resolves text +
    * confidence. Optional `psm` selects the page-segmentation mode (default "6").
+   * `isFullFrame` true (whole-screen capture, no region) makes main isolate the
+   * PRIMARY OBJECTIVES column before returning text; false (a calibrated region)
+   * keeps the unchanged crop-text behavior.
    */
   recognizeOcr(
     imageDataUrl: string,
     psm?: "6" | "11",
+    isFullFrame?: boolean,
   ): Promise<OcrRecognizeResult>;
 
   // --- overlay window (Phase D) ---
