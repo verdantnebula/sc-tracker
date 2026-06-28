@@ -492,15 +492,70 @@ const REWARD_UNIT_RE = /([0-9OoQlI|SsB.,\s]{2,})\s*a?[\s.]*uec\b/gim;
 // gap chars (whitespace, punctuation, 1-2 stray letters) between the label and
 // the number, instead of just an optional colon/period. The gap is bounded
 // ([^0-9\n]{0,6}) so it can't leap across unrelated text to a distant number.
+// The captured number also absorbs SPACE-grouped thousands ("191 500") via the
+// trailing "(?:\s\d{3})*", so a space-separated reward isn't truncated to its
+// first group (the comma/period separators are already inside the char class).
 const REWARD_LABEL_RE =
-  /\b(?:reward|payout|pay)\b[^0-9\n]{0,6}?([0-9OoQlI|SsB.,]{2,})/gim;
+  /\b(?:reward|payout|pay)\b[^0-9\n]{0,6}?([0-9OoQlI|SsB.,]{2,}(?:\s\d{3})*)/gim;
+
+// LAST-RESORT money-shape fallback (Item 3). When BOTH the unit-anchored and the
+// label-anchored paths find nothing — e.g. the "Reward" label OCR'd as "Rewarc"
+// AND the aUEC glyph read as junk so there's no unit to anchor on — we scan for
+// the largest "money-shaped" figure on the screen. A reward figure looks like a
+// grouped thousands number (345,500 / 191.500 / 191 500) OR a bare run of 5+
+// digits; we take the LARGEST such figure (the contract reward dwarfs any small
+// stray number). This is GATED to fire only when the primary paths are empty, and
+// it EXCLUDES SCU amounts (n/total fractions and any number adjacent to "SCU"),
+// which are the only other big numbers on a contract screen. It feeds the
+// review-before-apply UI, so a wrong guess is correctable — but the exclusions +
+// the gate keep false positives low.
+//
+// A grouped-thousands figure: 1-3 digits, then 1+ groups of <sep><exactly 3
+// digits>, where <sep> is comma/period/space. This anchors on the 3-digit
+// grouping so a lone "2400" (no grouping, <5 digits) is NOT money-shaped.
+const MONEY_GROUPED_RE = /\b(\d{1,3}(?:[.,  ]\d{3})+)/g;
+// A bare run of 5+ digits (e.g. "290500" with no separators).
+const MONEY_BARE_RE = /\b(\d{5,})\b/g;
+// An SCU amount we must NOT treat as a reward: an "n/total" fraction, or any
+// number immediately followed by (optional space then) an "SCU" unit. Used to
+// blank out SCU figures from the text BEFORE the money-shape scan so they can't
+// be mis-grabbed. "[5S]cu" mirrors the parser's tolerance for the "5CU" misread.
+const SCU_AMOUNT_RE = /\b\d[\d.,/ ]*\s*[5S]?cu\b/gi;
+const SCU_FRACTION_RE = /\b\d[\d.,]*\s*\/\s*\d[\d.,]*\b/g;
+
+/**
+ * Last-resort: find the largest money-shaped figure after masking out SCU
+ * amounts/fractions. Returns null when nothing money-shaped remains. PURE.
+ */
+function recoverRewardFallback(text: string): number | null {
+  // Mask SCU amounts + fractions to spaces so the money scan can't see them.
+  const masked = text
+    .replace(SCU_FRACTION_RE, (s) => " ".repeat(s.length))
+    .replace(SCU_AMOUNT_RE, (s) => " ".repeat(s.length));
+
+  const candidates: number[] = [];
+  let m: RegExpExecArray | null;
+  MONEY_GROUPED_RE.lastIndex = 0;
+  while ((m = MONEY_GROUPED_RE.exec(masked)) !== null) {
+    const n = parseOcrNumber(m[1] ?? "");
+    if (n !== null && n > 0) candidates.push(n);
+  }
+  MONEY_BARE_RE.lastIndex = 0;
+  while ((m = MONEY_BARE_RE.exec(masked)) !== null) {
+    const n = parseOcrNumber(m[1] ?? "");
+    if (n !== null && n > 0) candidates.push(n);
+  }
+  return candidates.length > 0 ? Math.max(...candidates) : null;
+}
 
 /**
  * Find the contract reward. Prefers the strongest signal: a number directly
  * adjacent to an "aUEC" unit. Falls back to a number following a Reward/Payout
- * label. When several "aUEC" figures appear, the LARGEST is taken as the
- * contract reward (sub-rewards/fees are smaller) — a defensive heuristic, and
- * the user confirms it in the review step regardless.
+ * label. As a LAST RESORT — only when BOTH of those find nothing — scans for the
+ * largest money-shaped figure (excluding SCU amounts) via
+ * {@link recoverRewardFallback}. When several "aUEC" figures appear, the LARGEST
+ * is taken as the contract reward (sub-rewards/fees are smaller) — a defensive
+ * heuristic, and the user confirms it in the review step regardless.
  */
 function extractReward(text: string): number | null {
   const candidates: number[] = [];
@@ -517,7 +572,10 @@ function extractReward(text: string): number | null {
     const n = parseOcrNumber(m[1] ?? "");
     if (n !== null && n > 0) candidates.push(n);
   }
-  return candidates.length > 0 ? Math.max(...candidates) : null;
+  if (candidates.length > 0) return Math.max(...candidates);
+
+  // Both primary paths empty -> last-resort money-shape scan (gated here).
+  return recoverRewardFallback(text);
 }
 
 // ---------------------------------------------------------------------------

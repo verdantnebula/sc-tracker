@@ -74,6 +74,137 @@ export function similarity(a: string, b: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Confusable-character weighted edit distance (Item 1)
+// ---------------------------------------------------------------------------
+//
+// WHY. The plain Levenshtein above charges EVERY substitution a flat 1.0, so an
+// OCR glyph misread ("Quagtz" for "Quartz", "Baljini" for "Baijini", "5tims"
+// for "Stims") costs exactly as much as a genuinely different letter. But OCR
+// errors are NOT uniform — a small, well-known set of glyph pairs account for
+// most of them (i/l/1, o/0, s/5, b/8, g/9/q). Charging those pairs LESS than a
+// real substitution lets a noisy read snap to the correct reference entry while
+// a genuinely different name still accumulates full-cost edits and stays
+// unmatched.
+//
+// OVER-CORRECTION GUARD (the critical constraint). Cheap swaps make EVERYTHING
+// look a little closer, which could pull an unrelated name over the threshold.
+// Two things prevent that:
+//   1. Only the small confusable set is discounted; cross-group and arbitrary
+//      substitutions still cost the full 1.0, so a different name racks up
+//      full-cost edits and can't sneak in on cheap swaps alone.
+//   2. fuzzyMatch keeps the SAME 0.6 accept threshold as before (it never
+//      lowers it), so the discount only helps inputs that were already close.
+//      A clearly-different string ("Zworblax Station" vs "Baijini Point") has
+//      far more than a couple of confusable positions and stays well below 0.6.
+
+/** Per-character cost of a CONFUSABLE substitution (vs 1.0 for a normal one). */
+export const CONFUSABLE_SUB_COST = 0.4;
+
+/**
+ * OCR look-alike groups (defined in NORMALIZED space — lowercase a-z0-9, since
+ * normalizeForMatch strips everything else, so "|"/"!" never reach this map).
+ * A substitution between two members of the SAME group is "cheap"
+ * ({@link CONFUSABLE_SUB_COST}); any other substitution costs the full 1.0.
+ */
+const CONFUSABLE_GROUPS: readonly string[] = [
+  "il1", // i / l / 1  (and |,! — stripped by normalize before they arrive)
+  "o0", // o / 0
+  "s5", // s / 5
+  "b8", // b / 8  (B lowercases to b)
+  "g9q", // g / 9 / q
+];
+
+/** char -> group id, for O(1) "are these two chars confusable?" checks. */
+const CHAR_GROUP: ReadonlyMap<string, number> = (() => {
+  const m = new Map<string, number>();
+  CONFUSABLE_GROUPS.forEach((group, gi) => {
+    for (const ch of group) m.set(ch, gi);
+  });
+  return m;
+})();
+
+/** Substitution cost for replacing `a` with `b`: 0 if equal, cheap if they are
+ *  in the same confusable group, else the full 1.0. */
+function subCost(a: string, b: string): number {
+  if (a === b) return 0;
+  const ga = CHAR_GROUP.get(a);
+  if (ga !== undefined && ga === CHAR_GROUP.get(b)) return CONFUSABLE_SUB_COST;
+  return 1;
+}
+
+/**
+ * Confusable-aware Levenshtein. Same two-row DP as {@link levenshtein}, but the
+ * substitution cost comes from {@link subCost}, so an OCR look-alike swap is
+ * charged {@link CONFUSABLE_SUB_COST} instead of 1.0. Insertions/deletions stay
+ * at 1.0. The optional `{rn -> m}` / `{m -> rn}` collapse is handled as a cheap
+ * 2-for-1 transition (one m aligns with "rn" at near-confusable cost) so
+ * "Titaniurn" reads as "Titanium". PURE, never throws.
+ */
+export function weightedLevenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  let prev = new Array<number>(b.length + 1);
+  let curr = new Array<number>(b.length + 1);
+  let prev2 = new Array<number>(b.length + 1); // i-2 row, for the rn<->m rule
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const ca = a[i - 1];
+      const cb = b[j - 1];
+      let best = Math.min(
+        prev[j] + 1, // deletion
+        curr[j - 1] + 1, // insertion
+        prev[j - 1] + subCost(ca, cb), // substitution
+      );
+      // OPTIONAL {rn <-> m} merge: align a single "m" on one side with "rn" on
+      // the other for a cheap combined cost (one glyph misread as two). Costs
+      // CONFUSABLE_SUB_COST for the pair (cheaper than the 2 edits it replaces).
+      if (
+        i >= 2 &&
+        ca === "n" &&
+        a[i - 2] === "r" &&
+        cb === "m" &&
+        prev2[j - 1] !== undefined
+      ) {
+        best = Math.min(best, prev2[j - 1] + CONFUSABLE_SUB_COST);
+      }
+      if (
+        j >= 2 &&
+        cb === "n" &&
+        b[j - 2] === "r" &&
+        ca === "m" &&
+        prev[j - 2] !== undefined
+      ) {
+        best = Math.min(best, prev[j - 2] + CONFUSABLE_SUB_COST);
+      }
+      curr[j] = best;
+    }
+    const tmp = prev2;
+    prev2 = prev;
+    prev = curr;
+    curr = tmp;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Similarity in [0,1] from the {@link weightedLevenshtein} distance over the
+ * longer length. Identical to {@link similarity} but confusable-aware, so an
+ * OCR-glyph-only difference scores HIGHER than a plain-Levenshtein score would.
+ * Empty-vs-empty is 1. Clamped to [0,1] (cheap fractional costs can never make
+ * the distance exceed maxLen, but we clamp defensively).
+ */
+export function confusableSimilarity(a: string, b: string): number {
+  if (a.length === 0 && b.length === 0) return 1;
+  const max = Math.max(a.length, b.length);
+  if (max === 0) return 1;
+  const s = 1 - weightedLevenshtein(a, b) / max;
+  return s < 0 ? 0 : s > 1 ? 1 : s;
+}
+
+// ---------------------------------------------------------------------------
 // Match result + the matcher
 // ---------------------------------------------------------------------------
 
@@ -133,7 +264,12 @@ export function fuzzyMatch(
       return { value: cand, score: 1 };
     }
 
-    let score = similarity(normInput, normCand);
+    // Confusable-aware similarity: an OCR glyph misread (i/l/1, o/0, s/5, b/8,
+    // g/9/q, rn<->m) costs less than a real substitution, so a noisy read snaps
+    // to the right entry. The accept threshold is UNCHANGED (see below), so a
+    // genuinely different name — which has many full-cost edits, not just a
+    // couple of cheap swaps — still stays below it (over-correction guard).
+    let score = confusableSimilarity(normInput, normCand);
 
     // Containment boost: OCR frequently reads a fragment of a longer name.
     const [shorter, longer] =

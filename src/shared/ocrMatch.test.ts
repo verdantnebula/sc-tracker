@@ -8,11 +8,13 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  confusableSimilarity,
   fuzzyMatch,
   levenshtein,
   matchTitleToMissions,
   normalizeForMatch,
   similarity,
+  weightedLevenshtein,
 } from "./ocrMatch";
 
 // ---------------------------------------------------------------------------
@@ -144,6 +146,106 @@ describe("fuzzyMatch — noisy input", () => {
     const r = fuzzyMatch("Thundering Express Station", PREFIXED);
     expect(r.value).toBe("L3 Thundering Express Station");
     expect(r.score).toBeGreaterThan(0.6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Confusable-weighted edit distance (Item 1)
+// ---------------------------------------------------------------------------
+// OCR look-alike substitutions (i/l/1, o/0, s/5, b/8, g/9/q) should cost LESS
+// than an arbitrary substitution, so a glyph misread snaps to the right
+// reference entry — WITHOUT letting a genuinely different name snap to a wrong
+// one (the over-correction guard).
+
+describe("weightedLevenshtein (confusable-aware distance)", () => {
+  it("is 0 for identical strings", () => {
+    expect(weightedLevenshtein("quartz", "quartz")).toBe(0);
+  });
+
+  it("charges a confusable swap LESS than a normal substitution", () => {
+    // "quagtz" vs "quartz": g<->r is NOT a confusable pair (normal cost 1).
+    const normal = weightedLevenshtein("quaXtz", "quartz"); // X->r, arbitrary
+    // "quagtz": g is confusable with q/9 but not r, so g->r is still ~1 here;
+    // use a real confusable case: "0" vs "o" is a cheap swap.
+    const cheap = weightedLevenshtein("0livar", "olivar"); // 0<->o cheap
+    expect(cheap).toBeLessThan(normal);
+    expect(cheap).toBeCloseTo(0.4, 5);
+  });
+
+  it("treats each confusable group as cheap (i/l/1, o/0, s/5, b/8, g/9/q)", () => {
+    expect(weightedLevenshtein("l", "1")).toBeCloseTo(0.4, 5); // i/l/1
+    expect(weightedLevenshtein("o", "0")).toBeCloseTo(0.4, 5); // o/0
+    expect(weightedLevenshtein("s", "5")).toBeCloseTo(0.4, 5); // s/5
+    expect(weightedLevenshtein("b", "8")).toBeCloseTo(0.4, 5); // b/8
+    expect(weightedLevenshtein("g", "9")).toBeCloseTo(0.4, 5); // g/9/q
+    expect(weightedLevenshtein("q", "g")).toBeCloseTo(0.4, 5); // g/9/q
+  });
+
+  it("still charges a full unit for a non-confusable substitution", () => {
+    expect(weightedLevenshtein("a", "z")).toBe(1);
+    expect(weightedLevenshtein("o", "s")).toBe(1); // cross-group, not cheap
+  });
+});
+
+describe("confusableSimilarity", () => {
+  it("scores a confusable-only difference higher than plain similarity", () => {
+    // "titaniurn" vs "titanium": rn<->m (optional) OR treat the tail noise.
+    // Use a clean confusable case: "quagtz" vs "quartz" only differs at g/r,
+    // but a pure confusable example: "5tims" vs "stims".
+    expect(confusableSimilarity("5tims", "stims")).toBeGreaterThan(
+      similarity("5tims", "stims"),
+    );
+  });
+
+  it("is 1 for identical and bounded in [0,1]", () => {
+    expect(confusableSimilarity("quartz", "quartz")).toBe(1);
+    expect(confusableSimilarity("", "")).toBe(1);
+    const s = confusableSimilarity("abc", "xyz");
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("fuzzyMatch — confusable OCR hits snap to the right reference entry", () => {
+  const STATIONS = [
+    "Baijini Point",
+    "Everus Harbor",
+    "Seraphim Station",
+    "Port Olisar",
+    "Area 18",
+  ];
+  const COMMODITIES_X = ["Titanium", "Quartz", "Aluminum", "Stims", "Tungsten"];
+
+  it("snaps 'Baljini' -> Baijini Point (i/l/1 confusable)", () => {
+    const r = fuzzyMatch("Baljini Point", STATIONS);
+    expect(r.value).toBe("Baijini Point");
+  });
+
+  it("snaps 'Quagtz' -> Quartz (g/q confusable + close)", () => {
+    const r = fuzzyMatch("Quagtz", COMMODITIES_X);
+    expect(r.value).toBe("Quartz");
+  });
+
+  it("snaps '0livar' -> Port Olisar-style (o/0 confusable)", () => {
+    const r = fuzzyMatch("Port 0lisar", STATIONS);
+    expect(r.value).toBe("Port Olisar");
+  });
+
+  it("snaps 'Titaniurn' -> Titanium (rn<->m confusable, optional group)", () => {
+    const r = fuzzyMatch("Titaniurn", COMMODITIES_X);
+    expect(r.value).toBe("Titanium");
+  });
+
+  // OVER-CORRECTION GUARD: a clearly-different made-up name must NOT snap to any
+  // real reference entry even with cheap confusable swaps in play.
+  it("does NOT snap a clearly-different name to any reference entry", () => {
+    const r = fuzzyMatch("Zworblax Station", STATIONS);
+    expect(r.value).toBeNull();
+  });
+
+  it("does NOT snap an unrelated commodity to a real one", () => {
+    const r = fuzzyMatch("Xenophyte", COMMODITIES_X);
+    expect(r.value).toBeNull();
   });
 });
 

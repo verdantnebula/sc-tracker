@@ -228,6 +228,63 @@ describe("parseContractOcr — reward", () => {
     const out = parseContractOcr("Deliver 5 SCU of Stims to Grim HEX");
     expect(out.reward).toBeNull();
   });
+
+  // -------------------------------------------------------------------------
+  // Last-resort money-shape fallback (Item 3) — only when label AND unit fail.
+  // -------------------------------------------------------------------------
+
+  it("recovers the number when the Reward label is garbled and no unit reads", () => {
+    // "Rewarc" (d->c) won't match the \breward\b label, and there's no aUEC unit
+    // to anchor on — the money-shape fallback grabs the grouped figure.
+    const out = parseContractOcr("Rewarc H 345,500");
+    expect(out.reward).toBe(345500);
+  });
+
+  it("recovers a period-grouped figure with a coin-glyph label", () => {
+    const out = parseContractOcr("Reward # 191.500");
+    expect(out.reward).toBe(191500);
+  });
+
+  it("recovers a space-grouped figure when feasible", () => {
+    const out = parseContractOcr("Reward # 191 500");
+    expect(out.reward).toBe(191500);
+  });
+
+  it("picks the LARGEST money-shaped figure in the fallback", () => {
+    // Two grouped figures, no label/unit -> the larger is the reward.
+    const out = parseContractOcr("blah 12,000 ... grurble 88,500 xx");
+    expect(out.reward).toBe(88500);
+  });
+
+  it("does NOT false-grab from a body with only SCU amounts/fractions", () => {
+    // Realistic objectives: amounts are all adjacent to SCU or are n/total
+    // fractions. The fallback must NOT mistake any of these for a reward.
+    const body = [
+      "Deliver 0/106 SCU of Titanium to Baijini Point",
+      "Collect 32 SCU of Quartz from Everus Harbor",
+      "Max Box Size 4 SCU",
+    ].join("\n");
+    const out = parseContractOcr(body);
+    expect(out.reward).toBeNull();
+  });
+
+  it("does NOT grab a bare 4-digit number (below the 5-digit money floor)", () => {
+    // 2400 is not grouped and is < 5 digits -> not money-shaped -> no false grab.
+    const out = parseContractOcr("Container 2400 units somewhere");
+    expect(out.reward).toBeNull();
+  });
+
+  it("does NOT fire when the primary unit path already found a reward", () => {
+    // A real aUEC reward plus a stray large number: the unit path wins and the
+    // fallback never runs, so a bigger non-reward figure can't override it.
+    const out = parseContractOcr("Reward 45,000 aUEC\nSerial 9999999");
+    expect(out.reward).toBe(45000);
+  });
+
+  it("recovers a bare 5+ digit run when no grouping is present", () => {
+    const out = parseContractOcr("Rewarc 290500");
+    expect(out.reward).toBe(290500);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -235,30 +235,69 @@ export function fullFrameRect(srcW: number, srcH: number): Rect {
 }
 
 /**
- * The output scale for a FULL-FRAME OCR pass — the critical memory guard.
- *
- * A full-resolution frame must NEVER be blindly upscaled the way a small cropped
- * region is: a 4K frame (3840×2160) at the cropped-region's 3–4× would become an
- * ~11k×6k / ~15k×8k canvas and blow up memory (and add no legible detail, since
- * the source pixels are already there). So the full-frame factor is capped at 1×
- * (never upscaled). We also never DOWNSCALE below 1× — losing pixels only hurts
- * OCR — so the factor is exactly 1 for any valid full frame.
- *
- * Numbers, by design:
- *  - 3840×2160 full frame  -> factor 1   (stays 3840×2160; ~33 MB RGBA, fine)
- *  - 1280×720  full frame  -> factor 1   (stays 1280×720; NOT upscaled to ~1200px
- *                                          tall like a crop would be)
- *  - a small CROPPED region (e.g. 800×300) still goes through {@link normalizeScale}
- *    in the pipeline and upscales toward the target height (3–4×) for legibility.
- *
- * PURE + total. `_srcW`/`_srcH` are accepted for symmetry and to document that the
- * decision is intentionally INDEPENDENT of the frame size (always 1×).
- *
- * @param _srcW the captured frame's true pixel width (unused; documents intent).
- * @param _srcH the captured frame's true pixel height (unused; documents intent).
+ * Target for a full frame's LONG side after upscale (px). Tesseract reads best
+ * near ~300 DPI; for a typical mobiGlas capture, landing the long side around
+ * ~2400px brings the small contract glyphs into a size it recognizes well. Set
+ * inside the 2200–2600 window: high enough to help a 1080p/720p capture, low
+ * enough that a 4K frame (already 3840 long) needs no upscale at all.
  */
-export function fullFrameScale(_srcW?: number, _srcH?: number): number {
-  return 1;
+export const FULL_FRAME_TARGET_LONG_PX = 2400;
+
+/**
+ * Hard cap on EITHER output dimension of a full-frame upscale (px) — the memory
+ * guard. The derived factor is reduced if needed so neither width nor height
+ * exceeds this, so a 4K (3840×2160) frame can never balloon toward the
+ * cropped-region 3–4× (~11k×6k) and blow up the canvas. 4000 sits just above 4K's
+ * long side, so a 4K frame stays ~1× while smaller frames still get their full
+ * target upscale.
+ */
+export const FULL_FRAME_MAX_DIM_PX = 4000;
+
+/**
+ * The output scale for a FULL-FRAME OCR pass — a BOUNDED upscale (Item 2).
+ *
+ * Unlike the old fixed 1×, a LOW-RES full frame is now upscaled toward a useful
+ * resolution (Tesseract reads best near ~300 DPI), while a high-res frame is left
+ * essentially untouched and memory is never blown:
+ *
+ *   factor = clamp( FULL_FRAME_TARGET_LONG_PX / longSide,  1,  capScale )
+ *   capScale = FULL_FRAME_MAX_DIM_PX / longSide   (so longSide*factor <= cap)
+ *
+ *  - min 1×  : NEVER downscale — losing pixels only hurts OCR.
+ *  - max cap : neither dimension may exceed {@link FULL_FRAME_MAX_DIM_PX}, so a
+ *              4K frame stays ~1× (no ~11k×6k blowup).
+ *
+ * Numbers, by design (long side drives it; aspect ratio is preserved):
+ *  - 3840×2160 (4K)    -> target/long = 2400/3840 = 0.625 -> clamped UP to 1×
+ *                         (cap 4000/3840 = 1.04 doesn't bind). Stays 3840×2160.
+ *  - 1920×1080 (1080p) -> 2400/1920 = 1.25× -> 2400×1350 (cap 4000/1920=2.08 ok).
+ *  - 1280×720  (720p)  -> 2400/1280 = 1.875× -> 2400×1350 (within cap).
+ *  - 5000×3000 (over-cap input) -> target<long -> 1× (never downscale).
+ *  - a small CROPPED region (e.g. 800×300) still goes through {@link normalizeScale}
+ *    and upscales toward the target HEIGHT (3–4×) for legibility — unchanged.
+ *
+ * PURE + total + defensive: non-finite / non-positive dims fall back to 1×.
+ *
+ * @param srcW the captured frame's true pixel width.
+ * @param srcH the captured frame's true pixel height.
+ */
+export function fullFrameScale(srcW?: number, srcH?: number): number {
+  if (
+    !Number.isFinite(srcW) ||
+    !Number.isFinite(srcH) ||
+    (srcW as number) <= 0 ||
+    (srcH as number) <= 0
+  ) {
+    return 1;
+  }
+  const longSide = Math.max(srcW as number, srcH as number);
+  const target = FULL_FRAME_TARGET_LONG_PX / longSide; // desired upscale
+  const capScale = FULL_FRAME_MAX_DIM_PX / longSide; // max before exceeding cap
+  // Never downscale (>=1); never exceed the max-dim cap. If the cap itself is
+  // below 1 (an already-over-cap frame), clamp([1, <1]) collapses to 1 — we keep
+  // 1× rather than shrinking, since downscaling hurts OCR.
+  const upper = capScale < 1 ? 1 : capScale;
+  return clamp(target, 1, upper);
 }
 
 /**

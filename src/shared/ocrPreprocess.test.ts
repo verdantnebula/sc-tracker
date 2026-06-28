@@ -8,6 +8,8 @@ import {
   luminance,
   thresholdInvert,
   OCR_PREPROCESS_DEFAULTS,
+  FULL_FRAME_TARGET_LONG_PX,
+  FULL_FRAME_MAX_DIM_PX,
   type Rect,
   type ProportionalRegion,
 } from "./ocrPreprocess";
@@ -212,23 +214,62 @@ describe("fullFrameRect (region OPTIONAL -> whole-frame OCR)", () => {
   });
 });
 
-describe("fullFrameScale (full-frame memory guard)", () => {
-  it("never upscales a large full frame (4K stays 1x, not 3-4x)", () => {
-    // Critical guard: a 3840x2160 frame at 3-4x would be ~11k-15k px wide and
-    // blow up memory. The full-frame factor is capped at 1x.
-    expect(fullFrameScale(3840, 2160)).toBe(1);
+describe("fullFrameScale (BOUNDED upscale — Item 2)", () => {
+  // Tesseract reads best near ~300 DPI; a low-res full frame benefits from a
+  // bounded upscale toward a useful long-side resolution, WITHOUT blowing memory
+  // on a 4K frame. The factor: target the long side at FULL_FRAME_TARGET_LONG_PX,
+  // never below 1x (no downscale), and cap so neither dimension exceeds
+  // FULL_FRAME_MAX_DIM_PX.
+
+  it("keeps a 4K frame at ~1x (target < long side -> clamped up to 1)", () => {
+    // 3840 long side already exceeds the ~2400 target, so no upscale; and the
+    // max-dim cap keeps it from ever growing past FULL_FRAME_MAX_DIM_PX.
+    const s = fullFrameScale(3840, 2160);
+    expect(s).toBe(1);
   });
 
-  it("does not upscale a small full frame the way a crop would", () => {
-    // A 720px-tall CROP would upscale toward 1200px (~1.67x) via normalizeScale;
-    // a 720px-tall FULL FRAME must stay 1x.
-    expect(fullFrameScale(1280, 720)).toBe(1);
-    expect(normalizeScale(1280, 720)).toBeGreaterThan(1); // crop path differs
+  it("never lets either dimension exceed the max-dim cap", () => {
+    // Even a frame whose target would push it past the cap must be clamped so
+    // 3840*s <= FULL_FRAME_MAX_DIM_PX.
+    const s = fullFrameScale(3840, 2160);
+    expect(3840 * s).toBeLessThanOrEqual(FULL_FRAME_MAX_DIM_PX);
+    expect(2160 * s).toBeLessThanOrEqual(FULL_FRAME_MAX_DIM_PX);
   });
 
-  it("is 1x regardless of (or without) frame dimensions", () => {
+  it("upscales a 1080p full frame (>1x, within the cap)", () => {
+    // 1920 long side, target ~2400 -> ~1.25x. Bounded: 1920*s <= cap.
+    const s = fullFrameScale(1920, 1080);
+    expect(s).toBeGreaterThan(1);
+    expect(1920 * s).toBeLessThanOrEqual(FULL_FRAME_MAX_DIM_PX);
+  });
+
+  it("upscales a small 720p full frame more (~2x), still within the cap", () => {
+    // 1280 long side, target ~2400 -> ~1.875x.
+    const s = fullFrameScale(1280, 720);
+    expect(s).toBeGreaterThan(1.5);
+    expect(1280 * s).toBeLessThanOrEqual(FULL_FRAME_MAX_DIM_PX);
+    // A small full frame now upscales, like (but capped differently from) a crop.
+    expect(normalizeScale(1280, 720)).toBeGreaterThan(1);
+  });
+
+  it("NEVER downscales (factor >= 1) even for an over-cap input", () => {
+    // A frame already wider than the cap must stay at 1x (not shrink) — losing
+    // pixels only hurts OCR; the memory cost is the caller's existing concern.
+    const s = fullFrameScale(5000, 3000);
+    expect(s).toBe(1);
+  });
+
+  it("is defensive: non-finite / non-positive dims fall back to 1x", () => {
+    expect(fullFrameScale(0, 1080)).toBe(1);
+    expect(fullFrameScale(1920, -1)).toBe(1);
+    expect(fullFrameScale(NaN, 1080)).toBe(1);
     expect(fullFrameScale()).toBe(1);
-    expect(fullFrameScale(100, 50)).toBe(1);
+  });
+
+  it("exposes the target + cap as documented constants", () => {
+    expect(FULL_FRAME_TARGET_LONG_PX).toBeGreaterThanOrEqual(2200);
+    expect(FULL_FRAME_TARGET_LONG_PX).toBeLessThanOrEqual(2600);
+    expect(FULL_FRAME_MAX_DIM_PX).toBeCloseTo(4000, -2);
   });
 
   it("contrast: a small cropped region still upscales toward the target height", () => {

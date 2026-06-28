@@ -112,8 +112,9 @@ export async function runOcrPipeline(
   }
 
   // 3. PREPROCESS + 4. RECOGNIZE + 5. PARSE (recognizeContract does 4+5).
-  // `isFullFrame` (region == null) tells preprocessCrop to cap the scale at 1×
-  // (memory guard) AND tells main to isolate the PRIMARY OBJECTIVES column from
+  // `isFullFrame` (region == null) tells preprocessCrop to use the bounded
+  // full-frame scale (upscale low-res toward ~300 DPI, cap a 4K frame near 1×)
+  // AND tells main to isolate the PRIMARY OBJECTIVES column from
   // the side-by-side DETAILS column (a full-screen capture has both; a calibrated
   // crop already isolated one column, so the flag stays false there).
   const isFullFrame = region == null;
@@ -189,8 +190,10 @@ export function loadImage(dataUrl: string): Promise<HTMLImageElement> {
  * SCALE DECISION (memory guard):
  *  - CROPPED region (`isFullFrame` false): a small crop is upscaled toward the
  *    target height via normalizeScale (3–4×) so the glyphs are legible.
- *  - FULL FRAME (`isFullFrame` true): capped at fullFrameScale() === 1×, so a 4K
- *    frame stays 4K instead of exploding to ~11k×6k. Never downscaled below 1×.
+ *  - FULL FRAME (`isFullFrame` true): a BOUNDED upscale via fullFrameScale — a
+ *    low-res frame is upscaled toward a ~300-DPI target while a 4K frame stays
+ *    ~1× (capped at the max-dim guard), so it never explodes to ~11k×6k. Never
+ *    downscaled below 1×.
  *
  * @param isFullFrame true when `srcRect` is the WHOLE captured frame (no region).
  */
