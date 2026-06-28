@@ -318,6 +318,63 @@ export function legKey(
 }
 
 // ---------------------------------------------------------------------------
+// Pickup objective dedup (multi-Collect convergence).
+// ---------------------------------------------------------------------------
+
+/**
+ * The real mobiGlas PRIMARY OBJECTIVES column repeats a "Collect <commodity>
+ * from <pickup>" sub-objective UNDER EACH delivery — so a contract delivering
+ * the same commodity from one origin to N destinations OCRs as N IDENTICAL
+ * pickup objectives. The game, however, models that as a SINGLE pickup leg (you
+ * load the cargo once). Applying the N copies verbatim fills the one real pickup
+ * placeholder with the first copy and then INSERTs N-1 spurious synthetic
+ * (`manual_pickup_*`) duplicates — the gap this collapses.
+ *
+ * Collapse PICKUP objectives that share a legKey (kind|commodity|location,
+ * SCU-excluded, case/whitespace-normalized — the same identity the apply/match
+ * ladder uses) into ONE, SUMMING their SCU (the total cargo to collect for that
+ * commodity/origin). SCU summing rules mirror the parser's "positive number or
+ * null" contract:
+ *   - all-null    -> null  (unreadable; routed to a fillable placeholder)
+ *   - any-known   -> sum of the known parts (nulls contribute nothing)
+ * First occurrence wins POSITION (order preserved) and seeds the merged record;
+ * later copies only contribute SCU.
+ *
+ * DROPOFFS are deliberately PASSED THROUGH untouched: two deliveries of the same
+ * commodity to DIFFERENT destinations are distinct legs, and even same-commodity
+ * same-destination deliveries are modeled as separate game objectives — collapsing
+ * them would under-count legs. Only the pickup side has the N-copies-of-one shape.
+ *
+ * PURE + total. Returns a new array; inputs are not mutated.
+ */
+export function dedupePickupObjectives(
+  objectives: OcrApplyObjective[],
+): OcrApplyObjective[] {
+  const out: OcrApplyObjective[] = [];
+  // Map a pickup's legKey -> index in `out` (so we accumulate onto the first copy).
+  const seen = new Map<string, number>();
+  for (const o of objectives) {
+    if (o.kind !== "pickup") {
+      out.push(o);
+      continue;
+    }
+    const key = legKey(o.kind, o.commodity, o.location);
+    const at = seen.get(key);
+    if (at === undefined) {
+      seen.set(key, out.length);
+      out.push({ ...o });
+      continue;
+    }
+    // Merge: accumulate SCU onto the already-emitted first copy.
+    const merged = out[at]!;
+    const a = merged.scu;
+    const b = o.scu;
+    merged.scu = a === null && b === null ? null : (a ?? 0) + (b ?? 0);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Row <-> domain mapping
 // ---------------------------------------------------------------------------
 
@@ -1368,10 +1425,16 @@ class SqliteMissionStore implements MissionStore {
    */
   applyOcrObjectives(
     missionId: string,
-    objectives: OcrApplyObjective[],
+    rawObjectives: OcrApplyObjective[],
   ): Mission {
     const m = this.rawMission(missionId);
     if (!m) throw new Error(`mission not found: ${missionId}`);
+
+    // Collapse repeated "Collect <commodity> from <pickup>" objectives (the real
+    // screen prints one PER delivery) into a single pickup per commodity/origin,
+    // summing SCU — so the one real pickup leg is filled instead of leaving N-1
+    // spurious synthetic duplicates behind. Dropoffs pass through untouched.
+    const objectives = dedupePickupObjectives(rawObjectives);
 
     // Pull the raw leg rows so we can see completed + manual_override (rowToLeg
     // intentionally drops manual_override from the public Leg type).

@@ -15,7 +15,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import type { DomainEvent } from "@shared/events";
-import { openMissionStore, type MissionStore } from "./missionStore";
+import {
+  openMissionStore,
+  dedupePickupObjectives,
+  type MissionStore,
+} from "./missionStore";
+import type { OcrApplyObjective } from "@shared/types";
 
 let store: MissionStore;
 
@@ -765,6 +770,280 @@ describe("applyOcrObjectives — C1: null/rejected SCU is never silent-0 corrupt
     ]);
     const leg = store.getMission("m1")!.legs[0];
     expect(leg.scuTotal).toBe(40); // preserved, NOT zeroed
+  });
+});
+
+// =============================================================================
+// Multi-Collect pickup convergence — the real screen repeats a "Collect X from
+// <pickup>" sub-objective UNDER EACH delivery, so a contract delivering one
+// commodity from one origin to N destinations OCRs as N IDENTICAL pickup
+// objectives. The game models that as ONE pickup leg. These must converge onto
+// the single real pickup placeholder (location filled, game id preserved) WITHOUT
+// minting synthetic duplicates.
+// =============================================================================
+
+describe("dedupePickupObjectives — collapse repeated Collect sub-objectives", () => {
+  it("collapses N identical pickups (same commodity+location) into one", () => {
+    const objs: OcrApplyObjective[] = [
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+    ];
+    const out = dedupePickupObjectives(objs);
+    expect(out.length).toBe(1);
+    expect(out[0].kind).toBe("pickup");
+    expect(out[0].commodity).toBe("Quartz");
+    expect(out[0].location).toBe("MIC-L2 Long Forest Station");
+    expect(out[0].scu).toBeNull(); // all-null stays null (fillable)
+  });
+
+  it("sums SCU across merged copies (any-known -> sum, nulls contribute 0)", () => {
+    const objs: OcrApplyObjective[] = [
+      {
+        kind: "pickup",
+        commodity: "Aluminum",
+        scu: 32,
+        location: "CRU-L4 Shallow Fields Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Aluminum",
+        scu: null,
+        location: "CRU-L4 Shallow Fields Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Aluminum",
+        scu: 18,
+        location: "CRU-L4 Shallow Fields Station",
+      },
+    ];
+    const out = dedupePickupObjectives(objs);
+    expect(out.length).toBe(1);
+    expect(out[0].scu).toBe(50); // 32 + 0 + 18
+  });
+
+  it("merges case/whitespace-insensitively (legKey-normalized)", () => {
+    const objs: OcrApplyObjective[] = [
+      { kind: "pickup", commodity: "Iron", scu: 5, location: "Lorville" },
+      {
+        kind: "pickup",
+        commodity: "  iron ",
+        scu: 7,
+        location: "  LORVILLE  ",
+      },
+    ];
+    const out = dedupePickupObjectives(objs);
+    expect(out.length).toBe(1);
+    expect(out[0].scu).toBe(12);
+    expect(out[0].commodity).toBe("Iron"); // first copy seeds the merged record
+    expect(out[0].location).toBe("Lorville");
+  });
+
+  it("keeps DISTINCT pickups (different commodity or location) separate", () => {
+    const objs: OcrApplyObjective[] = [
+      { kind: "pickup", commodity: "Iron", scu: 5, location: "Lorville" },
+      { kind: "pickup", commodity: "Gold", scu: 7, location: "Lorville" },
+      { kind: "pickup", commodity: "Iron", scu: 9, location: "Area18" },
+    ];
+    const out = dedupePickupObjectives(objs);
+    expect(out.length).toBe(3);
+  });
+
+  it("passes DROPOFFS through untouched (same commodity+dest are distinct legs)", () => {
+    const objs: OcrApplyObjective[] = [
+      { kind: "dropoff", commodity: "Iron", scu: 10, location: "Area18" },
+      { kind: "dropoff", commodity: "Iron", scu: 10, location: "Area18" },
+    ];
+    const out = dedupePickupObjectives(objs);
+    expect(out.length).toBe(2); // dropoffs are NOT deduped
+  });
+
+  it("preserves order; pickup merge does not reorder dropoffs", () => {
+    const objs: OcrApplyObjective[] = [
+      { kind: "dropoff", commodity: "Iron", scu: 10, location: "Area18" },
+      { kind: "pickup", commodity: "Iron", scu: 5, location: "Lorville" },
+      {
+        kind: "dropoff",
+        commodity: "Gold",
+        scu: 12,
+        location: "Baijini Point",
+      },
+      { kind: "pickup", commodity: "Iron", scu: 5, location: "Lorville" },
+    ];
+    const out = dedupePickupObjectives(objs);
+    expect(out.map((o) => `${o.kind}:${o.commodity}`)).toEqual([
+      "dropoff:Iron",
+      "pickup:Iron",
+      "dropoff:Gold",
+    ]);
+    const pk = out.find((o) => o.kind === "pickup")!;
+    expect(pk.scu).toBe(10);
+  });
+
+  it("does not mutate the input array or its objects", () => {
+    const objs: OcrApplyObjective[] = [
+      { kind: "pickup", commodity: "Iron", scu: 5, location: "Lorville" },
+      { kind: "pickup", commodity: "Iron", scu: 7, location: "Lorville" },
+    ];
+    dedupePickupObjectives(objs);
+    expect(objs.length).toBe(2);
+    expect(objs[0].scu).toBe(5); // original untouched
+  });
+});
+
+describe("applyOcrObjectives — multi-Collect converges onto the real pickup leg", () => {
+  it("4 identical Collect objs + 1 suppressed pickup leg -> one filled leg, NO dup", () => {
+    // The headline scenario: the game created ONE suppressed pickup placeholder
+    // (kind=pickup, commodity set, location empty, real game objectiveId). The
+    // OCR yields 4 identical "Collect Quartz from MIC-L2 ..." objectives. The
+    // pickup leg must get the location, keep its objectiveId, and NO synthetic
+    // duplicate legs may appear.
+    seedPlaceholders("m1", [{ kind: "pickup", objectiveId: "pickup_a_0" }]);
+    // Give the suppressed leg its commodity (still fillable, no manual_override).
+    store.applyOcrObjectives("m1", [
+      { kind: "pickup", commodity: "Quartz", scu: null, location: null },
+    ]);
+
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Quartz",
+        scu: null,
+        location: "MIC-L2 Long Forest Station",
+      },
+    ]);
+
+    const m = store.getMission("m1")!;
+    const pickups = m.legs.filter((l) => l.kind === "pickup");
+    expect(pickups.length).toBe(1); // converged — no synthetic duplicates
+    expect(pickups[0].id).toBe("pickup_a_0"); // real game objectiveId preserved
+    expect(pickups[0].location).toBe("MIC-L2 Long Forest Station");
+    expect(m.legs.every((l) => !l.id.startsWith("manual_"))).toBe(true);
+  });
+
+  it("suppressed pickup leg with NO commodity yet is filled by the converged pickup", () => {
+    // Even when the game created a totally blank pickup placeholder (no commodity,
+    // no location), the converged single OCR pickup fills it (commodity + location)
+    // in place — preserving the real id, no synthetic dup.
+    seedPlaceholders("m1", [{ kind: "pickup", objectiveId: "pickup_a_0" }]);
+
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "pickup",
+        commodity: "Aluminum",
+        scu: null,
+        location: "CRU-L4 Shallow Fields Station",
+      },
+      {
+        kind: "pickup",
+        commodity: "Aluminum",
+        scu: null,
+        location: "CRU-L4 Shallow Fields Station",
+      },
+    ]);
+
+    const m = store.getMission("m1")!;
+    const pickups = m.legs.filter((l) => l.kind === "pickup");
+    expect(pickups.length).toBe(1);
+    expect(pickups[0].id).toBe("pickup_a_0");
+    expect(pickups[0].commodity).toBe("Aluminum");
+    expect(pickups[0].location).toBe("CRU-L4 Shallow Fields Station");
+  });
+
+  it("full contract shape: 4 deliveries (1 pickup leg) -> 4 dropoff legs + 1 pickup leg", () => {
+    // The realistic mobiGlas shape: 4 Deliver objectives to 4 destinations, each
+    // with its own repeated Collect-from-same-origin sub-objective. The game made
+    // 4 dropoff placeholders + 1 pickup placeholder. After apply: 4 filled dropoffs
+    // + 1 filled pickup, all real ids, zero synthetic legs.
+    seedPlaceholders("m1", [
+      { kind: "pickup", objectiveId: "pickup_a_0" },
+      { kind: "dropoff", objectiveId: "dropoff_a_0" },
+      { kind: "dropoff", objectiveId: "dropoff_b_0" },
+      { kind: "dropoff", objectiveId: "dropoff_c_0" },
+      { kind: "dropoff", objectiveId: "dropoff_d_0" },
+    ]);
+
+    const origin = "MIC-L2 Long Forest Station";
+    store.applyOcrObjectives("m1", [
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 40,
+        location: "Green Glade Station",
+      },
+      { kind: "pickup", commodity: "Quartz", scu: 40, location: origin },
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 30,
+        location: "Melodic Fields Station",
+      },
+      { kind: "pickup", commodity: "Quartz", scu: 30, location: origin },
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 20,
+        location: "Thundering Express Station",
+      },
+      { kind: "pickup", commodity: "Quartz", scu: 20, location: origin },
+      {
+        kind: "dropoff",
+        commodity: "Quartz",
+        scu: 10,
+        location: "Baijini Point",
+      },
+      { kind: "pickup", commodity: "Quartz", scu: 10, location: origin },
+    ]);
+
+    const m = store.getMission("m1")!;
+    expect(m.legs.every((l) => !l.id.startsWith("manual_"))).toBe(true);
+    const dropoffs = m.legs.filter((l) => l.kind === "dropoff");
+    const pickups = m.legs.filter((l) => l.kind === "pickup");
+    expect(dropoffs.length).toBe(4); // each destination its own leg
+    expect(pickups.length).toBe(1); // the 4 Collect copies converged
+    expect(pickups[0].id).toBe("pickup_a_0");
+    expect(pickups[0].location).toBe(origin);
+    expect(pickups[0].scuTotal).toBe(100); // 40 + 30 + 20 + 10
   });
 });
 
