@@ -18,6 +18,7 @@ import {
   cleanOcrSpan,
   cleanContractTitle,
 } from "./ocrParse";
+import { fuzzyMatch } from "./ocrMatch";
 
 // ---------------------------------------------------------------------------
 // Low-level helpers
@@ -537,6 +538,130 @@ describe("parseContractOcr — full multi-leg contract (repeated dest/commodity)
 
   it("recovers exactly 8 objectives total (4 dropoffs + 4 pickups)", () => {
     expect(parseContractOcr(FULL_OCR).objectives).toHaveLength(8);
+  });
+});
+
+// =============================================================================
+// Wrapped-destination Lagrange glitch — order-independent cleanup
+// -----------------------------------------------------------------------------
+// On the real "Everus Harbor pilot's special" contract, destinations of the form
+// "<Station> at Hurston's LN Lagrange point." wrap across OCR lines and the row
+// reconstruction INTERLEAVES the qualifier's words INTO the station name:
+//   "Thundering Express Station at Hurston's L3 Lagrange point"
+//     came out as "Thundering Lagrange point Express Station"
+// while the L5 sibling reconstructed in-order and came out CLEAN. The first
+// delivery additionally absorbed the DETAILS letter's opener:
+//   "Thundering Express The folks at Everus Harbor …"
+// trimDestination must be ROBUST TO WORD ORDER: strip the Lagrange residue
+// wherever it lands and reject the greeting bleed, leaving a station name (or
+// prefix) the containment-aware fuzzy matcher snaps to the reference
+// "HUR-LN <Station>" — the SAME shape the clean L5 path already produced.
+//
+// These fixtures are SYNTHETIC (we don't have the exact raw word stream); they
+// reproduce the OBSERVED garble patterns so the fix is robust to them. The
+// commodity/SCU come from the real (game-data) contract: L3 Thundering Express
+// Station (Hydrogen Fuel 58, Ship Ammunition 94) and L5 High Course Station
+// (Quantum Fuel 89, Hydrogen Fuel 61).
+// =============================================================================
+
+describe("parseContractOcr — wrapped Lagrange destination glitch", () => {
+  const loc = (text: string): string =>
+    parseContractOcr(text).objectives[0]?.location ?? "";
+
+  it("strips MID-NAME 'Lagrange point' interleave (L3 Thundering Express)", () => {
+    // The observed garble: "Lagrange point" landed BETWEEN "Thundering" and
+    // "Express Station". The trailing-only cut can't reach it; the residue scrub
+    // must, leaving the station name in its captured order.
+    const out = loc(
+      "Deliver 0/58 SCU of Hydrogen Fuel to Thundering Lagrange point " +
+        "Express Station at Hurston's L3 Lagrange point.",
+    );
+    expect(out).toBe("Thundering Express Station");
+    expect(out).not.toMatch(/lagrange/i);
+    expect(out).not.toMatch(/point/i); // no stray "point" from the qualifier
+  });
+
+  it("rejects the opening-letter flavor bleed ('The folks …')", () => {
+    // "Station" was dropped by the garble and the DETAILS letter opener bled in.
+    // The greeting cut removes "The folks at Everus Harbor", leaving the station
+    // PREFIX which the fuzzy matcher resolves to the full reference name.
+    const out = loc(
+      "Deliver 0/58 SCU of Hydrogen Fuel to Thundering Express The folks " +
+        "at Everus Harbor are expecting this shipment.",
+    );
+    expect(out).toBe("Thundering Express");
+    expect(out).not.toMatch(/folks/i);
+    expect(out).not.toMatch(/everus/i);
+  });
+
+  it("keeps the L5 clean case working + the SAME shape (bare station name)", () => {
+    const out = loc(
+      "Deliver 0/89 SCU of Quantum Fuel to High Course Station " +
+        "at Hurston's L5 Lagrange point.",
+    );
+    expect(out).toBe("High Course Station");
+  });
+
+  it("scrubs residue even when the LN code wraps onto its own fragment", () => {
+    // Interleave variant: only "at Hurston's" lead-in survives mid-name (the LN
+    // code + "Lagrange point" wrapped elsewhere and were already scrubbed).
+    const out = loc(
+      "Deliver 0/94 SCU of Ship Ammunition to Thundering Express Station " +
+        "at Hurston's",
+    );
+    expect(out).toBe("Thundering Express Station");
+  });
+
+  it("does NOT strip a legitimate trailing 'Point' station suffix", () => {
+    // Guard: "Baijini Point" must survive — only "Lagrange point" is residue.
+    expect(loc("Deliver 0/12 SCU of Stims to Baijini Point.")).toBe(
+      "Baijini Point",
+    );
+  });
+});
+
+// END-TO-END snap: a cleaned destination must fuzzy-match the reference name with
+// the HUR-LN prefix (the shape the app shows). Confirms the parse-side fix lands
+// the user back on the same reference entry the clean path already hit.
+describe("wrapped Lagrange destination — snaps to HUR-LN reference", () => {
+  const REFS = [
+    "HUR-L3 Thundering Express Station",
+    "HUR-L5 High Course Station",
+  ] as const;
+  const cleaned = (text: string): string =>
+    parseContractOcr(text).objectives[0]?.location ?? "";
+
+  it("garbled L3 interleave snaps to 'HUR-L3 Thundering Express Station'", () => {
+    const m = fuzzyMatch(
+      cleaned(
+        "Deliver 0/58 SCU of Hydrogen Fuel to Thundering Lagrange point " +
+          "Express Station at Hurston's L3 Lagrange point.",
+      ),
+      REFS,
+    );
+    expect(m.value).toBe("HUR-L3 Thundering Express Station");
+  });
+
+  it("flavor-bled L3 prefix snaps to 'HUR-L3 Thundering Express Station'", () => {
+    const m = fuzzyMatch(
+      cleaned(
+        "Deliver 0/58 SCU of Hydrogen Fuel to Thundering Express The folks " +
+          "at Everus Harbor are expecting this shipment.",
+      ),
+      REFS,
+    );
+    expect(m.value).toBe("HUR-L3 Thundering Express Station");
+  });
+
+  it("clean L5 snaps to 'HUR-L5 High Course Station' (unchanged)", () => {
+    const m = fuzzyMatch(
+      cleaned(
+        "Deliver 0/89 SCU of Quantum Fuel to High Course Station " +
+          "at Hurston's L5 Lagrange point.",
+      ),
+      REFS,
+    );
+    expect(m.value).toBe("HUR-L5 High Course Station");
   });
 });
 

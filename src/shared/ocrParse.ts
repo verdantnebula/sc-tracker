@@ -328,6 +328,18 @@ const LOCATION_FLAVOR_RE =
 const DEST_PROSE_RE =
   /\s+(?:seems|please|contractors?|waiting|looking|processed|process|above|contact|need|needs|require|requires|delivery|shipment|containers?|elevator|crew|ready|busy|today)\b.*$/i;
 
+// OPENING-LETTER / GREETING flavor words. The contract DETAILS letter opens with
+// a salutation ("Hey, the folks at Everus Harbor …") that bleeds into a
+// destination span when the station-name capture is truncated mid-name on a
+// full-screen OCR (the observed "Thundering Express The folks …" garble). These
+// greeting/letter-prose tokens NEVER appear inside a station name, so the
+// destination is truncated at (before) the first one. Anchored on a leading
+// space so each must be its OWN token — can't fire on a substring inside a real
+// name. Distinct from DEST_PROSE_RE only for clarity of intent (letter opener vs
+// mid-sentence prose); both are applied in trimDestination.
+const DEST_GREETING_RE =
+  /\s+(?:hey|hi|hello|greetings|dear|folks|the\s+folks|good\s+(?:day|morning|evening)|expect|expecting|thanks|thank\s+you|regards|cheers|sincerely)\b.*$/i;
+
 // Station-type suffix words that legitimately END a location name. We anchor the
 // destination to the LAST such suffix (keeping an optional trailing pad/dock code
 // like "S4DC05") and cut any prose that follows it. This catches bleed that
@@ -354,6 +366,40 @@ const STATION_ANCHOR_RE = new RegExp(
 );
 
 /**
+ * Remove Lagrange-qualifier RESIDUE wherever it appears in a destination span,
+ * not just when it trails. The qualifier is "<station> at <body>('s) LN Lagrange
+ * point" — but OCR line-wrap + row reconstruction can INTERLEAVE its words into
+ * the middle of the station name, e.g. "Thundering Lagrange point Express
+ * Station" (the "Lagrange point" tokens landed between "Thundering" and "Express
+ * Station"). The trailing " at … Lagrange point" cut alone can't fix that, so we
+ * also scrub the order-independent residue tokens:
+ *   - a stray "at <body>('s) LN" fragment (the qualifier's lead-in, body + LN
+ *     code) appearing anywhere,
+ *   - a standalone "Lagrange point" / "Lagrange" token anywhere.
+ * We deliberately do NOT strip a bare "point" (no preceding "Lagrange"): "point"
+ * legitimately ENDS a station name ("Baijini Point"), so removing it blindly
+ * would corrupt real names. After scrubbing, the leftover words rejoin in their
+ * captured order ("Thundering Express Station"), which the fuzzy matcher then
+ * snaps to the reference "HUR-LN <Station>" — the SAME shape the clean path
+ * produces. PURE; order-independent by construction (defense in depth, since OCR
+ * word order is unreliable). cleanOcrSpan collapses the residual whitespace.
+ */
+function stripLagrangeResidue(s: string): string {
+  let out = s;
+  // 1. A stray "at <body>('s) L<N>" qualifier lead-in anywhere (body is 1-2 word
+  //    tokens like "Hurston" / "Hurston's" / "Crusader"; LN is L1..L5, OCR digit
+  //    confusions tolerated). Stops BEFORE consuming following station-name words.
+  out = out.replace(/\bat\s+[A-Za-z]+(?:'s|s)?\s+L[0-9OoQlI|]\b/gi, " ");
+  // 2. A standalone "Lagrange point" pair, or a lone "Lagrange", anywhere.
+  out = out.replace(/\blagrange\s+point\b/gi, " ");
+  out = out.replace(/\blagrange\b/gi, " ");
+  // 3. A lone "at <body>('s)" lead-in left behind once "Lagrange point" is gone
+  //    (e.g. interleave dropped the LN code): "at Hurston's" with nothing after.
+  out = out.replace(/\bat\s+[A-Za-z]+(?:'s|s)?\s*$/gi, " ");
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/**
  * Trim a destination/location span read after "to"/"from":
  *   - drop an " at … Lagrange point" qualifier (the fuzzy matcher keys off the
  *     station name, not the Lagrange suffix),
@@ -366,8 +412,21 @@ const STATION_ANCHOR_RE = new RegExp(
  */
 function trimDestination(raw: string): string {
   let s = raw;
-  // Cut an " at … Lagrange point" qualifier (case-insensitive).
+  // Cut an " at … Lagrange point" qualifier (case-insensitive). Fast path for the
+  // IN-ORDER capture where the qualifier trails the station name as written.
   s = s.replace(/\s+at\s+.*?lagrange\s+point.*$/i, "");
+  // Scrub Lagrange-qualifier RESIDUE that the trailing cut can't reach because
+  // OCR line-wrap interleaved its words INTO the station name (e.g. "Thundering
+  // Lagrange point Express Station"). Order-independent — see
+  // stripLagrangeResidue. Done early so the surviving station words rejoin before
+  // the station-suffix anchor runs below.
+  s = stripLagrangeResidue(s);
+  // Cut at an opening-letter / greeting flavor word ("Hey", "the folks", …) that
+  // the DETAILS letter bled into a truncated destination span. Done BEFORE the
+  // period cut because the bled greeting may carry no period (e.g. "Thundering
+  // Express The folks at Everus Harbor"). The remaining "<station-prefix>" then
+  // snaps to its full reference name via the containment-aware fuzzy matcher.
+  s = s.replace(DEST_GREETING_RE, "");
   // Cut a trailing " above <body>" qualifier — the station name precedes the
   // " above " token (e.g. "Everus Harbor above Hurston" -> "Everus Harbor";
   // "Everus Harbor above j The refinery …" -> "Everus Harbor"). Cut at the FIRST
