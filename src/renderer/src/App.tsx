@@ -42,6 +42,7 @@ import {
   type OcrPrefill,
 } from "./components/OcrCaptureDialog";
 import { AutoOcrCapture } from "./components/AutoOcrCapture";
+import { buildManualMissionDraft } from "@shared/ocrManualMission";
 
 import {
   dropoffGroups,
@@ -241,6 +242,10 @@ function CargoApp({
   const [tab, setTab] = useState<TabKey>("dropoff");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // When true, the Manual Add → OCR create-new dialog is open: an OcrCaptureDialog
+  // in create-new mode that, on Apply, mints a NEW manual mission from the capture
+  // (gated on ocrEnabled, like the other OCR entry points). Cancel creates nothing.
+  const [showManualOcr, setShowManualOcr] = useState(false);
   const [showCollectLogs, setShowCollectLogs] = useState(false);
   // When set, the MANUAL OCR capture/review dialog is open. The dialog now opens
   // its target dropdown EMPTY (no preselect) and self-captures on mount.
@@ -477,6 +482,17 @@ function CargoApp({
   const saveManual = (input: ManualMissionInput): void => {
     void window.api.addMission(input);
     setShowForm(false);
+  };
+
+  // Manual Add → OCR (create-new): create a NEW manual mission from a reviewed
+  // OCR capture and return its id so the OcrCaptureDialog can populate it via the
+  // existing applyOcr/reward path. Called ONLY on the dialog's Apply (never on
+  // Cancel), so no orphan empty mission is left behind. The draft is created with
+  // EMPTY legs (buildManualMissionDraft) — applyOcr inserts the reviewed legs
+  // fresh, keeping the SCU/null hardening + convergence path unchanged.
+  const createManualFromOcr = async (title: string): Promise<string> => {
+    const mission = await window.api.addMission(buildManualMissionDraft(title));
+    return mission.id;
   };
 
   // Persist a ship selection (Phase A). Optimistic local update + persist; the
@@ -757,6 +773,24 @@ function CargoApp({
             knownGivers={knownGivers}
             onCancel={() => setShowForm(false)}
             onSave={saveManual}
+            ocrEnabled={ocrEnabled}
+            onOcrCapture={() => setShowManualOcr(true)}
+          />
+        )}
+
+        {/* Manual Add → OCR (create-new). The SAME capture/review dialog in
+            create-new mode: on Apply it mints a NEW manual mission from the
+            capture (createManualFromOcr) then applies the reviewed objectives +
+            reward to it. Gated on ocrEnabled. Cancel leaves no mission behind. */}
+        {ocrEnabled && showManualOcr && (
+          <OcrCaptureDialog
+            missions={activeMissions}
+            reference={reference}
+            onCreateManualMission={createManualFromOcr}
+            onClose={() => {
+              setShowManualOcr(false);
+              setShowForm(false);
+            }}
           />
         )}
 

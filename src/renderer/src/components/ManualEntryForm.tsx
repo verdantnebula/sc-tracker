@@ -28,12 +28,23 @@ export function ManualEntryForm({
   knownGivers,
   onCancel,
   onSave,
+  ocrEnabled = false,
+  onOcrCapture,
 }: {
   reference: ReferenceData;
   /** Givers discovered from logs (no guessed hardcoded list). May be empty. */
   knownGivers: string[];
   onCancel: () => void;
   onSave: (input: ManualMissionInput) => void;
+  /**
+   * EXPERIMENTAL OCR (Phase F): when true, show an "OCR Capture" action in the
+   * header that captures a contract the game never tracked into a NEW manual
+   * mission (review-before-apply; nothing is created until the user confirms).
+   * Mirrors the gating of the other OCR entry points. Off => action hidden.
+   */
+  ocrEnabled?: boolean;
+  /** Open the OCR create-new capture dialog. Only meaningful when ocrEnabled. */
+  onOcrCapture?: () => void;
 }): React.JSX.Element {
   const [title, setTitle] = useState("");
   const [giver, setGiver] = useState(knownGivers[0] ?? "");
@@ -119,21 +130,50 @@ export function ManualEntryForm({
           >
             ＋ Add Cargo Mission
           </span>
-          <button
-            className="sc-ghost-btn"
-            onClick={onCancel}
-            style={{
-              width: 30,
-              height: 30,
-              background: "transparent",
-              border: "1px solid var(--border-strong)",
-              color: "var(--text-2)",
-              cursor: "pointer",
-              fontSize: 15,
-            }}
-          >
-            ✕
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* EXPERIMENTAL: OCR a never-tracked contract straight into a new
+                manual mission. Gated on ocrEnabled (hidden otherwise) so it
+                matches the other OCR entry points. Review-before-apply: the
+                dialog creates nothing until the user confirms. */}
+            {ocrEnabled && onOcrCapture && (
+              <button
+                className="sc-ghost-btn"
+                onClick={onOcrCapture}
+                title="Capture a contract by OCR and create a new manual mission from it (experimental)"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 12px",
+                  background: "rgba(52,224,224,0.08)",
+                  border: "1px solid rgba(52,224,224,0.35)",
+                  color: "var(--primary)",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  cursor: "pointer",
+                }}
+              >
+                ⊙ OCR CAPTURE
+              </button>
+            )}
+            <button
+              className="sc-ghost-btn"
+              onClick={onCancel}
+              style={{
+                width: 30,
+                height: 30,
+                background: "transparent",
+                border: "1px solid var(--border-strong)",
+                color: "var(--text-2)",
+                cursor: "pointer",
+                fontSize: 15,
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body */}

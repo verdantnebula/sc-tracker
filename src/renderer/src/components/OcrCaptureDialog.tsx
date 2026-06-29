@@ -48,6 +48,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { Mission, ReferenceData, OcrCaptureRegion } from "@shared/types";
 import { resolvePreselectTarget } from "@shared/ocrMatch";
+import { resolveManualMissionTitle } from "@shared/ocrManualMission";
+
+/**
+ * Sentinel `targetId` selecting the "create a NEW manual mission" apply target
+ * (Manual Add → OCR). Distinct from any real mission id (real ids are
+ * `manual-<ts>-<rand>` or game ids). When this is the chosen target, Apply
+ * creates a fresh manual mission from the OCR result, then applies the reviewed
+ * objectives + reward to it. Only offered when `onCreateManualMission` is set.
+ */
+export const CREATE_NEW_TARGET = "__create_new_manual_mission__";
 import {
   mapSelectionToSource,
   cropRectFromRegion,
@@ -129,6 +139,7 @@ export function OcrCaptureDialog({
   reference,
   prefill,
   preselectMissionId,
+  onCreateManualMission,
   onClose,
 }: {
   /** Active missions the result can be applied to. */
@@ -150,6 +161,16 @@ export function OcrCaptureDialog({
    * For the auto path the prefill's own `preselectMissionId` is used instead.
    */
   preselectMissionId?: string | null;
+  /**
+   * MANUAL ADD → OCR (create-new mode): when provided, the "APPLY TO" selector
+   * offers a "New manual mission" target ({@link CREATE_NEW_TARGET}). On Apply
+   * with that target, this is called to create the mission and MUST resolve to
+   * the new mission's id; the dialog then applies the reviewed objectives +
+   * reward to it via the existing applyOcr/updateMission path. Called ONLY on
+   * Apply — so Cancel leaves no orphan mission behind (review-before-apply).
+   * `title` is the resolved title to seed the new mission with.
+   */
+  onCreateManualMission?: (title: string) => Promise<string>;
   onClose: () => void;
 }): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>(
@@ -189,9 +210,18 @@ export function OcrCaptureDialog({
   // coalesce so one resolver path handles both.
   const explicitPreselect =
     prefill?.preselectMissionId ?? preselectMissionId ?? null;
-  const [targetId, setTargetId] = useState<string | null>(() =>
-    preselectTarget(explicitPreselect, prefill?.title ?? null, missions),
-  );
+  // CREATE-NEW mode (Manual Add → OCR): the dialog can mint a new manual mission
+  // on Apply. When active and nothing else pre-targets, default the selector to
+  // the "New manual mission" sentinel so it's a one-click capture-into-new-haul.
+  const createNewMode = typeof onCreateManualMission === "function";
+  const [targetId, setTargetId] = useState<string | null>(() => {
+    const pre = preselectTarget(
+      explicitPreselect,
+      prefill?.title ?? null,
+      missions,
+    );
+    return pre ?? (createNewMode ? CREATE_NEW_TARGET : null);
+  });
   const [showRaw, setShowRaw] = useState(false);
   // The user's calibrated capture region (proportions 0..1), or null until the
   // first capture draws one. Held in component state so a recalibrate / reset
@@ -537,7 +567,10 @@ export function OcrCaptureDialog({
   function applyTitlePreselect(title: string | null): void {
     setOcrTitle(title);
     setTargetId(
-      (cur) => cur ?? preselectTarget(explicitPreselect, title, missions),
+      (cur) =>
+        cur ??
+        preselectTarget(explicitPreselect, title, missions) ??
+        (createNewMode ? CREATE_NEW_TARGET : null),
     );
   }
 
@@ -545,9 +578,13 @@ export function OcrCaptureDialog({
   // user can't kick off a second capture mid-recognition.
   const busy = phase.kind === "capturing" || phase.kind === "recognizing";
 
+  // The chosen target is either the "create a new manual mission" sentinel
+  // (create-new mode) or an existing active mission. Both are valid Apply
+  // destinations; only an UNCHOSEN target (null/empty) blocks Apply.
+  const targetIsCreateNew = createNewMode && targetId === CREATE_NEW_TARGET;
   const target = missions.find((m) => m.id === targetId) ?? null;
   const canApply =
-    target !== null &&
+    (target !== null || targetIsCreateNew) &&
     (objectives.length > 0 || reward !== null) &&
     phase.kind === "review";
 
@@ -557,12 +594,30 @@ export function OcrCaptureDialog({
   // and prunes leftover unmatched placeholders — instead of appending duplicate
   // legs (the old addLegs path, Bug 1a). Any non-leg field (reward) still flows
   // through the existing audited updateMission path.
+  //
+  // CREATE-NEW (Manual Add → OCR): when the target is the sentinel, the new
+  // manual mission is created HERE — on Apply only, so a Cancel leaves nothing
+  // behind. `onCreateManualMission` returns the new id and the SAME applyOcr +
+  // reward path then populates it (a fresh, legless mission means every reviewed
+  // objective takes applyOcr's fresh-insert branch, keeping the SCU/null
+  // hardening unchanged — no merge against pre-existing legs).
   function apply(): void {
-    if (!target) return;
+    if (!canApply) return;
     const run = async (): Promise<void> => {
+      // Resolve the destination mission id, creating it now in create-new mode.
+      let destId: string;
+      if (targetIsCreateNew) {
+        if (!onCreateManualMission) return;
+        destId = await onCreateManualMission(
+          resolveManualMissionTitle(ocrTitle),
+        );
+      } else {
+        if (!target) return;
+        destId = target.id;
+      }
       if (objectives.length > 0) {
         await window.api.applyOcr(
-          target.id,
+          destId,
           objectives.map((o) => ({
             kind: o.kind,
             commodity: o.commodity,
@@ -572,7 +627,7 @@ export function OcrCaptureDialog({
         );
       }
       if (reward !== null) {
-        await window.api.updateMission(target.id, { reward });
+        await window.api.updateMission(destId, { reward });
       }
     };
     void run()
@@ -715,7 +770,11 @@ export function OcrCaptureDialog({
         {phase.kind === "applied" && (
           <ResultBanner
             ok
-            text="Applied to the mission. Review the legs in the detail panel."
+            text={
+              targetIsCreateNew
+                ? "Created a new manual mission from the capture. Review its legs in the Mission List."
+                : "Applied to the mission. Review the legs in the detail panel."
+            }
           />
         )}
 
@@ -735,6 +794,7 @@ export function OcrCaptureDialog({
             preTargeted={
               explicitPreselect !== null && targetId === explicitPreselect
             }
+            allowCreateNew={createNewMode}
             onUpdateObjective={updateObjective}
             onRemoveObjective={removeObjective}
           />
@@ -806,11 +866,13 @@ export function OcrCaptureDialog({
                 style={primaryBtn(canApply)}
                 title={
                   canApply
-                    ? "Apply the reviewed objectives to the selected mission"
+                    ? targetIsCreateNew
+                      ? "Create a new manual mission from the reviewed capture"
+                      : "Apply the reviewed objectives to the selected mission"
                     : "Select a mission first"
                 }
               >
-                APPLY TO MISSION
+                {targetIsCreateNew ? "CREATE MISSION" : "APPLY TO MISSION"}
               </button>
             )}
           </div>
@@ -1014,6 +1076,7 @@ function ReviewBody({
   targetId,
   setTargetId,
   preTargeted,
+  allowCreateNew,
   onUpdateObjective,
   onRemoveObjective,
 }: {
@@ -1029,6 +1092,12 @@ function ReviewBody({
   missions: Mission[];
   targetId: string | null;
   setTargetId: (id: string | null) => void;
+  /**
+   * Manual Add → OCR (create-new mode): when true, the "APPLY TO" selector
+   * offers a "New manual mission" option ({@link CREATE_NEW_TARGET}) so the
+   * reviewed contract can be turned into a brand-new manual haul on Apply.
+   */
+  allowCreateNew: boolean;
   /**
    * True when the dropdown was PRE-TARGETED to a specific mission by the caller
    * (the per-mission "OCR Capture" button or a confident auto correlation) and
@@ -1170,11 +1239,18 @@ function ReviewBody({
           ...(preTargeted ? { borderColor: "var(--primary)" } : null),
         }}
       >
-        {missions.length === 0 ? (
-          <option value="">No active missions</option>
-        ) : (
-          <option value="">Select a mission…</option>
+        {/* CREATE-NEW (Manual Add → OCR): offered first so the capture can become
+            a brand-new manual haul. Selecting it creates the mission on Apply. */}
+        {allowCreateNew && (
+          <option value={CREATE_NEW_TARGET}>➕ New manual mission</option>
         )}
+        {/* Placeholder only when there's no create-new option to default to. */}
+        {!allowCreateNew &&
+          (missions.length === 0 ? (
+            <option value="">No active missions</option>
+          ) : (
+            <option value="">Select a mission…</option>
+          ))}
         {missions.map((m) => (
           <option key={m.id} value={m.id}>
             {m.title || m.id}
