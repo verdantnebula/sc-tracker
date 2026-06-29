@@ -745,6 +745,8 @@ function CargoApp({
             onSetNotes={(notes) => setNotes(selected.id, notes)}
             onAbandon={() => abandon(selected.id)}
             onMarkComplete={() => markComplete(selected.id)}
+            ocrEnabled={ocrEnabled}
+            onOcrCapture={() => setOcrCaptureFor({ missionId: selected.id })}
           />
         )}
 
@@ -771,6 +773,7 @@ function CargoApp({
           <OcrCaptureDialog
             missions={activeMissions}
             reference={reference}
+            preselectMissionId={ocrCaptureFor.missionId}
             onClose={() => setOcrCaptureFor(null)}
           />
         )}

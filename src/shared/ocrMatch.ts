@@ -392,3 +392,47 @@ export function matchTitleToMissions(
   const confident = bestScore >= threshold && gap >= margin;
   return { index: bestIdx, score: bestScore, confident };
 }
+
+// ---------------------------------------------------------------------------
+// Preselect-target resolution (OCR dialog "APPLY TO")
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the initial "APPLY TO" target id for the OCR review dialog, in strict
+ * precedence order. PURE — drives the dialog's `targetId` seed so the same logic
+ * is unit-testable in isolation.
+ *
+ *   1. EXPLICIT preselect (`preselectId`) — the caller pre-targeted a specific
+ *      mission (the per-mission "OCR Capture" button in the detail panel, or a
+ *      CONFIDENT auto-correlation). Honored ONLY when that id is actually one of
+ *      the candidate missions (defensive: a stale/closed mission id falls
+ *      through rather than seeding an unselectable target).
+ *   2. CONFIDENT title match — when there is no valid explicit preselect, match
+ *      the OCR'd title against the candidates and use it ONLY on a confident
+ *      match (cleared threshold AND beat the runner-up by the margin).
+ *   3. Otherwise null — the dropdown stays EMPTY (Apply greyed until the user
+ *      deliberately picks a mission). Never guesses between near-duplicates.
+ *
+ * @param preselectId  caller's explicit pre-target (mission id), or null.
+ * @param ocrTitle     the OCR'd contract title (cleaned), or null.
+ * @param candidateIds the candidate mission ids, SAME ORDER as `candidateTitles`.
+ * @param candidateTitles the candidate mission titles, parallel to ids.
+ */
+export function resolvePreselectTarget(
+  preselectId: string | null | undefined,
+  ocrTitle: string | null | undefined,
+  candidateIds: readonly string[],
+  candidateTitles: readonly string[],
+): string | null {
+  // 1. Explicit preselect wins — but only if it's a real candidate.
+  if (preselectId && candidateIds.includes(preselectId)) return preselectId;
+
+  // 2. Fall back to a CONFIDENT title match.
+  const match = matchTitleToMissions(ocrTitle, candidateTitles);
+  if (match.confident && match.index >= 0) {
+    return candidateIds[match.index] ?? null;
+  }
+
+  // 3. No confident target — leave empty.
+  return null;
+}

@@ -47,7 +47,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Mission, ReferenceData, OcrCaptureRegion } from "@shared/types";
-import { matchTitleToMissions } from "@shared/ocrMatch";
+import { resolvePreselectTarget } from "@shared/ocrMatch";
 import {
   mapSelectionToSource,
   cropRectFromRegion,
@@ -104,30 +104,31 @@ type Phase =
   | { kind: "error"; message: string };
 
 /**
- * Resolve a CONFIDENT title-based preselect: match the OCR title against the
- * candidate missions' titles and return the matched mission id ONLY when the
- * match is confident (cleared threshold AND beat the runner-up by a margin).
- * Otherwise null — so the dropdown stays empty (preserving "default empty,
- * Apply greyed until chosen", and never a false pick between near-duplicates).
- * PURE.
+ * Resolve the dialog's initial/refreshed target id, honoring an explicit
+ * pre-target first (the per-mission "OCR Capture" button or a confident auto
+ * correlation), then falling back to a CONFIDENT title match, else null. Thin
+ * wrapper over the PURE {@link resolvePreselectTarget} so the dialog just passes
+ * its missions; precedence + the "preselect must be a real candidate" guard live
+ * in the shared, unit-tested helper.
  */
-function confidentTitleTarget(
+function preselectTarget(
+  preselectId: string | null | undefined,
   ocrTitle: string | null,
   missions: Mission[],
 ): string | null {
-  if (!ocrTitle || missions.length === 0) return null;
-  const match = matchTitleToMissions(
+  return resolvePreselectTarget(
+    preselectId,
     ocrTitle,
+    missions.map((m) => m.id),
     missions.map((m) => m.title ?? ""),
   );
-  if (!match.confident || match.index < 0) return null;
-  return missions[match.index]?.id ?? null;
 }
 
 export function OcrCaptureDialog({
   missions,
   reference,
   prefill,
+  preselectMissionId,
   onClose,
 }: {
   /** Active missions the result can be applied to. */
@@ -140,6 +141,15 @@ export function OcrCaptureDialog({
    * (capture on mount). See {@link OcrPrefill}.
    */
   prefill?: OcrPrefill;
+  /**
+   * MANUAL pre-target (per-mission capture): the mission whose detail panel
+   * launched this capture. Pre-selects the "APPLY TO" dropdown to THIS mission so
+   * the reviewed contract applies here in one click — the manual counterpart to
+   * auto-capture's `preselectMissionId`. The user can still change the target in
+   * the dropdown (escape hatch). NEVER auto-applies; review-before-apply stands.
+   * For the auto path the prefill's own `preselectMissionId` is used instead.
+   */
+  preselectMissionId?: string | null;
   onClose: () => void;
 }): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>(
@@ -173,10 +183,15 @@ export function OcrCaptureDialog({
   // but ONLY on a CONFIDENT title match (clears threshold AND beats the runner-up
   // by a margin, so two near-duplicates don't get a false pick). An unconfident
   // or ambiguous match leaves the dropdown EMPTY (Apply greyed until chosen).
-  const [targetId, setTargetId] = useState<string | null>(() => {
-    if (prefill?.preselectMissionId) return prefill.preselectMissionId;
-    return confidentTitleTarget(prefill?.title ?? null, missions);
-  });
+  // The explicit pre-target: the AUTO path supplies it via the prefill (confident
+  // correlation), the MANUAL per-mission button supplies it via the prop. They're
+  // mutually exclusive in practice (prefill ⇒ auto, preselectMissionId ⇒ manual);
+  // coalesce so one resolver path handles both.
+  const explicitPreselect =
+    prefill?.preselectMissionId ?? preselectMissionId ?? null;
+  const [targetId, setTargetId] = useState<string | null>(() =>
+    preselectTarget(explicitPreselect, prefill?.title ?? null, missions),
+  );
   const [showRaw, setShowRaw] = useState(false);
   // The user's calibrated capture region (proportions 0..1), or null until the
   // first capture draws one. Held in component state so a recalibrate / reset
@@ -514,13 +529,16 @@ export function OcrCaptureDialog({
 
   /**
    * Record the OCR'd title and, when the user hasn't already picked a target,
-   * pre-select the matching mission ONLY on a CONFIDENT title match (else leave
-   * the dropdown empty). Called by every manual capture path once OCR completes.
-   * Never overrides a target the user has already chosen this session.
+   * pre-select the target — honoring an explicit pre-target first (the per-mission
+   * capture button), then a CONFIDENT title match, else leaving the dropdown empty.
+   * Called by every manual capture path once OCR completes. Never overrides a
+   * target the user has already chosen this session.
    */
   function applyTitlePreselect(title: string | null): void {
     setOcrTitle(title);
-    setTargetId((cur) => cur ?? confidentTitleTarget(title, missions));
+    setTargetId(
+      (cur) => cur ?? preselectTarget(explicitPreselect, title, missions),
+    );
   }
 
   // Busy = an in-flight capture/OCR pass; disables the footer controls so the
@@ -714,6 +732,9 @@ export function OcrCaptureDialog({
             missions={missions}
             targetId={targetId}
             setTargetId={setTargetId}
+            preTargeted={
+              explicitPreselect !== null && targetId === explicitPreselect
+            }
             onUpdateObjective={updateObjective}
             onRemoveObjective={removeObjective}
           />
@@ -992,6 +1013,7 @@ function ReviewBody({
   missions,
   targetId,
   setTargetId,
+  preTargeted,
   onUpdateObjective,
   onRemoveObjective,
 }: {
@@ -1007,6 +1029,13 @@ function ReviewBody({
   missions: Mission[];
   targetId: string | null;
   setTargetId: (id: string | null) => void;
+  /**
+   * True when the dropdown was PRE-TARGETED to a specific mission by the caller
+   * (the per-mission "OCR Capture" button or a confident auto correlation) and
+   * the user hasn't changed it. Drives a small "pre-targeted" hint so the chosen
+   * mission is obvious; the dropdown stays fully changeable.
+   */
+  preTargeted: boolean;
   onUpdateObjective: (i: number, p: Partial<ReviewObjective>) => void;
   onRemoveObjective: (i: number) => void;
 }): React.JSX.Element {
@@ -1107,13 +1136,39 @@ function ReviewBody({
 
       {/* target mission selector — the SINGLE dropdown, after the objectives.
           Defaults to an empty placeholder so the APPLY button stays disabled
-          until the user deliberately picks a mission (or an auto pre-target). */}
+          until the user deliberately picks a mission (or an auto pre-target).
+          When PRE-TARGETED (per-mission capture button / confident auto), the
+          dropdown is seeded to that mission and a hint makes it obvious — but it
+          stays fully changeable (escape hatch); it does NOT auto-apply. */}
       <label style={fieldLabel}>APPLY TO</label>
+      {preTargeted && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            margin: "0 0 6px",
+            fontFamily: "var(--font-display)",
+            fontSize: 11,
+            lineHeight: 1.4,
+            color: "var(--primary)",
+          }}
+        >
+          <span aria-hidden="true">📌</span>
+          <span>
+            Pre-targeted to this mission. You can change it below before
+            applying.
+          </span>
+        </div>
+      )}
       <select
         value={targetId ?? ""}
         onChange={(e) => setTargetId(e.target.value || null)}
         aria-label="Apply to mission"
-        style={selectStyle}
+        style={{
+          ...selectStyle,
+          ...(preTargeted ? { borderColor: "var(--primary)" } : null),
+        }}
       >
         {missions.length === 0 ? (
           <option value="">No active missions</option>

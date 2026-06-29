@@ -28,6 +28,8 @@ export function MissionDetailPanel({
   onSetNotes,
   onAbandon,
   onMarkComplete,
+  ocrEnabled,
+  onOcrCapture,
 }: {
   mission: Mission;
   reference: ReferenceData;
@@ -48,6 +50,12 @@ export function MissionDetailPanel({
   onAbandon: () => void;
   /** Force the whole mission to "complete" (manual escape hatch). */
   onMarkComplete: () => void;
+  /** EXPERIMENTAL OCR opt-in. Gates the per-mission "OCR Capture" button so it
+      matches the existing OCR entry points (shown only when OCR is enabled). */
+  ocrEnabled: boolean;
+  /** Open the OCR capture dialog PRE-TARGETED to THIS mission (manual capture →
+      review → one-click Apply to this mission). Never auto-applies. */
+  onOcrCapture: () => void;
 }): React.JSX.Element {
   const t = missionTotals(mission);
   const incomplete = isMissionIncomplete(mission);
@@ -575,6 +583,34 @@ export function MissionDetailPanel({
             gap: 10,
           }}
         >
+          {/* Per-mission OCR capture — the manual counterpart to auto-capture's
+              mission pre-targeting. Opens the SAME review dialog PRE-TARGETED to
+              THIS mission, so after capture + review the user Applies in one click
+              and it lands here (no "APPLY TO" guessing). Review-before-apply is
+              preserved (it never auto-applies). Gated on ocrEnabled to match the
+              existing OCR entry points. */}
+          {ocrEnabled && (
+            <button
+              className="sc-ghost-btn"
+              onClick={onOcrCapture}
+              title="Capture this contract from your mobiGlas screen via OCR, pre-targeted to this mission"
+              style={{
+                width: "100%",
+                padding: 11,
+                background: "rgba(52,224,224,0.06)",
+                border: "1px solid rgba(52,224,224,0.4)",
+                color: "var(--primary)",
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+                fontSize: 12,
+                letterSpacing: 1,
+                cursor: "pointer",
+              }}
+            >
+              📷 OCR CAPTURE CONTRACT
+            </button>
+          )}
+
           {/* Manual "Mark complete" escape hatch — for any non-complete mission.
               Reuses the existing updateMission({status:'complete'}) path; if any
               leg is still undelivered we confirm first so it isn't an accident. */}

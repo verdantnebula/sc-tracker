@@ -13,6 +13,7 @@ import {
   levenshtein,
   matchTitleToMissions,
   normalizeForMatch,
+  resolvePreselectTarget,
   similarity,
   weightedLevenshtein,
 } from "./ocrMatch";
@@ -363,5 +364,82 @@ describe("matchTitleToMissions", () => {
       score: 0,
       confident: false,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolvePreselectTarget — "APPLY TO" seed precedence (manual + auto)
+// ---------------------------------------------------------------------------
+
+describe("resolvePreselectTarget", () => {
+  const IDS = ["m1", "m2"];
+  const TITLES = [
+    "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+    "Senior | Medium Haul | from ARC-L1 Wide Forest Station",
+  ];
+
+  it("honors an explicit preselect that is a real candidate (the per-mission button)", () => {
+    // Explicit pre-target wins even when a title would match a DIFFERENT mission.
+    expect(
+      resolvePreselectTarget(
+        "m2",
+        "Senior Medium Haul from MIC-L2 Long Forest Station", // would match m1
+        IDS,
+        TITLES,
+      ),
+    ).toBe("m2");
+  });
+
+  it("ignores an explicit preselect that is NOT a candidate, falling through to title", () => {
+    // A stale/closed mission id must not seed an unselectable target; fall back
+    // to the confident title match instead.
+    expect(
+      resolvePreselectTarget(
+        "ghost",
+        "Senior Medium Haul from MIC-L2 Long Forest Station",
+        IDS,
+        TITLES,
+      ),
+    ).toBe("m1");
+  });
+
+  it("uses a CONFIDENT title match when there is no explicit preselect", () => {
+    expect(
+      resolvePreselectTarget(
+        null,
+        "Senior Medium Haul from ARC-L1 Wide Forest Station",
+        IDS,
+        TITLES,
+      ),
+    ).toBe("m2");
+  });
+
+  it("returns null when there is no preselect and no confident title match", () => {
+    expect(
+      resolvePreselectTarget(null, "Eliminate the bounty target", IDS, TITLES),
+    ).toBeNull();
+  });
+
+  it("returns null on an ambiguous title (identical candidates, no margin)", () => {
+    const dupeIds = ["a", "b"];
+    const dupeTitles = [
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+      "Senior | Medium Haul | from MIC-L2 Long Forest Station",
+    ];
+    expect(
+      resolvePreselectTarget(
+        null,
+        "Senior Medium Haul from MIC-L2 Long Forest Station",
+        dupeIds,
+        dupeTitles,
+      ),
+    ).toBeNull();
+  });
+
+  it("is defensive: no preselect + null title + empty candidates -> null", () => {
+    expect(resolvePreselectTarget(null, null, [], [])).toBeNull();
+    expect(
+      resolvePreselectTarget(undefined, undefined, IDS, TITLES),
+    ).toBeNull();
   });
 });
