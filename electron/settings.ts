@@ -97,6 +97,18 @@ export interface AppSettings {
    */
   autoOcrCapture: boolean;
   /**
+   * EXPERIMENTAL (Phase 3): the SETTLE DELAY, in milliseconds, the AUTO capture
+   * path waits AFTER the `missionAccepted` log event before running the OCR
+   * pipeline. The log line that triggers an auto-capture can be written before
+   * the mobiGlas contract screen has finished rendering/animating, so an
+   * immediate capture grabs a half-rendered frame -> partial/garbled OCR. This
+   * short delay lets the screen settle first. Applies ONLY to the auto path;
+   * manual capture (the dialog buttons) is user-timed and never delayed.
+   * Default 500ms. Clamped to [0, 3000]. Persisted so the choice survives a
+   * restart. 0 disables the wait (capture fires immediately, the old behavior).
+   */
+  autoOcrCaptureDelayMs: number;
+  /**
    * Whether the app checks for updates on launch (electron-updater). Default
    * true: on a packaged launch the app quietly checks GitHub Releases and, if a
    * newer version exists, downloads it in the BACKGROUND and shows a dismissible
@@ -125,6 +137,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ocrEnabled: false,
   ocrCaptureRegion: null,
   autoOcrCapture: false,
+  autoOcrCaptureDelayMs: 500,
   updateCheckEnabled: true,
 };
 
@@ -234,6 +247,28 @@ function clamp01(n: number): number {
   return n;
 }
 
+/** The maximum auto-OCR settle delay we allow (ms). 3s is plenty for the
+ *  contract screen to finish animating; longer would just feel broken. */
+export const AUTO_OCR_DELAY_MAX_MS = 3000;
+
+/**
+ * Coerce an arbitrary value to a valid auto-OCR settle delay in ms: a finite
+ * number rounded to an integer and clamped to [0, AUTO_OCR_DELAY_MAX_MS].
+ * Anything missing or non-numeric falls back to the default (500ms) so an older
+ * settings.json written before the key existed reads back as the sensible
+ * default rather than 0 (which would silently disable the settle wait). Exported
+ * for unit testing.
+ */
+export function normalizeAutoOcrDelayMs(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.autoOcrCaptureDelayMs;
+  }
+  const n = Math.round(value);
+  if (n < 0) return 0;
+  if (n > AUTO_OCR_DELAY_MAX_MS) return AUTO_OCR_DELAY_MAX_MS;
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit testing — no real fs unless you pass it one)
 // ---------------------------------------------------------------------------
@@ -273,6 +308,9 @@ export function mergeSettings(
   next.ocrEnabled = normalizeBool(next.ocrEnabled);
   next.ocrCaptureRegion = normalizeCaptureRegion(next.ocrCaptureRegion);
   next.autoOcrCapture = normalizeBool(next.autoOcrCapture);
+  next.autoOcrCaptureDelayMs = normalizeAutoOcrDelayMs(
+    next.autoOcrCaptureDelayMs,
+  );
   next.updateCheckEnabled = normalizeBoolDefaultTrue(next.updateCheckEnabled);
   if ("liveFolder" in patch) {
     const v = patch.liveFolder;
@@ -298,6 +336,11 @@ export function mergeSettings(
   }
   if ("autoOcrCapture" in patch) {
     next.autoOcrCapture = normalizeBool(patch.autoOcrCapture);
+  }
+  if ("autoOcrCaptureDelayMs" in patch) {
+    next.autoOcrCaptureDelayMs = normalizeAutoOcrDelayMs(
+      patch.autoOcrCaptureDelayMs,
+    );
   }
   if ("updateCheckEnabled" in patch) {
     next.updateCheckEnabled = normalizeBoolDefaultTrue(
@@ -329,6 +372,7 @@ export function normalizeSettings(parsed: unknown): AppSettings {
     ocrEnabled: normalizeBool(raw.ocrEnabled),
     ocrCaptureRegion: normalizeCaptureRegion(raw.ocrCaptureRegion),
     autoOcrCapture: normalizeBool(raw.autoOcrCapture),
+    autoOcrCaptureDelayMs: normalizeAutoOcrDelayMs(raw.autoOcrCaptureDelayMs),
     updateCheckEnabled: normalizeBoolDefaultTrue(raw.updateCheckEnabled),
   };
 }

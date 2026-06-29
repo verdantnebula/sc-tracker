@@ -67,6 +67,8 @@ export const IPC = {
   SETTINGS_SET_OCR_REGION: "settings:setOcrCaptureRegion",
   SETTINGS_GET_AUTO_OCR: "settings:getAutoOcrCapture",
   SETTINGS_SET_AUTO_OCR: "settings:setAutoOcrCapture",
+  SETTINGS_GET_AUTO_OCR_DELAY: "settings:getAutoOcrCaptureDelayMs",
+  SETTINGS_SET_AUTO_OCR_DELAY: "settings:setAutoOcrCaptureDelayMs",
   SETTINGS_GET_UPDATE_CHECK_ENABLED: "settings:getUpdateCheckEnabled",
   SETTINGS_SET_UPDATE_CHECK_ENABLED: "settings:setUpdateCheckEnabled",
 
@@ -208,6 +210,13 @@ export interface IpcRequestMap {
   [IPC.SETTINGS_SET_AUTO_OCR]: {
     args: [enabled: boolean];
     result: boolean;
+  };
+  /** The auto-OCR settle delay in ms applied before an auto-capture (default 500). */
+  [IPC.SETTINGS_GET_AUTO_OCR_DELAY]: { args: []; result: number };
+  /** Persist the auto-OCR settle delay (clamped to [0,3000]); returns the saved value. */
+  [IPC.SETTINGS_SET_AUTO_OCR_DELAY]: {
+    args: [delayMs: number];
+    result: number;
   };
   /** Whether the app checks for updates on launch (default true). */
   [IPC.SETTINGS_GET_UPDATE_CHECK_ENABLED]: { args: []; result: boolean };
@@ -385,6 +394,14 @@ export interface ApiBridge {
   getAutoOcrCapture(): Promise<boolean>;
   /** Persist the auto-OCR-capture flag; resolves to the saved value. */
   setAutoOcrCapture(enabled: boolean): Promise<boolean>;
+  /**
+   * Read the auto-OCR settle delay in ms (the wait after a cargo accept before
+   * the AUTO capture runs, so the contract screen can finish rendering). Default
+   * 500; clamped to [0, 3000].
+   */
+  getAutoOcrCaptureDelayMs(): Promise<number>;
+  /** Persist the auto-OCR settle delay (clamped to [0, 3000]); resolves to the saved value. */
+  setAutoOcrCaptureDelayMs(delayMs: number): Promise<number>;
 
   // --- auto-update (electron-updater) ---
   /** Read whether automatic update checks are enabled (default true). */

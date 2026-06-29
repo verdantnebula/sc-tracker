@@ -788,9 +788,8 @@ function registerIpc(): void {
 
   // --- Custom LIVE-folder settings ----------------------------------------
 
-  ipcMain.handle(
-    IPC.SETTINGS_GET_LOG_PATH,
-    (): LogPathInfo => buildLogPathInfo(),
+  ipcMain.handle(IPC.SETTINGS_GET_LOG_PATH, (): LogPathInfo =>
+    buildLogPathInfo(),
   );
 
   ipcMain.handle(
@@ -928,6 +927,23 @@ function registerIpc(): void {
     settings = saveSettings({ autoOcrCapture: enabled === true });
     return settings.autoOcrCapture;
   });
+
+  // Auto-OCR settle delay (ms): the AUTO capture path waits this long after a
+  // cargo accept before running OCR, so the mobiGlas contract screen can finish
+  // rendering (the trigger log line can land before the screen has painted).
+  // saveSettings clamps to [0, 3000] and merges so no unrelated key is dropped.
+  ipcMain.handle(
+    IPC.SETTINGS_GET_AUTO_OCR_DELAY,
+    (): number => settings.autoOcrCaptureDelayMs,
+  );
+
+  ipcMain.handle(
+    IPC.SETTINGS_SET_AUTO_OCR_DELAY,
+    (_e, delayMs: number): number => {
+      settings = saveSettings({ autoOcrCaptureDelayMs: delayMs });
+      return settings.autoOcrCaptureDelayMs;
+    },
+  );
 
   // --- Auto-update (electron-updater) — NON-FORCED -------------------------
   // Read/persist the update-check flag (default true) and install a downloaded

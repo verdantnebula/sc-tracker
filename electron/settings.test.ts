@@ -18,12 +18,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  AUTO_OCR_DELAY_MAX_MS,
   clampOverlayBounds,
   DEFAULT_SETTINGS,
   folderHasGameLog,
   gameLogPathForFolder,
   loadSettings,
   mergeSettings,
+  normalizeAutoOcrDelayMs,
   normalizeSettings,
   OVERLAY_DEFAULT_SIZE,
   OVERLAY_MIN_SIZE,
@@ -77,6 +79,7 @@ describe("loadSettings / saveSettings", () => {
       ocrEnabled: false,
       ocrCaptureRegion: null,
       autoOcrCapture: false,
+      autoOcrCaptureDelayMs: 500,
       updateCheckEnabled: true,
     });
   });
@@ -203,6 +206,7 @@ describe("mergeSettings", () => {
     ocrEnabled: false,
     ocrCaptureRegion: null,
     autoOcrCapture: false,
+    autoOcrCaptureDelayMs: 500,
     updateCheckEnabled: true,
   };
 
@@ -227,6 +231,7 @@ describe("mergeSettings", () => {
       ocrEnabled: false,
       ocrCaptureRegion: null,
       autoOcrCapture: false,
+      autoOcrCaptureDelayMs: 500,
       updateCheckEnabled: true,
     });
   });
@@ -255,6 +260,45 @@ describe("mergeSettings", () => {
     expect(
       normalizeSettings({ liveFolder: null, mode: "cargo" }).autoOcrCapture,
     ).toBe(false);
+  });
+
+  it("autoOcrCaptureDelayMs: defaults to 500, clamps to [0,3000], rounds, and falls back when absent/non-numeric (Phase 3)", () => {
+    // Default is the sensible settle delay, not 0.
+    expect(DEFAULT_SETTINGS.autoOcrCaptureDelayMs).toBe(500);
+
+    // A valid in-range value round-trips.
+    expect(
+      mergeSettings(base, { autoOcrCaptureDelayMs: 1000 })
+        .autoOcrCaptureDelayMs,
+    ).toBe(1000);
+
+    // Clamp: below 0 -> 0; above the max -> the max.
+    expect(normalizeAutoOcrDelayMs(-50)).toBe(0);
+    expect(normalizeAutoOcrDelayMs(99999)).toBe(AUTO_OCR_DELAY_MAX_MS);
+    expect(AUTO_OCR_DELAY_MAX_MS).toBe(3000);
+
+    // Fractional values round to an integer.
+    expect(normalizeAutoOcrDelayMs(749.6)).toBe(750);
+
+    // 0 is honored (disables the wait) — it is a valid in-range value.
+    expect(
+      mergeSettings(base, { autoOcrCaptureDelayMs: 0 }).autoOcrCaptureDelayMs,
+    ).toBe(0);
+
+    // Non-numeric / non-finite -> default 500 (never silently 0).
+    expect(
+      mergeSettings(base, {
+        autoOcrCaptureDelayMs: "fast",
+      } as unknown as Partial<AppSettings>).autoOcrCaptureDelayMs,
+    ).toBe(500);
+    expect(normalizeAutoOcrDelayMs(Number.NaN)).toBe(500);
+    expect(normalizeAutoOcrDelayMs(Infinity)).toBe(500);
+
+    // Absent in a legacy file -> defaults to 500 (existing users get the settle).
+    expect(
+      normalizeSettings({ liveFolder: null, mode: "cargo" })
+        .autoOcrCaptureDelayMs,
+    ).toBe(500);
   });
 
   it("updateCheckEnabled is opt-OUT: only an explicit false turns it off", () => {
@@ -472,6 +516,7 @@ describe("resolveGameLogPath", () => {
           ocrEnabled: false,
           ocrCaptureRegion: null,
           autoOcrCapture: false,
+          autoOcrCaptureDelayMs: 500,
           updateCheckEnabled: true,
         },
         exists,
@@ -491,6 +536,7 @@ describe("resolveGameLogPath", () => {
           ocrEnabled: false,
           ocrCaptureRegion: null,
           autoOcrCapture: false,
+          autoOcrCaptureDelayMs: 500,
           updateCheckEnabled: true,
         },
         () => false,
@@ -512,6 +558,7 @@ describe("resolveGameLogPath", () => {
           ocrEnabled: false,
           ocrCaptureRegion: null,
           autoOcrCapture: false,
+          autoOcrCaptureDelayMs: 500,
           updateCheckEnabled: true,
         },
         () => true,
@@ -532,6 +579,7 @@ describe("resolveGameLogPath", () => {
           ocrEnabled: false,
           ocrCaptureRegion: null,
           autoOcrCapture: false,
+          autoOcrCaptureDelayMs: 500,
           updateCheckEnabled: true,
         },
         () => true,

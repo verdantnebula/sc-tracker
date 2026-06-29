@@ -412,6 +412,9 @@ function createMockApi(): ApiBridge {
   // standalone dev (no OCR_AUTO_REQUEST is ever emitted here), so this just lets
   // the gear checkbox round-trip its value.
   let autoOcrCapture = false;
+  // In-memory auto-OCR settle delay (ms). Mirrors the real default + clamp so
+  // the gear dropdown round-trips its value in standalone dev.
+  let autoOcrCaptureDelayMs = 500;
   // In-memory calibrated OCR capture region (Phase 2). null = uncalibrated; a
   // saved region is clamped to [0,1] proportions like the real normalizer.
   let ocrCaptureRegion: OcrCaptureRegion | null = null;
@@ -685,6 +688,16 @@ function createMockApi(): ApiBridge {
     setAutoOcrCapture: async (enabled: boolean): Promise<boolean> => {
       autoOcrCapture = enabled === true;
       return autoOcrCapture;
+    },
+    getAutoOcrCaptureDelayMs: async (): Promise<number> =>
+      autoOcrCaptureDelayMs,
+    setAutoOcrCaptureDelayMs: async (delayMs: number): Promise<number> => {
+      // Mirror the real normalizer: finite number, integer, clamped to [0,3000].
+      autoOcrCaptureDelayMs =
+        typeof delayMs === "number" && Number.isFinite(delayMs)
+          ? Math.min(3000, Math.max(0, Math.round(delayMs)))
+          : 500;
+      return autoOcrCaptureDelayMs;
     },
     captureScreenForOcr: async () => ({
       outcome: "error" as const,

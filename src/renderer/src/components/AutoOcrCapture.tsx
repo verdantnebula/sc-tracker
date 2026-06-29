@@ -55,6 +55,7 @@ export function AutoOcrCapture({
   missions,
   reference,
   reviewOpen,
+  captureDelayMs,
   onAutoReview,
 }: {
   /** Whether Auto OCR Capture is enabled (host is inert when false). */
@@ -65,6 +66,13 @@ export function AutoOcrCapture({
   reference: ReferenceData;
   /** True when a review dialog is already open — defer surfacing if so. */
   reviewOpen: boolean;
+  /**
+   * SETTLE DELAY (ms) to wait AFTER an OCR_AUTO_REQUEST before running the OCR
+   * pipeline, so the mobiGlas contract screen can finish rendering (the trigger
+   * log line can land before the screen has painted). Applies to the AUTO path
+   * only. 0 -> capture immediately. Clamped upstream in settings to [0, 3000].
+   */
+  captureDelayMs: number;
   /** Open the review dialog pre-filled with this auto-capture OCR result. */
   onAutoReview: (prefill: OcrPrefill) => void;
 }): React.JSX.Element | null {
@@ -84,8 +92,18 @@ export function AutoOcrCapture({
   referenceRef.current = reference;
   const reviewOpenRef = useRef<boolean>(reviewOpen);
   reviewOpenRef.current = reviewOpen;
+  const captureDelayMsRef = useRef<number>(captureDelayMs);
+  captureDelayMsRef.current = captureDelayMs;
   const onAutoReviewRef = useRef(onAutoReview);
   onAutoReviewRef.current = onAutoReview;
+
+  // Pending SETTLE timers keyed by missionId. A timer fires the actual capture
+  // after captureDelayMs. Kept so we can (a) clear ALL on unmount/disable — no
+  // capture-after-unmount; and (b) SUPERSEDE a same-mission re-emit (the accept
+  // log line can repeat) by clearing+rescheduling, never double-capturing.
+  const settleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   // True when a capture is ready to review but a dialog is already open, so we
   // show a small "waiting" badge until the open dialog closes.
@@ -154,13 +172,18 @@ export function AutoOcrCapture({
     }
   };
 
-  // Subscribe to the auto-capture signal once. Each request runs the pipeline and
-  // enqueues a pending entry (or shows the calibrate notice). Fully guarded.
+  // Subscribe to the auto-capture signal once. Each request waits the SETTLE
+  // DELAY (so the contract screen finishes rendering) and then runs the pipeline
+  // and enqueues a pending entry. Fully guarded.
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    const timers = settleTimersRef.current;
 
-    const handle = async (request: {
+    // The actual capture, run AFTER the settle delay has elapsed (or immediately
+    // when the delay is 0). Guards on `cancelled` after every await so a capture
+    // can never land after unmount/disable.
+    const runCapture = async (request: {
       missionId: string;
       title: string;
       ts: number;
@@ -218,12 +241,36 @@ export function AutoOcrCapture({
       }
     };
 
-    const unsub = window.api.onOcrAutoRequest(
-      (request) => void handle(request),
-    );
+    // On a request, SCHEDULE the capture after the settle delay. If a timer for
+    // the same missionId is already pending (the accept log line re-emitted), we
+    // SUPERSEDE it — clear and reschedule — so the clock restarts and we never
+    // run two captures for one accept. A delay of 0 captures on the next tick.
+    const handle = (request: {
+      missionId: string;
+      title: string;
+      ts: number;
+    }): void => {
+      const existing = timers.get(request.missionId);
+      if (existing !== undefined) clearTimeout(existing);
+      const delay = captureDelayMsRef.current;
+      const t = setTimeout(
+        () => {
+          timers.delete(request.missionId);
+          if (cancelled) return;
+          void runCapture(request);
+        },
+        delay > 0 ? delay : 0,
+      );
+      timers.set(request.missionId, t);
+    };
+
+    const unsub = window.api.onOcrAutoRequest((request) => handle(request));
     return () => {
       cancelled = true;
       unsub();
+      // Clear any settle timers still pending so no capture fires post-unmount.
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
@@ -247,11 +294,17 @@ export function AutoOcrCapture({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
-  // When disabled, drop any queued work + transient UI so nothing lingers.
+  // When disabled, drop any queued work + transient UI so nothing lingers. The
+  // subscription effect's cleanup (dep [enabled]) already clears settle timers
+  // when enabled flips false; we clear here too for defense-in-depth so a
+  // pending settle timer can never fire a capture after the feature is off.
   useEffect(() => {
     if (enabled) return;
     pendingRef.current = [];
     resultsRef.current.clear();
+    const timers = settleTimersRef.current;
+    for (const t of timers.values()) clearTimeout(t);
+    timers.clear();
     setDeferred(false);
   }, [enabled]);
 

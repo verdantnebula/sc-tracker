@@ -237,6 +237,10 @@ function CargoApp({
   // only when ocrEnabled. Read on mount; toggled from the gear panel. Drives the
   // AutoOcrCapture host (subscribes to OCR_AUTO_REQUEST from main).
   const [autoOcrCapture, setAutoOcrCapture] = useState(false);
+  // Settle delay (ms) the AUTO capture waits after a cargo accept before running
+  // OCR, so the contract screen finishes rendering. Read on mount; changed from
+  // the gear panel. Default 500 mirrors the persisted default. Drives the host.
+  const [autoOcrCaptureDelayMs, setAutoOcrCaptureDelayMs] = useState(500);
 
   // --- local UI state ---
   const [tab, setTab] = useState<TabKey>("dropoff");
@@ -278,6 +282,7 @@ function CargoApp({
     void api.getOverlayState().then((s) => setOverlayEnabled(s.enabled));
     void api.getOcrEnabled().then(setOcrEnabled);
     void api.getAutoOcrCapture().then(setAutoOcrCapture);
+    void api.getAutoOcrCaptureDelayMs().then(setAutoOcrCaptureDelayMs);
 
     const unsubs = [
       api.onOverlayStateChanged((s) => setOverlayEnabled(s.enabled)),
@@ -530,6 +535,13 @@ function CargoApp({
     void window.api.setAutoOcrCapture(next).then(setAutoOcrCapture);
   };
 
+  // Change the auto-OCR settle delay (ms). Persists via settings; main clamps to
+  // [0, 3000] and returns the saved value, which we adopt (optimistic + confirmed).
+  const changeAutoOcrDelay = (ms: number): void => {
+    setAutoOcrCaptureDelayMs(ms); // optimistic
+    void window.api.setAutoOcrCaptureDelayMs(ms).then(setAutoOcrCaptureDelayMs);
+  };
+
   const clearActive = (): void => {
     const n = activeMissions.length;
     const ok = window.confirm(
@@ -596,6 +608,8 @@ function CargoApp({
         onOcrCapture={() => setOcrCaptureFor({ missionId: null })}
         autoOcrCapture={autoOcrCapture}
         onToggleAutoOcr={toggleAutoOcr}
+        autoOcrCaptureDelayMs={autoOcrCaptureDelayMs}
+        onChangeAutoOcrDelay={changeAutoOcrDelay}
       />
 
       {/* Log-not-found warning strip — full width, directly under the TopBar and
@@ -835,6 +849,7 @@ function CargoApp({
           missions={activeMissions}
           reference={reference}
           reviewOpen={Boolean(ocrCaptureFor) || autoOcrReview !== null}
+          captureDelayMs={autoOcrCaptureDelayMs}
           onAutoReview={setAutoOcrReview}
         />
 

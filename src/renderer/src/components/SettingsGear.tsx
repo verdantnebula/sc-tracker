@@ -21,7 +21,44 @@ type OcrControls = {
   autoOcrCapture: boolean;
   /** Toggle Auto OCR Capture (gated on ocrEnabled — disabled when OCR is off). */
   onToggleAutoOcr: () => void;
+  /** Auto-OCR settle delay (ms) before an auto-capture runs (default 500). */
+  autoOcrCaptureDelayMs: number;
+  /** Change the auto-OCR settle delay (persists; clamped to [0,3000]). */
+  onChangeAutoOcrDelay: (ms: number) => void;
 };
+
+/**
+ * The settle-delay presets offered in the gear dropdown, as {ms, label} pairs.
+ * A small fixed set is friendlier than a raw millisecond input. Exported + pure
+ * so the value<->label mapping is unit-tested without rendering.
+ */
+export const AUTO_OCR_DELAY_OPTIONS: ReadonlyArray<{
+  ms: number;
+  label: string;
+}> = [
+  { ms: 0, label: "None (capture immediately)" },
+  { ms: 500, label: "0.5s (default)" },
+  { ms: 1000, label: "1s" },
+  { ms: 1500, label: "1.5s" },
+];
+
+/**
+ * Snap an arbitrary saved delay (ms) to the closest preset's ms value, so the
+ * dropdown always shows a valid option even if the persisted value was set out
+ * of band (e.g. a hand-edited settings.json). Pure + exported for testing.
+ */
+export function snapAutoOcrDelayToOption(ms: number): number {
+  let best = AUTO_OCR_DELAY_OPTIONS[0];
+  let bestDist = Math.abs(ms - best.ms);
+  for (const opt of AUTO_OCR_DELAY_OPTIONS) {
+    const dist = Math.abs(ms - opt.ms);
+    if (dist < bestDist) {
+      best = opt;
+      bestDist = dist;
+    }
+  }
+  return best.ms;
+}
 
 export function SettingsGear({
   logPathInfo,
@@ -451,6 +488,74 @@ function LogFolderPanel({
               cue). Works full-screen out of the box; calibrating a capture
               region in Contract Capture is optional and improves accuracy.
             </p>
+
+            {/* Settle delay (Phase 3) — gated like the auto-capture toggle:
+                disabled + greyed unless BOTH OCR and Auto-capture are on, since
+                the delay only affects the auto path. Lets the contract screen
+                finish rendering before the auto-capture grabs a frame. */}
+            {(() => {
+              const delayActive = ocr.ocrEnabled && ocr.autoOcrCapture;
+              const selected = snapAutoOcrDelayToOption(
+                ocr.autoOcrCaptureDelayMs,
+              );
+              return (
+                <label
+                  title={
+                    delayActive
+                      ? "How long to wait after accepting a haul before auto-capturing, so the contract screen can finish rendering"
+                      : "Enable Auto-capture first"
+                  }
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "8px 10px",
+                    marginTop: 10,
+                    border: "1px solid var(--border-strong)",
+                    cursor: delayActive ? "pointer" : "not-allowed",
+                    opacity: delayActive ? 1 : 0.5,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: delayActive
+                        ? "var(--text-bright)"
+                        : "var(--muted)",
+                    }}
+                  >
+                    Settle delay before capture
+                  </span>
+                  <select
+                    value={selected}
+                    disabled={!delayActive}
+                    onChange={(e) =>
+                      ocr.onChangeAutoOcrDelay(Number(e.target.value))
+                    }
+                    aria-label="Auto-capture settle delay"
+                    style={{
+                      flex: "none",
+                      fontFamily: "var(--font-display)",
+                      fontSize: 12,
+                      padding: "4px 6px",
+                      background: "rgba(9,16,21,0.98)",
+                      color: "var(--text-bright)",
+                      border: "1px solid var(--border-strong)",
+                      cursor: delayActive ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    {AUTO_OCR_DELAY_OPTIONS.map((opt) => (
+                      <option key={opt.ms} value={opt.ms}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            })()}
           </>
         )}
 

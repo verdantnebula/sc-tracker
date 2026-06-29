@@ -114,6 +114,13 @@ const api: ApiBridge = {
     ipcRenderer.invoke(IPC.SETTINGS_GET_AUTO_OCR) as Promise<boolean>,
   setAutoOcrCapture: (enabled: boolean) =>
     ipcRenderer.invoke(IPC.SETTINGS_SET_AUTO_OCR, enabled) as Promise<boolean>,
+  getAutoOcrCaptureDelayMs: () =>
+    ipcRenderer.invoke(IPC.SETTINGS_GET_AUTO_OCR_DELAY) as Promise<number>,
+  setAutoOcrCaptureDelayMs: (delayMs: number) =>
+    ipcRenderer.invoke(
+      IPC.SETTINGS_SET_AUTO_OCR_DELAY,
+      delayMs,
+    ) as Promise<number>,
   captureScreenForOcr: () =>
     ipcRenderer.invoke(IPC.OCR_CAPTURE_SCREEN) as Promise<OcrCaptureResult>,
   recognizeOcr: (

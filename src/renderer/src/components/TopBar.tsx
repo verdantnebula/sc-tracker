@@ -26,6 +26,8 @@ export function TopBar({
   onOcrCapture,
   autoOcrCapture,
   onToggleAutoOcr,
+  autoOcrCaptureDelayMs,
+  onChangeAutoOcrDelay,
 }: {
   logStatus: LogStatus | null;
   logPathInfo: LogPathInfo | null;
@@ -52,6 +54,10 @@ export function TopBar({
   autoOcrCapture: boolean;
   /** Toggle Auto OCR Capture on/off (persists; gated on ocrEnabled). */
   onToggleAutoOcr: () => void;
+  /** Auto-OCR settle delay (ms) before an auto-capture runs (default 500). */
+  autoOcrCaptureDelayMs: number;
+  /** Change the auto-OCR settle delay (persists; clamped to [0,3000]). */
+  onChangeAutoOcrDelay: (ms: number) => void;
 }): React.JSX.Element {
   return (
     <header
@@ -118,7 +124,14 @@ export function TopBar({
         onResync={onResync}
         onReset={onReset}
         onCollectLogs={onCollectLogs}
-        ocr={{ ocrEnabled, onToggleOcr, autoOcrCapture, onToggleAutoOcr }}
+        ocr={{
+          ocrEnabled,
+          onToggleOcr,
+          autoOcrCapture,
+          onToggleAutoOcr,
+          autoOcrCaptureDelayMs,
+          onChangeAutoOcrDelay,
+        }}
       />
 
       {/* EXPERIMENTAL OCR capture entry — only present when the feature is
